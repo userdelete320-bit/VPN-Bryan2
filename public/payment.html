@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>VPN Cuba — Pago</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Azeret+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════
+   SIGNAL PAYMENT — VPN Cuba
+   Tema adaptativo por plan
+═══════════════════════════════════════════ */
+
+:root {
+  --black:  #000000;
+  --deep:   #030305;
+  --panel:  #080810;
+  --ink:    #0d0d18;
+  --wire:   rgba(255,255,255,.055);
+  --wire-hi:rgba(255,255,255,.12);
+  --txt:    #eeeef5;
+  --txt-2:  #7a7a96;
+  --txt-3:  #3a3a52;
+
+  --f-head: 'Bebas Neue', sans-serif;
+  --f-body: 'Cabinet Grotesk', sans-serif;
+  --f-mono: 'Azeret Mono', monospace;
+
+  /* Default = basic (cyan) */
+  --sig:      #00d4ff;
+  --glow:     rgba(0,212,255,.18);
+  --sig-soft: rgba(0,212,255,.08);
+  --sig-line: rgba(0,212,255,.22);
+  --btn-bg:   linear-gradient(160deg, #05122a 0%, #0a2850 50%, #1a6bcc 100%);
+  --btn-txt:  #e8f4ff;
+}
+
+/* Per-plan overrides applied via JS on <html data-plan="..."> */
+html[data-plan="trial"] {
+  --sig:      #f5c542;
+  --glow:     rgba(245,197,66,.18);
+  --sig-soft: rgba(245,197,66,.08);
+  --sig-line: rgba(245,197,66,.22);
+  --btn-bg:   linear-gradient(160deg, #2a1f10 0%, #4a3318 50%, #c9a96e 100%);
+  --btn-txt:  #fff8ee;
+}
+html[data-plan="basico"] {
+  --sig:      #00d4ff;
+  --glow:     rgba(0,212,255,.18);
+  --sig-soft: rgba(0,212,255,.08);
+  --sig-line: rgba(0,212,255,.22);
+  --btn-bg:   linear-gradient(160deg, #05122a 0%, #0a2850 50%, #1a6bcc 100%);
+  --btn-txt:  #e8f4ff;
+}
+html[data-plan="avanzado"] {
+  --sig:      #c8e8ff;
+  --glow:     rgba(200,232,255,.14);
+  --sig-soft: rgba(200,232,255,.07);
+  --sig-line: rgba(200,232,255,.20);
+  --btn-bg:   linear-gradient(160deg, #020d14 0%, #072030 50%, #0a4a70 100%);
+  --btn-txt:  #e2f5ff;
+}
+html[data-plan="cuba_vip"] {
+  --sig:      #ffb300;
+  --glow:     rgba(255,179,0,.22);
+  --sig-soft: rgba(255,179,0,.08);
+  --sig-line: rgba(255,179,0,.26);
+  --btn-bg:   linear-gradient(160deg, #1c1200 0%, #4b2f00 50%, #ff9f1a 100%);
+  --btn-txt:  #fff7e6;
+}
+html[data-plan="premium"] {
+  --sig:      #ff4d2e;
+  --glow:     rgba(255,77,46,.22);
+  --sig-soft: rgba(255,77,46,.08);
+  --sig-line: rgba(255,77,46,.24);
+  --btn-bg:   linear-gradient(160deg, #1a0800 0%, #3a1200 50%, #c03200 100%);
+  --btn-txt:  #fff4ee;
+}
+html[data-plan="anual"] {
+  --sig:      #00ff88;
+  --glow:     rgba(0,255,136,.18);
+  --sig-soft: rgba(0,255,136,.07);
+  --sig-line: rgba(0,255,136,.20);
+  --btn-bg:   linear-gradient(160deg, #011208 0%, #032a10 50%, #0a6622 100%);
+  --btn-txt:  #edfff2;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--black);
+  color: var(--txt);
+  font-family: var(--f-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Scanlines */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.07) 2px, rgba(0,0,0,.07) 4px);
+  opacity: .3;
+}
+
+/* Ambient glow behind content */
+body::after {
+  content: '';
+  position: fixed;
+  top: -30vh; left: -20vw;
+  width: 80vw; height: 80vh;
+  background: radial-gradient(circle, var(--glow), transparent 70%);
+  opacity: .4;
+  pointer-events: none;
+  z-index: 0;
+  transition: background 1s ease;
+}
+
+.wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+  position: relative;
+  z-index: 2;
+}
+
+/* ── TICKER ─────────────────────────────── */
+.ticker-bar {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  background: var(--deep);
+  border-bottom: 1px solid var(--wire-hi);
+  overflow: hidden;
+  height: 30px;
+  display: flex;
+  align-items: center;
+}
+.ticker-inner {
+  display: flex;
+  white-space: nowrap;
+  animation: ticker-scroll 24s linear infinite;
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--txt-2);
+}
+.ticker-inner span { padding: 0 2rem; }
+.ticker-inner .hi { color: var(--sig); }
+.ticker-fade { position: absolute; right: 0; top: 0; bottom: 0; width: 50px; background: linear-gradient(270deg, var(--deep) 40%, transparent); z-index: 2; }
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ── HEADER ─────────────────────────────── */
+.hero {
+  text-align: center;
+  padding: 28px 10px 20px;
+}
+
+.plan-freq {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .8rem;
+  border: 1px solid var(--sig-line);
+  background: var(--sig-soft);
+  font-family: var(--f-mono);
+  font-size: .62rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--sig);
+  margin-bottom: 16px;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+.plan-freq .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--sig);
+  box-shadow: 0 0 6px var(--sig);
+  animation: dot-blink 1.8s ease-in-out infinite;
+}
+
+@keyframes dot-blink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .2; }
+}
+
+.hero-title {
+  font-family: var(--f-head);
+  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  letter-spacing: .08em;
+  line-height: .9;
+  color: var(--txt);
+  margin-bottom: 6px;
+}
+
+.hero-plan {
+  font-family: var(--f-head);
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: .14em;
+  color: var(--sig);
+  text-shadow: 0 0 20px var(--glow);
+  animation: plan-pulse 3s ease-in-out infinite;
+}
+
+@keyframes plan-pulse {
+  0%,100% { text-shadow: 0 0 20px var(--glow); }
+  50%      { text-shadow: 0 0 40px var(--glow), 0 0 60px var(--glow); }
+}
+
+.h-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--sig-line), transparent);
+  margin: 20px 0;
+  position: relative;
+}
+.h-line::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: -2px;
+  transform: translateX(-50%);
+  width: 50px; height: 5px;
+  background: linear-gradient(90deg, transparent, var(--sig), transparent);
+  filter: blur(3px);
+}
+
+/* ── CARDS ──────────────────────────────── */
+.card {
+  background: var(--deep);
+  border: 1px solid var(--sig-line);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+  position: relative;
+  transition: border-color .3s, box-shadow .3s;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--sig), transparent);
+  opacity: .4;
+}
+
+.card:hover {
+  border-color: var(--sig);
+  box-shadow: 0 0 20px var(--glow);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--wire);
+}
+
+.card-head i {
+  color: var(--sig);
+  font-size: .9rem;
+  opacity: .8;
+}
+
+.card-title {
+  font-family: var(--f-head);
+  font-size: 1.1rem;
+  letter-spacing: .1em;
+  color: var(--txt);
+}
+
+.card-freq {
+  font-family: var(--f-mono);
+  font-size: .58rem;
+  color: var(--sig);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  margin-left: auto;
+  opacity: .7;
+}
+
+/* ── SUMMARY ────────────────────────────── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.summary-item {
+  background: rgba(255,255,255,.02);
+  border: 1px solid var(--wire);
+  border-left: 2px solid var(--sig);
+  padding: 10px 12px;
+  transition: background .2s;
+}
+
+.summary-item:hover { background: var(--sig-soft); }
+
+.s-label {
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--txt-3);
+  margin-bottom: 4px;
+}
+
+.s-value {
+  font-family: var(--f-body);
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--txt);
+}
+
+.s-value.price {
+  font-family: var(--f-head);
+  font-size: 1.4rem;
+  letter-spacing: .04em;
+  color: var(--sig);
+  text-shadow: 0 0 12px var(--glow);
+}
+
+/* ── COUPON ─────────────────────────────── */
+.coupon-row {
+  display: flex;
+  gap: 10px;
+}
+
+.coupon-input {
+  flex: 1;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--wire-hi);
+  color: var(--txt);
+  font-family: var(--f-mono);
+  font-size: .8rem;
+  padding: .75rem 1rem;
+  letter-spacing: .06em;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.coupon-input:focus {
+  border-color: var(--sig);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+.coupon-input::placeholder { color: var(--txt-3); }
+
+.coupon-btn {
+  background: var(--sig-soft);
+  border: 1px solid var(--sig);
+  color: var(--sig);
+  font-family: var(--f-mono);
+  font-size: .7rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 0 1.2rem;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color .25s;
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+}
+
+.coupon-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--sig);
+  transform: translateX(-100%);
+  transition: transform .3s cubic-bezier(.22,.8,.36,1);
+  z-index: 0;
+}
+
+.coupon-btn:hover::before { transform: translateX(0); }
+.coupon-btn:hover { color: var(--black); }
+.coupon-btn span, .coupon-btn i { position: relative; z-index: 1; }
+.coupon-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.coupon-msg {
+  font-family: var(--f-mono);
+  font-size: .7rem;
+  margin-top: 8px;
+  letter-spacing: .06em;
+}
+.coupon-msg.ok  { color: #00ff88; }
+.coupon-msg.err { color: #ff4d4d; }
+
+.discount-box {
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0,0,0,.4);
+  border-left: 2px solid var(--sig);
+}
+
+.discount-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--f-mono);
+  font-size: .72rem;
+  padding: 4px 0;
+  color: var(--txt-2);
+}
+
+.discount-row .val { color: var(--sig); font-weight: 500; }
+.discount-row .val.new-price { color: var(--txt); font-size: .9rem; }
+.discount-row .val.old-price { text-decoration: line-through; opacity: .5; }
+
+.remove-coupon {
+  background: none;
+  border: none;
+  color: #ff4d4d;
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  cursor: pointer;
+  margin-top: 6px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .7;
+  transition: opacity .2s;
+}
+.remove-coupon:hover { opacity: 1; }
+
+/* ── REFERRAL DISCOUNT BANNER ───────────── */
+.referral-banner {
+  display: none;
+  background: var(--sig-soft);
+  border: 1px solid var(--sig-line);
+  border-left: 3px solid var(--sig);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-family: var(--f-mono);
+  font-size: .72rem;
+  color: var(--sig);
+  letter-spacing: .06em;
+}
+
+.referral-banner i { margin-right: 6px; }
+
+/* ── PAYMENT METHOD ─────────────────────── */
+.method-select {
+  width: 100%;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--wire-hi);
+  color: var(--txt);
+  font-family: var(--f-mono);
+  font-size: .8rem;
+  padding: .75rem 1rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7a96' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+.method-select:focus { border-color: var(--sig); }
+.method-select option { background: var(--ink); }
+
+.method-desc {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-3);
+  margin-top: 8px;
+  letter-spacing: .05em;
+}
+.method-desc i { color: var(--sig); margin-right: 4px; }
+
+/* Method info panels */
+.method-panel { display: none; margin-top: 14px; }
+.method-panel.active { display: block; }
+
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--wire);
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.info-row:last-child { border-bottom: none; }
+
+.info-label {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-2);
+  letter-spacing: .06em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.info-label i { color: var(--sig); width: 14px; text-align: center; }
+
+.info-value {
+  font-family: var(--f-mono);
+  font-size: .78rem;
+  color: var(--txt);
+  font-weight: 500;
+  word-break: break-all;
+  max-width: 220px;
+}
+
+.copy-btn {
+  background: var(--sig-soft);
+  border: 1px solid var(--sig-line);
+  color: var(--sig);
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.copy-btn:hover { background: var(--sig); color: var(--black); }
+
+.usdt-amount {
+  text-align: center;
+  padding: 14px;
+  border: 1px solid var(--sig-line);
+  background: rgba(0,0,0,.4);
+  margin: 10px 0;
+}
+
+.usdt-big {
+  font-family: var(--f-head);
+  font-size: 2.4rem;
+  letter-spacing: .06em;
+  color: var(--sig);
+  text-shadow: 0 0 20px var(--glow);
+}
+
+.usdt-sub {
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-2);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.mobile-price-box {
+  text-align: center;
+  padding: 12px;
+  background: rgba(37,211,102,.06);
+  border: 1px solid rgba(37,211,102,.2);
+  margin: 10px 0;
+}
+
+.mobile-big {
+  font-family: var(--f-head);
+  font-size: 2rem;
+  letter-spacing: .05em;
+  color: #25D366;
+}
+
+.note-box {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-2);
+  padding: 8px 12px;
+  background: rgba(255,255,255,.02);
+  border-left: 2px solid var(--sig);
+  margin-top: 10px;
+  letter-spacing: .04em;
+}
+.note-box i { color: var(--sig); margin-right: 5px; }
+
+/* ── UPLOAD ─────────────────────────────── */
+.upload-area {
+  border: 1px dashed var(--sig-line);
+  background: rgba(0,0,0,.3);
+  padding: 30px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .25s, background .25s;
+}
+
+.upload-area:hover, .upload-area.drag {
+  border-color: var(--sig);
+  background: var(--sig-soft);
+  box-shadow: 0 0 20px var(--glow);
+}
+
+.upload-area i {
+  font-size: 2.2rem;
+  color: var(--sig);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.upload-area .u-title {
+  font-family: var(--f-body);
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--txt);
+  margin-bottom: 4px;
+}
+
+.upload-area .u-sub {
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-3);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.preview-box {
+  display: none;
+  margin-top: 12px;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-2);
+}
+
+.preview-img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border: 1px solid var(--sig-line);
+  display: block;
+}
+
+.remove-img {
+  background: rgba(255,77,77,.15);
+  border: 1px solid rgba(255,77,77,.4);
+  color: #f87171;
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.remove-img:hover { background: rgba(255,77,77,.3); }
+
+.warn-box {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: #fbbf24;
+  padding: 8px 12px;
+  background: rgba(251,191,36,.07);
+  border-left: 2px solid #fbbf24;
+  margin-top: 10px;
+  letter-spacing: .04em;
+}
+.warn-box i { margin-right: 5px; }
+
+/* ── PROGRESS ───────────────────────────── */
+.progress-bar-wrap {
+  height: 2px;
+  background: var(--wire);
+  margin: 16px 0;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--sig), var(--sig));
+  box-shadow: 0 0 8px var(--sig);
+  transition: width .5s ease;
+  width: 33%;
+}
+
+.steps-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.step-lbl {
+  font-family: var(--f-mono);
+  font-size: .58rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--txt-3);
+  transition: color .3s;
+}
+
+.step-lbl.active { color: var(--sig); }
+
+/* ── SUBMIT ─────────────────────────────── */
+.submit-btn {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--sig);
+  background: transparent;
+  color: var(--sig);
+  font-family: var(--f-mono);
+  font-size: .8rem;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color .28s;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+}
+
+.submit-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--sig);
+  transform: translateX(-100%);
+  transition: transform .38s cubic-bezier(.22,.8,.36,1);
+  z-index: 0;
+}
+
+.submit-btn:hover::before { transform: translateX(0); }
+.submit-btn:hover { color: var(--black); }
+.submit-btn:disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+.submit-btn span, .submit-btn i { position: relative; z-index: 1; }
+
+.processing-note {
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-3);
+  text-align: center;
+  margin-top: 10px;
+  letter-spacing: .06em;
+}
+.processing-note i { color: var(--sig); margin-right: 4px; }
+
+/* ── NOTIFICATION ───────────────────────── */
+#notification {
+  position: fixed;
+  top: 20px; right: 20px;
+  background: var(--ink);
+  border: 1px solid var(--wire-hi);
+  border-left: 3px solid var(--sig);
+  padding: .75rem 1rem;
+  font-family: var(--f-mono);
+  font-size: .74rem;
+  letter-spacing: .04em;
+  color: var(--txt);
+  z-index: 3000;
+  transform: translateX(160%);
+  transition: transform .28s cubic-bezier(.22,.8,.36,1);
+  max-width: min(90vw, 320px);
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+}
+
+/* ── FOOTER ─────────────────────────────── */
+.footer {
+  text-align: center;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--wire);
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-3);
+  letter-spacing: .06em;
+}
+
+/* ── ANIMATE IN ─────────────────────────── */
+.card {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: card-in .45s cubic-bezier(.22,.8,.36,1) forwards;
+}
+.card:nth-child(1) { animation-delay: .05s; }
+.card:nth-child(2) { animation-delay: .12s; }
+.card:nth-child(3) { animation-delay: .19s; }
+.card:nth-child(4) { animation-delay: .26s; }
+.card:nth-child(5) { animation-delay: .33s; }
+.card:nth-child(6) { animation-delay: .40s; }
+
+@keyframes card-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .info-row { flex-direction: column; align-items: flex-start; }
+  .copy-btn { width: 100%; text-align: center; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TICKER -->
+<div class="ticker-bar">
+  <div class="ticker-inner">
+    <span>VPN CUBA · Portal de Pago Seguro</span>
+    <span class="hi manual-highlight">Revisión manual · 1-12 horas</span>
+    <span>Pago en CUP · Saldo Móvil · USDT</span>
+    <span class="hi">Recibirás confirmación por Telegram</span>
+    <span>WireGuard Protocol · Cifrado avanzado</span>
+    <span class="hi">Soporte directo tras confirmación</span>
+    <!-- duplicate -->
+    <span>VPN CUBA · Portal de Pago Seguro</span>
+    <span class="hi manual-highlight">Revisión manual · 1-12 horas</span>
+    <span>Pago en CUP · Saldo Móvil · USDT</span>
+    <span class="hi">Recibirás confirmación por Telegram</span>
+    <span>WireGuard Protocol · Cifrado avanzado</span>
+    <span class="hi">Soporte directo tras confirmación</span>
+  </div>
+  <div class="ticker-fade"></div>
+</div>
+
+<div id="notification"></div>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="plan-freq">
+      <span class="dot"></span>
+      <span id="freqLabel">FREQ·00 · PROCESANDO</span>
+    </div>
+    <div class="hero-title">VPN CUBA</div>
+    <div class="hero-plan" id="planTitle">PLAN</div>
+  </header>
+
+  <!-- referral discount banner -->
+  <div class="referral-banner" id="referralBanner">
+    <i class="fas fa-users"></i>
+    Tienes un <strong id="refDiscountPct">0%</strong> de descuento por referidos activo — se aplicará automáticamente al confirmar tu pago.
+  </div>
+
+  <!-- Progress -->
+  <div class="steps-row">
+    <span class="step-lbl active" id="lbl1">// Información</span>
+    <span class="step-lbl" id="lbl2">// Pago</span>
+    <span class="step-lbl" id="lbl3">// Confirmado</span>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-receipt"></i>
+      <span class="card-title">RESUMEN</span>
+      <span class="card-freq" id="cardFreq">FREQ·--</span>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="s-label">Plan</div>
+        <div class="s-value" id="sumPlan">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">Duración</div>
+        <div class="s-value" id="sumPeriod">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">Precio CUP</div>
+        <div class="s-value price" id="sumPrice">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">Saldo móvil</div>
+        <div class="s-value" id="sumMobile">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">USDT</div>
+        <div class="s-value" id="sumUsdt">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">ID</div>
+        <div class="s-value" id="sumId" style="font-size:.78rem;">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COUPON -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-tag"></i>
+      <span class="card-title">CUPÓN DE DESCUENTO</span>
+    </div>
+    <div class="coupon-row">
+      <input class="coupon-input" id="couponInput" type="text" placeholder="// código de descuento" maxlength="20">
+      <button class="coupon-btn" id="couponBtn" onclick="applyCoupon()">
+        <i class="fas fa-check"></i> <span>Aplicar</span>
+      </button>
+    </div>
+    <div class="coupon-msg" id="couponMsg"></div>
+    <div class="discount-box" id="discountBox">
+      <div class="discount-row"><span>Cupón:</span><span class="val" id="dCode">—</span></div>
+      <div class="discount-row"><span>Descuento:</span><span class="val" id="dPct">—</span></div>
+      <div class="discount-row"><span>Precio anterior:</span><span class="val old-price" id="dOld">—</span></div>
+      <div class="discount-row"><span>Precio final:</span><span class="val new-price" id="dNew">—</span></div>
+      <button class="remove-coupon" onclick="removeCoupon()"><i class="fas fa-times"></i> Quitar cupón</button>
+    </div>
+  </div>
+
+  <!-- PAYMENT METHOD -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-credit-card"></i>
+      <span class="card-title">MÉTODO DE PAGO</span>
+    </div>
+    <select class="method-select" id="methodSelect" onchange="onMethodChange()">
+      <option value="transfer">Tarjeta BPA</option>
+      <option value="metropolitan">Tarjeta Metropolitana</option>
+      <option value="mitransfer">Monedero MITRANSFER</option>
+      <option value="mobile">Saldo Móvil</option>
+      <option value="usdt">USDT (BEP20)</option>
+    </select>
+    <div class="method-desc" id="methodDesc"><i class="fas fa-info-circle"></i> Selecciona tu método de pago.</div>
+
+    <!-- BPA -->
+    <div class="method-panel active" id="panel-transfer">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-credit-card"></i> Número de tarjeta</div>
+        <div class="info-value">9248-1299-7027-1730</div>
+        <button class="copy-btn" onclick="copy('9248129970271730',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-mobile-alt"></i> Móvil a confirmar</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="note-box"><i class="fas fa-info-circle"></i> Incluye el número de confirmación en el comprobante.</div>
+    </div>
+
+    <!-- Metropolitana -->
+    <div class="method-panel" id="panel-metropolitan">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-credit-card"></i> Número de tarjeta</div>
+        <div class="info-value">9238-9598-7118-1386</div>
+        <button class="copy-btn" onclick="copy('9238959871181386',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-mobile-alt"></i> Móvil a confirmar</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+    </div>
+
+    <!-- MITRANSFER -->
+    <div class="method-panel" id="panel-mitransfer">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-wallet"></i> Número de teléfono</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+    </div>
+
+    <!-- Saldo Móvil -->
+    <div class="method-panel" id="panel-mobile">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-mobile-alt"></i> Número de teléfono</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="mobile-price-box">
+        <div class="mobile-big" id="mobilePriceBig">— CUP</div>
+        <div class="usdt-sub">Precio con saldo móvil</div>
+      </div>
+      <div class="note-box"><i class="fas fa-info-circle"></i> Recarga el saldo exacto en el número indicado.</div>
+    </div>
+
+    <!-- USDT -->
+    <div class="method-panel" id="panel-usdt">
+      <div class="usdt-amount">
+        <div class="usdt-sub">Monto exacto a enviar</div>
+        <div class="usdt-big" id="usdtBig">— USDT</div>
+        <div class="usdt-sub">Red: BEP20 (Binance Smart Chain)</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-wallet"></i> Dirección BEP20</div>
+        <div class="info-value" id="usdtAddr">0x55B81bD7df1b0c6Db33fD532207CF2Bf137C1519</div>
+        <button class="copy-btn" onclick="copy(document.getElementById('usdtAddr').textContent,this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="note-box"><i class="fas fa-exclamation-triangle"></i> Envía solo por red BEP20. Monto exacto.</div>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-camera"></i>
+      <span class="card-title">COMPROBANTE DE PAGO</span>
+    </div>
+    <div class="upload-area" id="uploadArea">
+      <i class="fas fa-cloud-upload-alt"></i>
+      <div class="u-title">Arrastra o toca para subir</div>
+      <div class="u-sub">JPG · PNG · GIF — Máx. 5 MB</div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" hidden>
+    <div class="warn-box"><i class="fas fa-crop-alt"></i> Si el envío falla, recorta o reduce el tamaño de la imagen.</div>
+    <div class="preview-box" id="previewBox">
+      <div class="preview-header">
+        <span><i class="fas fa-image"></i> Vista previa</span>
+        <button class="remove-img" onclick="removeImg()"><i class="fas fa-trash"></i> Eliminar</button>
+      </div>
+      <img class="preview-img" id="previewImg" alt="Vista previa">
+    </div>
+  </div>
+
+  <!-- SUBMIT -->
+  <div class="card">
+    <button class="submit-btn" id="submitBtn" disabled onclick="submitPayment()">
+      <i class="fas fa-paper-plane"></i> <span id="submitTxt">Enviar comprobante</span>
+    </button>
+    <div class="processing-note"><i class="fas fa-clock"></i> <span class="manual-pill">Revisión manual</span>: <span class="manual-highlight">1-12 horas</span>. Recibirás confirmación por Telegram.</div>
+  </div>
+
+  <footer class="footer">
+    <p>© 2025 VPN Cuba · Pago seguro</p>
+    <p style="margin-top:4px;">Los archivos de configuración se envían manualmente tras la verificación.</p>
+  </footer>
+
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp ?? { expand(){}, MainButton:{ hide(){} }, initDataUnsafe:{} };
+tg.expand?.();
+tg.MainButton?.hide?.();
+
+// ── CONFIG ────────────────────────────────
+const USDT_ADDRESS = '0x55B81bD7df1b0c6Db33fD532207CF2Bf137C1519';
+
+const PLANS = {
+  trial:    { name: 'Prueba Libre',  period: '1 hora',    cup: 0,     mobile: 0,    usdt: 0,    freq: 'FREQ·LIBRE' },
+  basico:   { name: 'Básico',        period: '1 mes',      cup: 400,   mobile: 200,  usdt: 0.7,  freq: 'FREQ·01' },
+  avanzado: { name: 'Avanzado',      period: '2 meses',    cup: 900,   mobile: 300,  usdt: 1.4,  freq: 'FREQ·02' },
+  cuba_vip: { name: 'CUBA VIP',      period: '1 mes',      cup: 1200,  mobile: 400,  usdt: 2.0,  freq: 'FREQ·CU' },
+  premium:  { name: 'Gaming',        period: '1 mes',      cup: 700,   mobile: 250,  usdt: 1.1,  freq: 'FREQ·MAX' },
+  anual:    { name: 'Plan Anual',    period: '12 meses',   cup: 15000, mobile: 5000, usdt: 30,   freq: 'FREQ·FULL' }
+};
+
+const METHOD_DESC = {
+  transfer:     'Transfiere el monto exacto a la tarjeta BPA indicada.',
+  metropolitan: 'Transfiere a la tarjeta Metropolitana indicada.',
+  mitransfer:   'Envía al monedero MITRANSFER indicado.',
+  mobile:       'Recarga saldo móvil al número indicado (precio especial).',
+  usdt:         'Envía USDT exacto por red BEP20 a la dirección indicada.'
+};
+
+let userId = null, planType = null, selectedFile = null, activeCoupon = null, currentMethod = 'transfer', referralDiscount = 0;
+let referralDiscountApplied = 0; // Para almacenar el descuento por referidos que viene de la URL
+
+// ── INIT ──────────────────────────────────
+function checkTerms(uid) {
+  if (!uid) return false;
+  return localStorage.getItem(`termsAccepted_${uid}`) === 'true';
+}
+
+async function init() {
+  const p = new URLSearchParams(window.location.search);
+  userId   = p.get('userId');
+  planType = p.get('plan') || 'basico';
+  let urlPrice = parseFloat(p.get('price'));
+  let urlUsdt = parseFloat(p.get('usdtAmount'));
+  referralDiscountApplied = parseFloat(p.get('discount')) || 0;
+
+  // Si no vienen por URL, intentar desde localStorage
+  if ((!urlPrice || isNaN(urlPrice)) && localStorage.getItem('selectedPlan')) {
+    try {
+      const stored = JSON.parse(localStorage.getItem('selectedPlan'));
+      planType = stored.type;
+      urlPrice = stored.finalPrice;
+      urlUsdt = stored.finalUsdt;
+      referralDiscountApplied = stored.discountApplied || 0;
+    } catch(e) {}
+  }
+
+  if (!userId && tg.initDataUnsafe?.user) {
+    userId = tg.initDataUnsafe.user.id.toString();
+  }
+
+  if (!userId || !checkTerms(userId)) {
+    window.location.href = `/index.html${userId ? `?userId=${userId}` : ''}`;
+    return;
+  }
+
+  // Apply plan theme
+  document.documentElement.setAttribute('data-plan', planType);
+
+  const plan = PLANS[planType] || PLANS.basico;
+  let finalPrice = plan.cup;
+  let finalUsdt = plan.usdt;
+  if (referralDiscountApplied > 0) {
+    finalPrice = Math.round(plan.cup * (1 - referralDiscountApplied/100));
+    finalUsdt = parseFloat((plan.usdt * (1 - referralDiscountApplied/100)).toFixed(2));
+    document.getElementById('refDiscountPct').textContent = referralDiscountApplied + '%';
+    document.getElementById('referralBanner').style.display = 'block';
+  } else if (urlPrice && !isNaN(urlPrice)) {
+    finalPrice = urlPrice;
+    if (urlUsdt && !isNaN(urlUsdt)) finalUsdt = urlUsdt;
+  }
+
+  // Header
+  document.getElementById('freqLabel').textContent = plan.freq + ' · ' + plan.period.toUpperCase();
+  document.getElementById('planTitle').textContent  = plan.name.toUpperCase();
+  document.getElementById('cardFreq').textContent   = plan.freq;
+
+  // Summary
+  document.getElementById('sumPlan').textContent   = plan.name;
+  document.getElementById('sumPeriod').textContent = plan.period;
+  document.getElementById('sumPrice').textContent  = finalPrice > 0 ? `${finalPrice.toLocaleString()} CUP` : 'Gratis';
+  document.getElementById('sumMobile').textContent = plan.mobile > 0 ? `${plan.mobile.toLocaleString()} CUP` : '—';
+  document.getElementById('sumUsdt').textContent   = finalUsdt > 0 ? `${finalUsdt} USDT` : '—';
+  document.getElementById('sumId').textContent     = userId;
+
+  // Mobile & USDT fields
+  const mobilePrice = plan.mobile > 0 ? (referralDiscountApplied > 0 ? Math.round(plan.mobile * (1 - referralDiscountApplied/100)) : plan.mobile) : 0;
+  document.getElementById('mobilePriceBig').textContent = mobilePrice > 0 ? `${mobilePrice.toLocaleString()} CUP` : '—';
+  document.getElementById('usdtBig').textContent        = finalUsdt > 0 ? `${finalUsdt} USDT` : '—';
+  document.getElementById('usdtAddr').textContent       = USDT_ADDRESS;
+
+  // Save final prices for submit
+  window.finalPriceCUP = finalPrice;
+  window.finalUsdtAmount = finalUsdt;
+
+  // Saved coupon
+  loadSavedCoupon();
+
+  // Upload
+  setupUpload();
+
+  updateSubmit();
+}
+
+// ── METHOD ────────────────────────────────
+function onMethodChange() {
+  currentMethod = document.getElementById('methodSelect').value;
+  document.querySelectorAll('.method-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${currentMethod}`).classList.add('active');
+  document.getElementById('methodDesc').innerHTML = `<i class="fas fa-info-circle"></i> ${METHOD_DESC[currentMethod]}`;
+  document.getElementById('submitTxt').textContent = currentMethod === 'usdt' ? 'Enviar comprobante USDT' : 'Enviar comprobante';
+  updateSubmit();
+}
+
+// ── COUPON (aplica sobre precio ya descontado por referidos) ──
+async function applyCoupon() {
+  const code = document.getElementById('couponInput').value.trim().toUpperCase();
+  const msg  = document.getElementById('couponMsg');
+  if (!code) { msg.className='coupon-msg err'; msg.textContent='// introduce un código'; return; }
+
+  const btn = document.getElementById('couponBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Verificando...</span>';
+
+  try {
+    const res  = await fetch(`/api/coupons/verify/${code}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ telegramId:userId }) });
+    const data = await res.json();
+
+    if (data.success) {
+      activeCoupon = data.coupon;
+      showDiscount(data.coupon);
+      saveCoupon(data.coupon);
+      msg.className='coupon-msg ok';
+      msg.textContent=`// cupón "${code}" aplicado · ${data.coupon.discount}% de descuento`;
+      document.getElementById('couponInput').value = '';
+      showNotification(`✅ Descuento del ${data.coupon.discount}% aplicado`, 'success');
+    } else {
+      msg.className='coupon-msg err';
+      msg.textContent=`// ${data.error || 'cupón no válido'}`;
+      showNotification('❌ Cupón no válido', 'error');
+    }
+  } catch(e) {
+    msg.className='coupon-msg err';
+    msg.textContent='// error al verificar';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check"></i> <span>Aplicar</span>';
+  }
+}
+
+function showDiscount(coupon) {
+  const base = window.finalPriceCUP;
+  const saved = Math.round(base * coupon.discount / 100);
+  const final = base - saved;
+  document.getElementById('dCode').textContent = coupon.code;
+  document.getElementById('dPct').textContent  = coupon.discount + '%';
+  document.getElementById('dOld').textContent  = base.toLocaleString() + ' CUP';
+  document.getElementById('dNew').textContent  = final.toLocaleString() + ' CUP';
+  document.getElementById('discountBox').style.display = 'block';
+  // Update price display
+  document.getElementById('sumPrice').textContent = final.toLocaleString() + ' CUP';
+  window.finalPriceCUP = final; // actualizar precio final con cupón
+}
+
+function removeCoupon() {
+  activeCoupon = null;
+  document.getElementById('discountBox').style.display = 'none';
+  document.getElementById('couponMsg').textContent = '';
+  document.getElementById('sumPrice').textContent = (window.finalPriceCUPOriginal || window.finalPriceCUP).toLocaleString() + ' CUP';
+  window.finalPriceCUP = window.finalPriceCUPOriginal || window.finalPriceCUP;
+  localStorage.removeItem(`coupon_${userId}`);
+  showNotification('Cupón eliminado', 'info');
+}
+
+function saveCoupon(c) { localStorage.setItem(`coupon_${userId}`, JSON.stringify({ ...c, ts: Date.now() })); }
+
+function loadSavedCoupon() {
+  try {
+    const s = localStorage.getItem(`coupon_${userId}`);
+    if (!s) return;
+    const c = JSON.parse(s);
+    if (Date.now() - c.ts > 86400000) { localStorage.removeItem(`coupon_${userId}`); return; }
+    activeCoupon = c;
+    showDiscount(c);
+    document.getElementById('couponMsg').className='coupon-msg ok';
+    document.getElementById('couponMsg').textContent=`// cupón "${c.code}" cargado`;
+  } catch(e) {}
+}
+
+// ── UPLOAD ────────────────────────────────
+function setupUpload() {
+  const area  = document.getElementById('uploadArea');
+  const input = document.getElementById('fileInput');
+  area.addEventListener('click', () => input.click());
+  area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag'); });
+  area.addEventListener('dragleave', () => area.classList.remove('drag'));
+  area.addEventListener('drop', e => { e.preventDefault(); area.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  input.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+}
+
+function handleFile(file) {
+  if (file.size > 5*1024*1024) { showNotification('❌ Máximo 5MB', 'error'); return; }
+  if (!['image/jpeg','image/png','image/gif','image/webp'].includes(file.type)) { showNotification('❌ Solo JPG, PNG, GIF, WEBP', 'error'); return; }
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('previewBox').style.display = 'block';
+    document.getElementById('progressFill').style.width = '66%';
+    document.getElementById('lbl2').classList.add('active');
+    updateSubmit();
+    showNotification('✅ Imagen cargada', 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImg() {
+  selectedFile = null;
+  document.getElementById('previewBox').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('progressFill').style.width = '33%';
+  document.getElementById('lbl2').classList.remove('active');
+  updateSubmit();
+}
+
+// ── SUBMIT ────────────────────────────────
+function updateSubmit() {
+  document.getElementById('submitBtn').disabled = !selectedFile;
+}
+
+async function submitPayment() {
+  const btn = document.getElementById('submitBtn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Enviando...</span>';
+
+  try {
+    let finalPrice = window.finalPriceCUP;
+    // Si hay cupón activo, su descuento ya está incluido en window.finalPriceCUP
+    // No hacer doble descuento
+
+    const fd = new FormData();
+    fd.append('telegramId', userId);
+    fd.append('plan', planType);
+    fd.append('price', finalPrice);
+    fd.append('method', currentMethod);
+    fd.append('screenshot', selectedFile);
+    if (activeCoupon) { fd.append('couponCode', activeCoupon.code); }
+    if (currentMethod === 'usdt') fd.append('usdtAmount', window.finalUsdtAmount);
+
+    const res = await fetch('/api/payment', { method:'POST', body:fd });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
+
+    if (activeCoupon) localStorage.removeItem(`coupon_${userId}`);
+
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('lbl3').classList.add('active');
+    showNotification('✅ Captura recibida. No hace falta enviar otra foto.', 'success');
+
+    setTimeout(() => {
+      if (tg?.platform && tg.platform !== 'unknown') tg.close();
+      else window.location.href = 'https://t.me/vpncubaw_bot';
+    }, 3000);
+
+  } catch(e) {
+    showNotification('❌ Error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+// ── COPY ──────────────────────────────────
+function copy(text, btn) {
+  navigator.clipboard.writeText(text.replace(/-/g,'')).then(() => {
+    const o = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Copiado';
+    setTimeout(() => { btn.innerHTML = o; }, 2000);
+    showNotification('Copiado al portapapeles', 'success');
+  }).catch(() => showNotification('Error al copiar', 'error'));
+}
+
+// ── NOTIFICATION ──────────────────────────
+function showNotification(msg, type='info') {
+  const n = document.getElementById('notification');
+  n.textContent = msg;
+  n.style.borderLeftColor = type==='success' ? '#00ff88' : type==='error' ? '#ff4d4d' : 'var(--sig)';
+  n.style.transform = 'translateX(0)';
+  clearTimeout(window.__nt);
+  window.__nt = setTimeout(() => { n.style.transform = 'translateX(160%)'; }, 3800);
+}
+
+// ── COUPON ENTER KEY ──────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  document.getElementById('couponInput').addEventListener('keypress', e => { if(e.key==='Enter') applyCoupon(); });
+});
+</script>
+</body>
+   </html>
