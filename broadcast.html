@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPN Cuba - Broadcast</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary: #0a0a1f;
+            --secondary: #121230;
+            --accent: #4f46e5;
+            --text: #ffffff;
+            --text-secondary: #a5b4fc;
+            --card-bg: rgba(18, 18, 48, 0.9);
+            --border: rgba(99, 102, 241, 0.2);
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 30px 20px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(79, 70, 229, 0.3);
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a5b4fc 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+            resize: vertical;
+        }
+
+        textarea {
+            min-height: 150px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            font-size: 1.1rem;
+        }
+
+        .btn:hover {
+            background: #4338ca;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: var(--card-bg);
+            border: 1px solid;
+            border-radius: 12px;
+            color: var(--text);
+            font-weight: 500;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .notification.error {
+            border-color: var(--error);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">📢 ENVIAR BROADCAST</h1>
+            <p class="subtitle">Envía un mensaje a todos los usuarios de VPN Cuba</p>
+        </div>
+
+        <div class="card">
+            <div class="stats" id="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalUsers">0</div>
+                    <div class="stat-label">Usuarios Totales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="vipUsers">0</div>
+                    <div class="stat-label">Usuarios VIP</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="activeUsers">0</div>
+                    <div class="stat-label">Usuarios Activos</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="message">Mensaje a enviar:</label>
+                <textarea id="message" placeholder="Escribe tu mensaje aquí..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="preview">Vista previa:</label>
+                <div id="preview" style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; min-height: 100px; color: var(--text-secondary);">
+                    El mensaje aparecerá aquí...
+                </div>
+            </div>
+
+            <button class="btn" id="sendBtn" onclick="sendBroadcast()">
+                📤 ENVIAR A TODOS LOS USUARIOS
+            </button>
+        </div>
+
+        <a href="/admin.html?userId=USER_ID&admin=true" class="back-btn" id="backBtn">
+            ← Volver al Panel Admin
+        </a>
+    </div>
+
+    <div class="notification" id="notification">
+        <span id="notificationText">Mensaje</span>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userId');
+        const admin = urlParams.get('admin') === 'true';
+
+        // Actualizar el enlace de regreso
+        document.getElementById('backBtn').href = `/admin.html?userId=${userId}&admin=true`;
+
+        // Verificar permisos
+        async function checkAdminAccess() {
+            if (!admin) {
+                showNotification('❌ No tienes permisos de administrador', 'error');
+                setTimeout(() => {
+                    window.location.href = '/plans.html?userId=' + userId;
+                }, 2000);
+                return false;
+            }
+
+            try {
+                const response = await fetch(`/api/check-admin/${userId}`);
+                const data = await response.json();
+                
+                if (!data.isAdmin) {
+                    showNotification('❌ No eres administrador', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/plans.html?userId=' + userId;
+                    }, 2000);
+                    return false;
+                }
+
+                return true;
+            } catch (error) {
+                showNotification('❌ Error verificando permisos', 'error');
+                return false;
+            }
+        }
+
+        // Cargar estadísticas
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('totalUsers').textContent = stats.totalUsers || 0;
+                document.getElementById('vipUsers').textContent = stats.vipUsers || 0;
+                document.getElementById('activeUsers').textContent = stats.activeUsers || stats.totalUsers || 0;
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+            }
+        }
+
+        // Vista previa del mensaje
+        document.getElementById('message').addEventListener('input', function() {
+            const preview = document.getElementById('preview');
+            if (this.value.trim()) {
+                preview.innerHTML = this.value.replace(/\n/g, '<br>');
+                preview.style.color = 'var(--text)';
+            } else {
+                preview.innerHTML = 'El mensaje aparecerá aquí...';
+                preview.style.color = 'var(--text-secondary)';
+            }
+        });
+
+        // Enviar broadcast
+        async function sendBroadcast() {
+            const message = document.getElementById('message').value.trim();
+            
+            if (!message) {
+                showNotification('❌ Escribe un mensaje para enviar', 'error');
+                return;
+            }
+
+            if (!confirm('¿Estás seguro de enviar este mensaje a TODOS los usuarios?')) {
+                return;
+            }
+
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = '📤 ENVIANDO...';
+
+            try {
+                // 1. Obtener todos los usuarios
+                const usersResponse = await fetch('/api/all-users');
+                const users = await usersResponse.json();
+                
+                const totalUsers = users.length;
+                let successCount = 0;
+                let failCount = 0;
+                const failedUsers = [];
+
+                // 2. Enviar mensaje a cada usuario
+                for (let i = 0; i < users.length; i++) {
+                    const user = users[i];
+                    
+                    try {
+                        await fetch('/api/send-message', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                telegramId: user.telegram_id,
+                                message: `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Por favor, no respondas a este mensaje. Para consultas, contacta a soporte: @L0quen2_`,
+                                adminId: userId
+                            })
+                        });
+                        
+                        successCount++;
+                        
+                        // Actualizar estadísticas cada 10 usuarios
+                        if (i % 10 === 0 || i === users.length - 1) {
+                            sendBtn.textContent = `📤 ENVIANDO... ${i + 1}/${totalUsers}`;
+                        }
+                        
+                        // Pequeño delay para evitar límites de Telegram
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                    } catch (error) {
+                        failCount++;
+                        failedUsers.push(user.telegram_id);
+                    }
+                }
+
+                // 3. Mostrar resultados
+                let resultMessage = `✅ *BROADCAST COMPLETADO*\n\n`;
+                resultMessage += `📊 *ESTADÍSTICAS:*\n`;
+                resultMessage += `• Total de usuarios: ${totalUsers}\n`;
+                resultMessage += `• Mensajes enviados: ${successCount}\n`;
+                resultMessage += `• Mensajes fallados: ${failCount}\n`;
+                resultMessage += `• Tasa de éxito: ${((successCount / totalUsers) * 100).toFixed(1)}%\n\n`;
+                
+                if (failCount > 0) {
+                    resultMessage += `❌ *Usuarios con error:*\n`;
+                    resultMessage += failedUsers.slice(0, 5).map(id => `• ${id}`).join('\n');
+                    if (failedUsers.length > 5) {
+                        resultMessage += `\n• ... y ${failedUsers.length - 5} más`;
+                    }
+                }
+                
+                document.getElementById('message').value = '';
+                document.getElementById('preview').innerHTML = 'El mensaje aparecerá aquí...';
+                document.getElementById('preview').style.color = 'var(--text-secondary)';
+                
+                alert(resultMessage);
+                showNotification('✅ Broadcast enviado correctamente', 'success');
+                
+            } catch (error) {
+                console.error('Error en broadcast:', error);
+                showNotification('❌ Error enviando broadcast', 'error');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = '📤 ENVIAR A TODOS LOS USUARIOS';
+            }
+        }
+
+        // Mostrar notificación
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notificationText');
+            
+            notificationText.textContent = message;
+            notification.className = 'notification ' + type;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', async function() {
+            const isAdminUser = await checkAdminAccess();
+            if (isAdminUser) {
+                await loadStats();
+            }
+        });
+    </script>
+</body>
+</html>
