@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPN Cuba - Admin Login</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="connection-line top-left"></div>
+        <div class="connection-line top-right"></div>
+        <div class="connection-line bottom-left"></div>
+        <div class="connection-line bottom-right"></div>
+        <div class="pulse-dot center"></div>
+        
+        <div class="header">
+            <div class="logo-container">
+                <div class="logo-glow"></div>
+                <h1>VPN CUBA ADMIN</h1>
+            </div>
+            <p class="subtitle">Panel de administración - Acceso restringido</p>
+        </div>
+        
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-icon">🔐</div>
+                <h2 class="login-title">Iniciar Sesión</h2>
+                
+                <form id="loginForm" onsubmit="event.preventDefault(); login();">
+                    <div class="form-group">
+                        <label for="username">Usuario:</label>
+                        <input type="text" id="username" class="form-input" 
+                               placeholder="admin" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Contraseña:</label>
+                        <input type="password" id="password" class="form-input" 
+                               placeholder="••••••••" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="secretKey">Clave secreta:</label>
+                        <input type="password" id="secretKey" class="form-input" 
+                               placeholder="Clave de administrador" required>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary" id="loginBtn">
+                        <span class="btn-icon">🚀</span>
+                        <span class="btn-text">Acceder al Panel</span>
+                        <div class="btn-glow"></div>
+                    </button>
+                </form>
+                
+                <div class="login-warning">
+                    <div class="warning-icon">⚠️</div>
+                    <div class="warning-text">
+                        <strong>Acceso restringido:</strong> Solo personal autorizado puede acceder a este panel.
+                        Cualquier intento no autorizado será registrado.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p class="footer-text">© 2025 VPN Cuba - Sistema de Administración</p>
+        </div>
+    </div>
+
+    <script>
+        // Intentar autenticación automática si hay token
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('adminToken');
+            if (token) {
+                // Verificar si el token es válido
+                verifyToken(token);
+            }
+        });
+        
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const secretKey = document.getElementById('secretKey').value;
+            
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Verificando...</span>';
+            
+            try {
+                const response = await fetch(`${window.API_BASE_URL || ''}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, secretKey })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Guardar token
+                    localStorage.setItem('adminToken', data.token);
+                    
+                    // Redirigir al panel
+                    window.location.href = 'admin.html';
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Credenciales incorrectas');
+                }
+            } catch (error) {
+                alert('❌ Error de autenticación: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '<span class="btn-icon">🚀</span><span class="btn-text">Acceder al Panel</span>';
+            }
+        }
+        
+        async function verifyToken(token) {
+            try {
+                const response = await fetch(`${window.API_BASE_URL || ''}/api/admin/verify`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    // Token válido, redirigir al panel
+                    window.location.href = 'admin.html';
+                }
+            } catch (error) {
+                // Token inválido, eliminar y mostrar formulario
+                localStorage.removeItem('adminToken');
+            }
+        }
+    </script>
+</body>
+</html>
