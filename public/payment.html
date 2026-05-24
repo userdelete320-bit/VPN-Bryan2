@@ -427,7 +427,8 @@
     padding-bottom:16px;
   }
   .tl-dot {
-    width:28px; height:28px; border-radius:50%;
+    width:28px; height:28px;
+    border-radius:50%;
     border:1.5px solid var(--border);
     background:var(--surface);
     display:flex; align-items:center; justify-content:center;
@@ -513,13 +514,15 @@
       <div class="step" id="step4" onclick="goToStep(4)"><div class="step-circle" id="sc4">04</div><div class="step-lbl">LISTO</div></div>
     </div>
   </div>
-  <div class="demo-selector" id="demoSelector">
+  <!-- demo selector para administradores (opcional) -->
+  <div class="demo-selector" id="demoSelector" style="display:flex;">
     <button class="demo-chip" onclick="selectPlanDemo('basic')">🌐 BÁSICO</button>
-    <button class="demo-chip active" onclick="selectPlanDemo('anual')">♾️ ANUAL</button>
+    <button class="demo-chip" onclick="selectPlanDemo('avanzado')">🚀 AVANZADO</button>
     <button class="demo-chip" onclick="selectPlanDemo('vip')">🏦 VIP</button>
     <button class="demo-chip" onclick="selectPlanDemo('gaming')">🎮 GAMING</button>
+    <button class="demo-chip" onclick="selectPlanDemo('anual')">♾️ ANUAL</button>
   </div>
-  <!-- PAGE 1 -->
+  <!-- PAGE 1: RESUMEN -->
   <div class="page active" id="page1">
     <div class="plan-hero"><div class="plan-hero-inner"><div class="plan-hero-name" id="heroName">ANUAL</div><div class="plan-hero-price"><strong id="heroPrice" style="color:var(--neon)">15000 CUP</strong></div><div id="heroSub" style="font-size:12px;color:var(--text-muted);margin-top:6px">12 meses · Todo incluido</div></div></div>
     <div class="referral-banner" id="refBanner" style="display:none"><span>👥</span><p>Tienes un <strong id="refDiscountPct">0%</strong> de descuento por referidos — se aplicará al pagar.</p></div>
@@ -530,11 +533,12 @@
       <div class="detail-row"><span class="detail-key">SALDO MÓVIL</span><span class="detail-val" id="sumMobile">10000 CUP</span></div>
       <div class="detail-row"><span class="detail-key">USDT</span><span class="detail-val" id="sumUSDT">25 USDT</span></div>
       <div class="detail-row"><span class="detail-key">ID PEDIDO</span><span class="detail-val" id="sumID">6373481979</span></div>
+      <div class="detail-row"><span class="detail-key">Nº CONFIRMACIÓN</span><span class="detail-val">63806513</span></div>
     </div></div>
     <div class="section"><div class="section-head"><span class="ico">✨</span><span class="lbl">INCLUYE</span></div><div class="features-grid" id="featureGrid"></div></div>
     <button class="next-btn green" onclick="goToStep(2)">Continuar al pago →</button>
   </div>
-  <!-- PAGE 2 -->
+  <!-- PAGE 2: PAGO -->
   <div class="page" id="page2">
     <div class="section"><div class="section-head"><span class="ico">🏷️</span><span class="lbl">CUPÓN</span></div><div class="section-body"><div class="coupon-row"><input class="coupon-input" id="couponInput" placeholder="CÓDIGO"><button class="coupon-btn" onclick="applyCoupon()">APLICAR</button></div><div class="price-summary"><div class="ps-row"><span class="ps-key">Precio base</span><span class="ps-val" id="ps-base">15000 CUP</span></div><div class="ps-row" id="ps-disc-row" style="display:none"><span class="ps-key">Descuento ref.</span><span class="ps-val" id="ps-disc">−0 CUP</span></div><div class="ps-row total"><span class="ps-key">Total a pagar</span><span class="ps-val" id="ps-total">15000 CUP</span></div></div></div></div>
     <div class="section"><div class="section-head"><span class="ico">💳</span><span class="lbl">MÉTODO DE PAGO</span></div><div class="method-tabs"><button class="method-tab active" onclick="switchTab('bpa')">BPA</button><button class="method-tab" onclick="switchTab('bandec')">BANDEC</button><button class="method-tab" onclick="switchTab('movil')">SALDO MÓVIL</button><button class="method-tab" onclick="switchTab('usdt')">USDT</button></div>
@@ -546,13 +550,13 @@
     <button class="next-btn green" onclick="goToStep(3)">Ya pagué — subir comprobante →</button>
     <button class="next-btn outline" onclick="goToStep(1)" style="background:transparent;border:1px solid var(--border);margin-top:4px">← Volver</button>
   </div>
-  <!-- PAGE 3 -->
+  <!-- PAGE 3: COMPROBANTE -->
   <div class="page" id="page3">
     <div class="section"><div class="section-head"><span class="ico">📸</span><span class="lbl">COMPROBANTE</span></div><div class="section-body">
       <div class="order-mini" style="background:var(--surface2);padding:12px;margin-bottom:12px;border-radius:var(--radius-xs);display:flex;justify-content:space-between"><span>Plan: <strong id="compPlan">Anual</strong></span><span id="compPrice" style="color:var(--neon)">15000 CUP</span></div>
       <div class="upload-zone" onclick="document.getElementById('fileInput').click()"><input type="file" id="fileInput" accept="image/*" onchange="handleFile(this)"><div class="upload-icon">📤</div><div class="upload-title">Toca para subir captura</div><div class="upload-sub">JPG · PNG · GIF (max 5MB)</div></div>
       <div class="upload-preview" id="uploadPreview"><div class="preview-thumb" id="previewThumb">🖼️</div><div class="preview-info"><div id="previewName">archivo.jpg</div><div id="previewSize">0 KB</div></div><button class="remove-btn" onclick="removeFile()">✕</button></div>
-      <div class="warning-note">⚠ Asegúrate que se vea el número de confirmación.</div>
+      <div class="warning-note">⚠ Asegúrate que se vea el número de confirmación (63806513).</div>
     </div></div>
     <button class="send-btn" id="sendBtn" disabled onclick="sendOrder()">📨 ENVIAR COMPROBANTE</button>
     <div class="send-info">🕐 Revisión manual · 1-12 horas · Recibirás confirmación por Telegram</div>
@@ -578,29 +582,229 @@ const userId = urlParams.get('userId');
 let selectedPlanKey = 'anual';
 let finalPriceCUP = 15000, finalUsdt = 25, discountApplied = 0;
 let fileUploaded = false, selectedFile = null;
+
+// Definición de planes con sus características (coincide con plans.html)
 const planData = {
-  basic:{name:'BÁSICO',duration:'1 mes',price:900,mobile:400,usdt:1.5,features:[['🌐','Streaming USA'],['⚡','2 Mbps']]},
-  avanzado:{name:'AVANZADO',duration:'2 meses',price:1600,mobile:800,usdt:2.5,features:[['🚀','2 meses'],['💰','Ahorro']]},
-  vip:{name:'VIP CUBA',duration:'1 mes',price:1200,mobile:500,usdt:1.9,features:[['🇨🇺','IP Cubana'],['🏦','Enzona']]},
-  gaming:{name:'GAMING',duration:'1 mes',price:1500,mobile:700,usdt:2.3,features:[['🎮','Latencia <25ms'],['🎯','QoS']]},
-  anual:{name:'ANUAL',duration:'12 meses',price:15000,mobile:10000,usdt:25,features:[['♾️','Acceso total'],['🏦','VIP incluido']]}
+  basic: {
+    name: 'BÁSICO', duration: '1 mes', price: 900, mobile: 400, usdt: 1.5,
+    features: [['🌐','Streaming USA (Netflix, Hulu, Prime)'], ['⚡','Velocidad hasta 2 Mbps'], ['🔒','WireGuard encriptado'], ['🆘','Soporte básico']],
+    tag: 'BÁSICO · 1 MES'
+  },
+  avanzado: {
+    name: 'AVANZADO', duration: '2 meses', price: 1600, mobile: 800, usdt: 2.5,
+    features: [['🚀','2 meses de servicio'], ['💰','Ahorra vs mensual'], ['🌐','Streaming USA incluido'], ['🆘','Soporte 24/7']],
+    tag: 'AVANZADO · 2 MESES'
+  },
+  vip: {
+    name: 'VIP CUBA', duration: '1 mes', price: 1200, mobile: 500, usdt: 1.9,
+    features: [['🇨🇺','IP residencial cubana'], ['🏦','Compatible Enzona'], ['📲','Compatible Transfermóvil'], ['🔒','Seguridad bancaria']],
+    tag: 'VIP · IP RESIDENCIAL CUBANA'
+  },
+  gaming: {
+    name: 'GAMING', duration: '1 mes', price: 1500, mobile: 700, usdt: 2.3,
+    features: [['🎮','Latencia <25ms'], ['🎯','QoS prioritario'], ['📦','Packet loss ~0%'], ['⚡','Optimizado para MLBB, CoD, Free Fire']],
+    tag: 'GAMING · QoS PRIORITARIO'
+  },
+  anual: {
+    name: 'ANUAL', duration: '12 meses', price: 15000, mobile: 10000, usdt: 25,
+    features: [['♾️','Acceso total a todos los planes'], ['🏦','VIP Cuba incluido'], ['🎮','Gaming incluido'], ['⚡','Nodo Turbo incluido']],
+    tag: 'ANUAL · ACCESO TOTAL'
+  }
 };
-function selectPlanDemo(key){ selectedPlanKey=key; const p=planData[key]; document.querySelectorAll('.demo-chip').forEach(c=>c.classList.remove('active')); event.target.classList.add('active'); document.getElementById('heroName').innerText=p.name; document.getElementById('heroPrice').innerText=p.price+' CUP'; document.getElementById('heroSub').innerText=p.duration+' · Todo incluido'; document.getElementById('sumPlan').innerText=p.name; document.getElementById('sumDuration').innerText=p.duration; document.getElementById('sumCUP').innerText=p.price+' CUP'; document.getElementById('sumMobile').innerText=p.mobile+' CUP'; document.getElementById('sumUSDT').innerText=p.usdt+' USDT'; document.getElementById('ps-base').innerText=p.price+' CUP'; document.getElementById('ps-total').innerText=p.price+' CUP'; document.getElementById('movilAmount').innerText=p.mobile+' CUP'; document.getElementById('usdtAmount').innerText=p.usdt+' USDT'; document.getElementById('compPlan').innerText=p.name; document.getElementById('compPrice').innerText=p.price+' CUP'; const grid=document.getElementById('featureGrid'); grid.innerHTML=p.features.map(f=>`<div class="feat-chip"><span>${f[0]}</span>${f[1]}</div>`).join(''); finalPriceCUP=p.price; finalUsdt=p.usdt; discountApplied=0; if(userId) loadReferralDiscount(); }
-async function loadReferralDiscount(){ try{ const res=await fetch(`/api/user-info/${userId}`); if(res.ok){ const data=await res.json(); const disc=data.referral_discount||0; if(disc>0){ discountApplied=disc; const factor=(100-disc)/100; const newPrice=Math.round(finalPriceCUP*factor); const newUsdt=(finalUsdt*factor).toFixed(2); document.getElementById('ps-total').innerText=newPrice+' CUP'; document.getElementById('compPrice').innerText=newPrice+' CUP'; document.getElementById('refBanner').style.display='flex'; document.getElementById('refDiscountPct').innerText=disc+'%'; document.getElementById('ps-disc-row').style.display='flex'; document.getElementById('ps-disc').innerText='−'+Math.round(finalPriceCUP*disc/100)+' CUP'; finalPriceCUP=newPrice; finalUsdt=parseFloat(newUsdt); } } }catch(e){} }
-function goToStep(n){ for(let i=1;i<=4;i++){ document.getElementById('page'+i).classList.remove('active'); const step=document.getElementById('step'+i); const circle=document.getElementById('sc'+i); step.classList.remove('active','done'); if(i<n){ step.classList.add('done'); circle.innerText='✓'; }else if(i===n){ step.classList.add('active'); circle.innerText='0'+i; }else circle.innerText='0'+i; if(i<4)document.getElementById('sl'+i).classList.toggle('done',i<n); } document.getElementById('page'+n).classList.add('active'); document.getElementById('demoSelector').style.display=n===1?'flex':'none'; window.scrollTo(0,0); }
-function goBack(){ if(currentStep>1) goToStep(currentStep-1); }
-function switchTab(id){ document.querySelectorAll('.method-tab').forEach((t,i)=>{t.classList.toggle('active',['bpa','bandec','movil','usdt'][i]===id);}); document.querySelectorAll('.method-panel').forEach(p=>p.classList.remove('active')); document.getElementById('tab-'+id).classList.add('active');}
-function copyText(text,btn){ navigator.clipboard.writeText(text); const orig=btn.innerText; btn.innerText='✓ Copiado'; setTimeout(()=>btn.innerText=orig,1500);}
-function applyCoupon(){ const code=document.getElementById('couponInput').value.trim().toUpperCase(); if(code==='CUBA20'){ const disc=Math.round(finalPriceCUP*0.2); document.getElementById('ps-total').innerText=(finalPriceCUP-disc)+' CUP'; document.getElementById('compPrice').innerText=(finalPriceCUP-disc)+' CUP'; document.getElementById('ps-disc-row').style.display='flex'; document.getElementById('ps-disc').innerText='−'+disc+' CUP'; showNotification('Cupón aplicado 20%','success'); } else showNotification('Cupón inválido','error');}
-function handleFile(input){ if(!input.files[0])return; const f=input.files[0]; if(f.size>5*1024*1024){showNotification('Máximo 5MB','error');return;} selectedFile=f; document.getElementById('previewName').innerText=f.name; document.getElementById('previewSize').innerText=(f.size/1024).toFixed(0)+' KB'; document.getElementById('uploadPreview').classList.add('show'); document.querySelector('.upload-zone').style.display='none'; fileUploaded=true; document.getElementById('sendBtn').disabled=false; const reader=new FileReader(); reader.onload=e=>document.getElementById('previewThumb').innerHTML=`<img class="preview-thumb" src="${e.target.result}">`; reader.readAsDataURL(f);}
-function removeFile(){ selectedFile=null; document.getElementById('uploadPreview').classList.remove('show'); document.querySelector('.upload-zone').style.display='block'; fileUploaded=false; document.getElementById('sendBtn').disabled=true;}
-async function sendOrder(){ if(!selectedFile){showNotification('Selecciona un archivo','error');return;} const btn=document.getElementById('sendBtn'); btn.disabled=true; btn.innerText='⏳ Enviando...'; const fd=new FormData(); fd.append('screenshot',selectedFile); fd.append('telegramId',userId); fd.append('plan',selectedPlanKey==='basic'?'basico':selectedPlanKey==='vip'?'cuba_vip':selectedPlanKey==='gaming'?'premium':selectedPlanKey); fd.append('price',finalPriceCUP); fd.append('method',document.querySelector('.method-tab.active').innerText.trim().toLowerCase().includes('usdt')?'usdt':document.querySelector('.method-tab.active').innerText.trim().toLowerCase().includes('móvil')?'mobile':'transfer'); fd.append('notes',''); try{ const res=await fetch('/api/payment',{method:'POST',body:fd}); const data=await res.json(); if(res.ok){ goToStep(4); showNotification('✅ Comprobante enviado','success'); }else throw new Error(data.error||'Error'); }catch(e){ showNotification('❌ Error: '+e.message,'error'); btn.disabled=false; btn.innerText='📨 ENVIAR COMPROBANTE'; } }
+
+// Función para actualizar toda la UI con el plan seleccionado
+function updateUIWithPlan(planKey) {
+  const p = planData[planKey];
+  if (!p) return;
+  selectedPlanKey = planKey;
+  finalPriceCUP = p.price;
+  finalUsdt = p.usdt;
+  // Actualizar hero
+  document.getElementById('heroName').innerText = p.name;
+  document.getElementById('heroPrice').innerText = p.price + ' CUP';
+  document.getElementById('heroSub').innerText = p.duration + ' · ' + (p.tag || '');
+  // Resumen
+  document.getElementById('sumPlan').innerText = p.name;
+  document.getElementById('sumDuration').innerText = p.duration;
+  document.getElementById('sumCUP').innerText = p.price + ' CUP';
+  document.getElementById('sumMobile').innerText = p.mobile + ' CUP';
+  document.getElementById('sumUSDT').innerText = p.usdt + ' USDT';
+  document.getElementById('movilAmount').innerText = p.mobile + ' CUP';
+  document.getElementById('usdtAmount').innerText = p.usdt + ' USDT';
+  document.getElementById('compPlan').innerText = p.name;
+  document.getElementById('compPrice').innerText = p.price + ' CUP';
+  document.getElementById('ps-base').innerText = p.price + ' CUP';
+  document.getElementById('ps-total').innerText = p.price + ' CUP';
+  // Features (INCLUYE)
+  const grid = document.getElementById('featureGrid');
+  grid.innerHTML = p.features.map(f => `<div class="feat-chip"><span class="fi">${f[0]}</span>${f[1]}</div>`).join('');
+  // Guardar en localStorage para envío
+  localStorage.setItem('selectedPlan', JSON.stringify({
+    type: planKey === 'basic' ? 'basico' : (planKey === 'avanzado' ? 'avanzado' : (planKey === 'vip' ? 'cuba_vip' : (planKey === 'gaming' ? 'premium' : 'anual'))),
+    originalPrice: p.price,
+    finalPrice: p.price,
+    finalUsdt: p.usdt,
+    discountApplied: 0,
+    usdtAddress: '0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2',
+    userId: userId,
+    timestamp: new Date().toISOString()
+  }));
+}
+
+// Leer plan desde localStorage o URL
+function loadSelectedPlan() {
+  const stored = localStorage.getItem('selectedPlan');
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      let planKey = null;
+      if (data.type === 'basico') planKey = 'basic';
+      else if (data.type === 'avanzado') planKey = 'avanzado';
+      else if (data.type === 'cuba_vip') planKey = 'vip';
+      else if (data.type === 'premium') planKey = 'gaming';
+      else if (data.type === 'anual') planKey = 'anual';
+      if (planKey && planData[planKey]) {
+        updateUIWithPlan(planKey);
+        // Aplicar descuento si viene
+        if (data.discountApplied && data.discountApplied > 0 && data.finalPrice) {
+          discountApplied = data.discountApplied;
+          finalPriceCUP = data.finalPrice;
+          finalUsdt = data.finalUsdt;
+          document.getElementById('heroPrice').innerText = finalPriceCUP + ' CUP';
+          document.getElementById('sumCUP').innerText = finalPriceCUP + ' CUP';
+          document.getElementById('compPrice').innerText = finalPriceCUP + ' CUP';
+          document.getElementById('ps-total').innerText = finalPriceCUP + ' CUP';
+          document.getElementById('refBanner').style.display = 'flex';
+          document.getElementById('refDiscountPct').innerText = discountApplied + '%';
+          document.getElementById('ps-disc-row').style.display = 'flex';
+          const original = planData[planKey].price;
+          const saved = original - finalPriceCUP;
+          document.getElementById('ps-disc').innerText = '−' + saved + ' CUP';
+        }
+        return;
+      }
+    } catch(e) {}
+  }
+  // Fallback a anual
+  updateUIWithPlan('anual');
+}
+
+// Función para cambiar de plan (solo para demo)
+function selectPlanDemo(planKey) {
+  updateUIWithPlan(planKey);
+  discountApplied = 0;
+  document.getElementById('refBanner').style.display = 'none';
+  document.getElementById('ps-disc-row').style.display = 'none';
+  document.getElementById('ps-total').innerText = planData[planKey].price + ' CUP';
+}
+
+// Navegación
+let currentStep = 1;
+function goToStep(n) {
+  if(n<1||n>4) return;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page'+n).classList.add('active');
+  for(let i=1;i<=4;i++){
+    const s=document.getElementById('step'+i);
+    const c=document.getElementById('sc'+i);
+    s.classList.remove('active','done');
+    if(i<n){ s.classList.add('done'); c.textContent='✓'; }
+    else if(i===n){ s.classList.add('active'); c.textContent='0'+i; }
+    else { c.textContent='0'+i; }
+    if(i<4) document.getElementById('sl'+i).classList.toggle('done', i<n);
+  }
+  document.getElementById('demoSelector').style.display = n===1 ? 'flex' : 'none';
+  currentStep=n;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function goBack() { if(currentStep>1) goToStep(currentStep-1); }
+
+// Métodos de pago
+function switchTab(id){
+  document.querySelectorAll('.method-tab').forEach((t,i)=>{
+    const ids=['bpa','bandec','movil','usdt'];
+    t.classList.toggle('active', ids[i]===id);
+  });
+  document.querySelectorAll('.method-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+}
+function copyText(text,btn){
+  navigator.clipboard.writeText(text);
+  const orig=btn.innerText;
+  btn.innerText='✓ Copiado';
+  setTimeout(()=>btn.innerText=orig,1500);
+}
+function applyCoupon(){
+  const code=document.getElementById('couponInput').value.trim().toUpperCase();
+  if(code==='CUBA20'){
+    const disc=Math.round(finalPriceCUP*0.2);
+    document.getElementById('ps-total').innerText=(finalPriceCUP-disc)+' CUP';
+    document.getElementById('compPrice').innerText=(finalPriceCUP-disc)+' CUP';
+    document.getElementById('ps-disc-row').style.display='flex';
+    document.getElementById('ps-disc').innerText='−'+disc+' CUP';
+    showNotification('Cupón aplicado 20%','success');
+  } else showNotification('Cupón inválido','error');
+}
+
+// Subir comprobante
+function handleFile(input){
+  if(!input.files[0])return;
+  const f=input.files[0];
+  if(f.size>5*1024*1024){showNotification('Máximo 5MB','error');return;}
+  selectedFile=f;
+  document.getElementById('previewName').innerText=f.name;
+  document.getElementById('previewSize').innerText=(f.size/1024).toFixed(0)+' KB';
+  document.getElementById('uploadPreview').classList.add('show');
+  document.querySelector('.upload-zone').style.display='none';
+  fileUploaded=true;
+  document.getElementById('sendBtn').disabled=false;
+  const reader=new FileReader();
+  reader.onload=e=>document.getElementById('previewThumb').innerHTML=`<img class="preview-thumb" src="${e.target.result}">`;
+  reader.readAsDataURL(f);
+}
+function removeFile(){
+  selectedFile=null;
+  document.getElementById('uploadPreview').classList.remove('show');
+  document.querySelector('.upload-zone').style.display='block';
+  fileUploaded=false;
+  document.getElementById('sendBtn').disabled=true;
+}
+async function sendOrder(){
+  if(!selectedFile){showNotification('Selecciona un archivo','error');return;}
+  const btn=document.getElementById('sendBtn');
+  btn.disabled=true;
+  btn.innerText='⏳ Enviando...';
+  const fd=new FormData();
+  fd.append('screenshot',selectedFile);
+  fd.append('telegramId',userId);
+  let planBackend = '';
+  if(selectedPlanKey==='basic') planBackend='basico';
+  else if(selectedPlanKey==='avanzado') planBackend='avanzado';
+  else if(selectedPlanKey==='vip') planBackend='cuba_vip';
+  else if(selectedPlanKey==='gaming') planBackend='premium';
+  else planBackend='anual';
+  fd.append('plan',planBackend);
+  fd.append('price',finalPriceCUP);
+  fd.append('method',document.querySelector('.method-tab.active').innerText.trim().toLowerCase().includes('usdt')?'usdt':(document.querySelector('.method-tab.active').innerText.trim().toLowerCase().includes('móvil')?'mobile':'transfer'));
+  fd.append('notes','');
+  try{
+    const res=await fetch('/api/payment',{method:'POST',body:fd});
+    const data=await res.json();
+    if(res.ok){
+      goToStep(4);
+      showNotification('✅ Comprobante enviado','success');
+    }else throw new Error(data.error||'Error');
+  }catch(e){
+    showNotification('❌ Error: '+e.message,'error');
+    btn.disabled=false;
+    btn.innerText='📨 ENVIAR COMPROBANTE';
+  }
+}
 function openTelegram(){ window.open('https://t.me/L0quen2','_blank'); }
 function showNotification(msg,type){ const n=document.getElementById('notification'); n.innerText=msg; n.style.borderLeftColor=type==='success'?'var(--neon)':'#ff4d4d'; n.style.transform='translateX(0)'; setTimeout(()=>n.style.transform='translateX(160%)',3000); }
-let currentStep=1; window.goToStep=goToStep; window.selectPlanDemo=selectPlanDemo; window.switchTab=switchTab; window.copyText=copyText; window.applyCoupon=applyCoupon; window.handleFile=handleFile; window.removeFile=removeFile; window.sendOrder=sendOrder; window.openTelegram=openTelegram;
-document.querySelectorAll('.method-tab')[0].click();
-if(localStorage.getItem('selectedPlan')){ try{ const stored=JSON.parse(localStorage.getItem('selectedPlan')); const plan=stored.type; if(plan==='basico')selectPlanDemo('basic'); else if(plan==='cuba_vip')selectPlanDemo('vip'); else if(plan==='premium')selectPlanDemo('gaming'); else if(plan==='anual')selectPlanDemo('anual'); else if(plan==='avanzado')selectPlanDemo('avanzado'); finalPriceCUP=stored.finalPrice; finalUsdt=stored.finalUsdt; discountApplied=stored.discountApplied; }catch(e){} }
-if(userId) loadReferralDiscount();
+
+// Cargar plan al inicio
+loadSelectedPlan();
 </script>
 </body>
 </html>
