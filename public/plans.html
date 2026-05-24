@@ -48,7 +48,6 @@
     position: relative;
   }
 
-  /* === GRAIN OVERLAY === */
   body::before {
     content: '';
     position: fixed;
@@ -59,7 +58,6 @@
     opacity: 0.4;
   }
 
-  /* === AMBIENT GLOW BG === */
   .bg-ambient {
     position: fixed;
     inset: 0;
@@ -89,7 +87,6 @@
   @keyframes drift1 { 0% { transform: translate(0,0); } 100% { transform: translate(5%,8%); } }
   @keyframes drift2 { 0% { transform: translate(0,0); } 100% { transform: translate(-5%,-8%); } }
 
-  /* === LAYOUT === */
   .app {
     position: relative;
     z-index: 1;
@@ -98,7 +95,25 @@
     padding: 0 0 100px;
   }
 
-  /* === HEADER === */
+  /* Pantalla de baneo */
+  .ban-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    display: none;
+  }
+
+  .ban-screen.active {
+    display: flex;
+  }
+
   .header {
     padding: 40px 24px 24px;
     position: relative;
@@ -149,7 +164,6 @@
     animation: fadeSlideDown 0.6s 0.2s ease both;
   }
 
-  /* === STATS ROW === */
   .stats-row {
     display: flex;
     gap: 10px;
@@ -178,7 +192,6 @@
     font-family: 'Space Mono', monospace;
   }
 
-  /* === SECTION LABEL === */
   .section-label {
     font-family: 'Space Mono', monospace;
     font-size: 10px;
@@ -189,7 +202,6 @@
     text-transform: uppercase;
   }
 
-  /* === NEW BADGE === */
   .new-badge {
     display: inline-block;
     background: linear-gradient(135deg, var(--neon-green), #00d080);
@@ -205,7 +217,6 @@
     text-transform: uppercase;
   }
 
-  /* === TURBO CARD (FEATURED) === */
   .turbo-card {
     margin: 0 24px 16px;
     position: relative;
@@ -343,7 +354,6 @@
   }
   .turbo-spec span { color: var(--neon-green); }
 
-  /* === PLAN CARDS SCROLL === */
   .plans-scroll {
     padding: 0 24px;
     display: flex;
@@ -374,7 +384,6 @@
     pointer-events: none;
   }
 
-  /* Color accents per plan */
   .plan-card.basic { --accent: var(--pastel-blue); --accent-glow: rgba(168,220,255,0.12); }
   .plan-card.advanced { --accent: var(--pastel-purple); --accent-glow: rgba(212,184,255,0.12); }
   .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); }
@@ -510,7 +519,6 @@
     box-shadow: 0 0 4px var(--accent);
   }
 
-  /* VIP highlight card */
   .plan-card.vip {
     border-color: rgba(255,229,102,0.2);
     background: linear-gradient(135deg, #111520, #141208);
@@ -519,7 +527,6 @@
     border-color: rgba(255,110,180,0.15);
   }
 
-  /* === COMPARISON === */
   .compare-section {
     margin: 0 24px 32px;
     animation: fadeSlideDown 0.5s 0.5s ease both;
@@ -576,7 +583,6 @@
   .nope { color: var(--text-dim); font-size: 14px; }
   .val-sm { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--pastel-blue); }
 
-  /* === FAQ === */
   .faq-section {
     margin: 0 24px 32px;
   }
@@ -618,7 +624,6 @@
     padding: 0 16px 14px;
   }
 
-  /* === TRUST STRIP === */
   .trust-strip {
     margin: 0 24px 28px;
     display: grid;
@@ -641,7 +646,6 @@
     line-height: 1.4;
   }
 
-  /* === BOTTOM NAV === */
   .bottom-nav {
     position: fixed;
     bottom: 0;
@@ -677,7 +681,6 @@
   .nav-item.active .nav-lbl { color: var(--pastel-blue); }
   .nav-item.active svg { color: var(--neon-blue); filter: drop-shadow(0 0 4px var(--neon-blue)); }
 
-  /* === MODAL OVERLAY === */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -794,7 +797,6 @@
     cursor: pointer;
   }
 
-  /* === ANIMATIONS === */
   @keyframes fadeSlideDown {
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -806,7 +808,6 @@
   .plans-scroll .plan-card:nth-child(4) { animation-delay: 0.55s; }
   .plans-scroll .plan-card:nth-child(5) { animation-delay: 0.6s; }
 
-  /* Ticker */
   .ticker-wrap {
     background: rgba(91,240,255,0.05);
     border-top: 1px solid rgba(91,240,255,0.1);
@@ -836,7 +837,6 @@
     100% { transform: translateX(-50%); }
   }
 
-  /* Scrollbar */
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -846,7 +846,14 @@
 
 <div class="bg-ambient"></div>
 
-<div class="app">
+<!-- Pantalla de baneo -->
+<div class="ban-screen" id="banScreen">
+  <div style="font-size:48px; margin-bottom:16px;">🚫</div>
+  <div style="font-family:'Syne',sans-serif; font-size:24px; font-weight:800; color:#fff; margin-bottom:12px;">Acceso bloqueado</div>
+  <div style="color:var(--text-muted); font-size:14px; max-width:280px;">Has sido baneado y no puedes usar el servicio. Si crees que es un error, contacta con soporte.</div>
+</div>
+
+<div class="app" id="mainApp">
 
   <!-- HEADER -->
   <div class="header">
@@ -883,7 +890,6 @@
       <div class="ticker-item">🇨🇺 IP RESIDENCIAL CU</div>
       <div class="ticker-item">🎮 GAMING PRIORITY</div>
       <div class="ticker-item">📡 MTU 1280 OPTIMIZADO</div>
-      <!-- repeat for seamless loop -->
       <div class="ticker-item">🟢 PRUEBA <span>ONLINE</span></div>
       <div class="ticker-item">⚡ WireGuard UDP:80</div>
       <div class="ticker-item">🔒 AES-256 CIFRADO</div>
@@ -1315,7 +1321,7 @@ function scrollTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Telegram Mini App init
+// ===== INICIALIZACIÓN (con verificación de baneo) =====
 window.addEventListener('load', () => {
   const tg = window.Telegram?.WebApp;
   if (tg) {
@@ -1323,6 +1329,23 @@ window.addEventListener('load', () => {
     tg.expand();
     tg.setHeaderColor('#080a0f');
     tg.setBackgroundColor('#080a0f');
+  }
+
+  if (currentUserId) {
+    fetch(`/api/user-info/${encodeURIComponent(currentUserId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.banned) {
+          document.getElementById('banScreen').classList.add('active');
+          document.getElementById('mainApp').style.display = 'none';
+          return;
+        }
+        // Si no está baneado, no es necesario hacer nada extra; la página ya está visible.
+      })
+      .catch(() => {
+        // Si falla la verificación, permitimos el acceso normal
+        console.log('No se pudo verificar el estado de baneo, acceso permitido.');
+      });
   }
 });
 </script>
