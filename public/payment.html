@@ -943,7 +943,7 @@ body::after {
         <div class="payment-info-box">
           <div class="pib-label">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            MÓVIL A CONFIRMAR
+            # A CONFIRMAR
           </div>
           <div class="pib-val">63806513</div>
           <button class="copy-btn" onclick="copyText('63806513',this)">
@@ -960,9 +960,9 @@ body::after {
       <!-- Metropolitana -->
       <div class="method-panel" id="tab-metropolitana">
         <div class="payment-info-box">
-          <div class="pib-label">NÚMERO DE TARJETA METROPOLITANA</div>
-          <div class="pib-val">9238-9598-7118-1386</div>
-          <button class="copy-btn" onclick="copyText('9238959871181386',this)">
+          <div class="pib-label">NÚMERO DE TARJETA Metropolitana</div>
+          <div class="pib-val">9225-4478-1234-5678</div>
+          <button class="copy-btn" onclick="copyText('9225447812345678',this)">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             COPIAR TARJETA
           </button>
@@ -1224,7 +1224,7 @@ const planData = {
   },
   gaming: {
     tag:'GAMING · QoS PRIORITARIO', name:'GAMING', sub:'Latencia mínima · MLBB · CoD · Free Fire',
-    price:'2,500 CUP', mobile:'800 CUP', usdt:'6.00 USDT', duration:'1 MES',
+    price:'1,600 CUP', mobile:'800 CUP', usdt:'4.00 USDT', duration:'1 MES',
     sumPlan:'Plan Gaming', sumDuration:'1 mes',
     features:[['🎮','MLBB·CoD·FF'],['⚡','<25ms latencia'],['🎯','QoS traffic'],['📦','~0% loss'],['🔒','AES-256'],['🆘','Soporte']],
     accentColor:'#ff6eb4', tagBg:'rgba(255,110,180,0.08)', tagBorder:'rgba(255,110,180,0.25)',
@@ -1243,6 +1243,9 @@ const planData = {
 let currentPlan = 'anual';
 let currentStep = 1;
 let fileUploaded = false;
+
+const qp = new URLSearchParams(window.location.search);
+const initialPlan = (qp.get('plan') || '').toLowerCase();
 
 // ===== SELECT PLAN =====
 function selectPlan(key) {
@@ -1442,7 +1445,7 @@ function openTelegram() {
 
 // ===== INIT =====
 window.addEventListener('load', ()=>{
-  selectPlan('anual');
+  selectPlan(initialPlan || 'anual');
   const tg = window.Telegram?.WebApp;
   if(tg){ tg.ready(); tg.expand(); tg.setHeaderColor('#06080e'); tg.setBackgroundColor('#06080e'); }
 });
