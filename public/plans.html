@@ -878,17 +878,17 @@
 
   <!-- TURBO CARD -->
   <div class="section-label">// LANZAMIENTO HOY</div>
-  <div class="turbo-card" onclick="openModal('turbo')">
+  <div class="turbo-card" onclick="openModal('trial')">
     <div class="turbo-inner">
       <div class="turbo-tag">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        NUEVO · 21 MAYO
+        PRUEBA DISPONIBLE
       </div>
-      <div class="turbo-name"><em>Prueba</em> Download</div>
-      <div class="turbo-desc">Acceso de prueba por plan. Elige el tipo de prueba y revisa la calidad antes de comprar.</div>
+      <div class="turbo-name"><em>Prueba</em></div>
+      <div class="turbo-desc">Sin límites de velocidad. Optimizado para descargas masivas. La fibra que Cuba nunca tuvo.</div>
       <div class="turbo-price-row">
         <div>
-          <div class="turbo-price"><sup>$</sup>0<sub>/prueba</sub></div>
+          <div class="turbo-price"><sup>0</sup><sub>/prueba</sub></div>
         </div>
         <button class="turbo-cta">
           Activar ahora
@@ -896,10 +896,10 @@
         </button>
       </div>
       <div class="turbo-specs">
-        <div class="turbo-spec">⚡ <span>VELOCIDAD</span> ILIMITADA</div>
-        <div class="turbo-spec">📦 <span>TORRENT</span> OK</div>
-        <div class="turbo-spec">☁️ <span>CLOUD</span> SYNC</div>
-        <div class="turbo-spec">🔄 <span>24/7</span> UPTIME</div>
+        <div class="turbo-spec">⚡ <span>PRUEBA</span> 1 POR PLAN</div>
+        <div class="turbo-spec">📋 <span>PLAN</span> A ELEGIR</div>
+        <div class="turbo-spec">🏦 <span>VIP</span> CUBA</div>
+        <div class="turbo-spec">🔒 <span>WIREGUARD</span> LISTO</div>
       </div>
     </div>
   </div>
@@ -914,7 +914,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🌐</div>
         <div class="plan-price-block">
-          <div class="plan-price">$XX</div>
+          <div class="plan-price">1,200 CUP</div>
           <div class="plan-price-period">/mes</div>
         </div>
       </div>
@@ -937,7 +937,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🚀</div>
         <div class="plan-price-block">
-          <div class="plan-price">$1600</div>
+          <div class="plan-price">2,000 CUP</div>
           <div class="plan-price-period">2 meses</div>
         </div>
       </div>
@@ -960,7 +960,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🏦</div>
         <div class="plan-price-block">
-          <div class="plan-price">$XX</div>
+          <div class="plan-price">3,500 CUP</div>
           <div class="plan-price-period">/mes</div>
         </div>
       </div>
@@ -984,7 +984,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🎮</div>
         <div class="plan-price-block">
-          <div class="plan-price">$XX</div>
+          <div class="plan-price">1,600 CUP</div>
           <div class="plan-price-period">/mes</div>
         </div>
       </div>
@@ -1008,7 +1008,7 @@
       <div class="plan-row1">
         <div class="plan-icon">♾️</div>
         <div class="plan-price-block">
-          <div class="plan-price">$XX</div>
+          <div class="plan-price">12,000 CUP</div>
           <div class="plan-price-period">/año</div>
         </div>
       </div>
@@ -1028,68 +1028,7 @@
 
   </div>
 
-  
-
-  <!-- TRUST STRIP -->
-  <div class="trust-strip">
-    <div class="trust-item">
-      <div class="icon">🔒</div>
-      <div class="label">AES-256<br>Cifrado</div>
-    </div>
-    <div class="trust-item">
-      <div class="icon">⚡</div>
-      <div class="label">WireGuard<br>Protocol</div>
-    </div>
-    <div class="trust-item">
-      <div class="icon">🛡️</div>
-      <div class="label">Sin logs<br>No tracking</div>
-    </div>
-  </div>
-
-  <!-- FAQ -->
-  <div class="faq-section">
-    <div class="section-label" style="padding:0;margin-bottom:14px">// FAQ</div>
-    <div class="faq-item" onclick="toggleFaq(this)">
-      <div class="faq-q">¿Funciona tras apagones? <span class="arr">+</span></div>
-      <div class="faq-a">Sí. Recomendamos desactivar Fast Startup en Windows y limpiar caché DNS tras un apagón. Nuestro soporte tiene guías paso a paso para reconectar en segundos.</div>
-    </div>
-    <div class="faq-item" onclick="toggleFaq(this)">
-      <div class="faq-q">¿Qué puerto usa? <span class="arr">+</span></div>
-      <div class="faq-a">Puerto 80 UDP con WireGuard. MTU 1280 y PersistentKeepalive 25, configurados automáticamente para Cuba.</div>
-    </div>
-    <div class="faq-item" onclick="toggleFaq(this)">
-      <div class="faq-q">¿Cómo activo el plan VIP? <span class="arr">+</span></div>
-      <div class="faq-a">Contáctanos en el canal oficial @L0quen2. IP residencial cubana activada en menos de 1 hora. Compatible con Enzona y Transfermóvil.</div>
-    </div>
-    <div class="faq-item" onclick="toggleFaq(this)">
-      <div class="faq-q">¿El Gaming plan reduce lag? <span class="arr">+</span></div>
-      <div class="faq-a">Usamos QoS (Quality of Service) en MikroTik para priorizar paquetes de juego. Latencia optimizada para MLBB, CoD Mobile y Free Fire.</div>
-    </div>
-  </div>
-
-</div>
-
-<!-- BOTTOM NAV -->
-<nav class="bottom-nav">
-  <div class="nav-item active">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-    <span class="nav-lbl">Planes</span>
-  </div>
-  <div class="nav-item" onclick="scrollTop()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>
-    <span class="nav-lbl">Estado</span>
-  </div>
-  <div class="nav-item">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-    <span class="nav-lbl">Soporte</span>
-  </div>
-  <div class="nav-item">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-    <span class="nav-lbl">Mi cuenta</span>
-  </div>
-</nav>
-
-<!-- MODAL -->
+  <!-- MODAL -->
 <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
   <div class="modal-sheet" id="modalSheet">
     <div class="modal-handle"></div>
@@ -1097,27 +1036,40 @@
   </div>
 </div>
 
+
 <script>
-const plans = {
-  turbo: {
+const tg = window.Telegram?.WebApp ?? {
+  initDataUnsafe: {},
+  ready(){},
+  expand(){},
+  sendData(){}
+};
+
+const params = new URLSearchParams(window.location.search);
+const queryUserId = params.get('userId');
+const tgUser = tg.initDataUnsafe?.user || {};
+const userId = queryUserId || tgUser.id || '';
+
+const PLAN_CONFIG = {
+  trial: {
+    title: 'Prueba',
     icon: '⚡',
-    name: 'Prueba',
     color: '#39ffa0',
     shadowColor: 'rgba(57,255,160,0.3)',
-    desc: 'El plan definitivo para descargas masivas. Sin límite de velocidad, sin restricciones. Torrent, cloud sync, backups: todo fluye al máximo.',
+    desc: 'Prueba rápida para validar velocidad, estabilidad y ruta antes de comprar.',
     features: [
-      { icon: '🚀', label: 'VELOCIDAD', val: 'ILIMITADA' },
+      { icon: '🧪', label: 'TIPO', val: 'PRUEBA' },
       { icon: '📡', label: 'PROTOCOLO', val: 'WireGuard' },
-      { icon: '📦', label: 'TORRENT', val: 'Permitido' },
-      { icon: '🔄', label: 'UPTIME', val: '99.9%' },
-      { icon: '☁️', label: 'CLOUD', val: 'Sync OK' },
-      { icon: '🛡️', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '🏦', label: 'VIP', val: 'Cuba' },
+      { icon: '🔄', label: 'USO', val: '1 por plan' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '✅', label: 'ESTADO', val: 'Disponible' },
     ],
-    cta: '🧪 Solicitar prueba',
+    cta: 'Solicitar prueba',
   },
   basic: {
+    title: 'Básico',
     icon: '🌐',
-    name: 'Plan Básico',
     color: '#a8dcff',
     shadowColor: 'rgba(168,220,255,0.3)',
     desc: 'La puerta de entrada a internet sin censura. Ideal para streaming y navegación cotidiana con conexión estable.',
@@ -1126,83 +1078,99 @@ const plans = {
       { icon: '⚡', label: 'VELOCIDAD', val: '2 Mbps' },
       { icon: '📡', label: 'PROTOCOLO', val: 'WireGuard' },
       { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
-      { icon: '📱', label: 'DISPOSITIVOS', val: '1 activo' },
-      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+      { icon: '📱', label: 'MÓVIL', val: 'Compatible' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Incluido' },
     ],
-    cta: '🌐 Elegir Básico',
+    price: 1200,
+    usdt: '3.00',
+    duration: '1 mes',
+    cta: 'Activar ahora',
   },
   advanced: {
+    title: 'Avanzado',
     icon: '🚀',
-    name: 'Plan Avanzado',
     color: '#d4b8ff',
     shadowColor: 'rgba(212,184,255,0.3)',
-    desc: '2 meses completos del plan Básico. La elección inteligente para quienes planean. Más tiempo, mejor precio.',
+    desc: '2 meses del plan básico. La opción inteligente con mejor ahorro.',
     features: [
-      { icon: '📅', label: 'DURACIÓN', val: '2 meses' },
-      { icon: '📺', label: 'STREAMING', val: 'USA incluido' },
+      { icon: '🚀', label: 'DURACIÓN', val: '2 meses' },
+      { icon: '🌐', label: 'STREAMING', val: 'USA' },
       { icon: '⚡', label: 'VELOCIDAD', val: '2 Mbps' },
-      { icon: '💰', label: 'AHORRO', val: 'vs. mensual' },
+      { icon: '💰', label: 'AHORRO', val: 'Sí' },
       { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
-      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Incluido' },
     ],
-    cta: '🚀 Elegir Avanzado',
+    price: 2000,
+    usdt: '5.00',
+    duration: '2 meses',
+    cta: 'Activar ahora',
   },
   vip: {
+    title: 'VIP Cuba',
     icon: '🏦',
-    name: 'VIP Cuba',
     color: '#ffe566',
-    shadowColor: 'rgba(255,229,102,0.3)',
-    desc: 'El único plan con IP Residencial Cubana real. Accede a Enzona, Transfermóvil y banca online desde cualquier lugar.',
+    shadowColor: 'rgba(255,229,102,0.22)',
+    desc: 'IP Residencial Cubana para Enzona y Transfermóvil.',
     features: [
-      { icon: '🇨🇺', label: 'IP ORIGEN', val: 'Residencial CU' },
+      { icon: '🇨🇺', label: 'IP', val: 'Residencial' },
       { icon: '🏦', label: 'ENZONA', val: 'Compatible' },
-      { icon: '📲', label: 'TRANSFERMÓVIL', val: 'Compatible' },
+      { icon: '📲', label: 'TRANSFER', val: 'Compatible' },
       { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
       { icon: '⚡', label: 'VELOCIDAD', val: '5 Mbps' },
       { icon: '🆘', label: 'SOPORTE', val: 'Prioritario' },
     ],
-    cta: '🏦 Activar VIP',
+    price: 3500,
+    usdt: '8.00',
+    duration: '1 mes',
+    cta: 'Activar ahora',
   },
   gaming: {
+    title: 'Gaming',
     icon: '🎮',
-    name: 'Plan Gaming',
     color: '#ff6eb4',
-    shadowColor: 'rgba(255,110,180,0.3)',
-    desc: 'Diseñado para gamers cubanos. QoS prioritario para paquetes de juego, latencia mínima garantizada.',
+    shadowColor: 'rgba(255,110,180,0.25)',
+    desc: 'QoS prioritario. Latencia mínima para MLBB, CoD, Free Fire.',
     features: [
-      { icon: '⚡', label: 'LATENCIA', val: '<25ms' },
-      { icon: '🎯', label: 'QoS', val: 'Tráfico prioritario' },
       { icon: '🎮', label: 'JUEGOS', val: 'MLBB · CoD · FF' },
-      { icon: '📦', label: 'PACKET LOSS', val: '~0%' },
+      { icon: '⚡', label: 'LATENCIA', val: '<25ms' },
+      { icon: '🎯', label: 'QOS', val: 'Prioritario' },
+      { icon: '📦', label: 'LOSS', val: '~0%' },
       { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
-      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Incluido' },
     ],
-    cta: '🎮 Activar Gaming',
+    price: 1600,
+    usdt: '4.00',
+    duration: '1 mes',
+    cta: 'Activar ahora',
   },
   anual: {
+    title: 'Anual Total',
     icon: '♾️',
-    name: 'Plan Anual',
     color: '#ffd4b8',
-    shadowColor: 'rgba(255,212,184,0.3)',
-    desc: '12 meses de acceso total. Todos los planes, todas las funciones. El mayor ahorro posible. La libertad completa.',
+    shadowColor: 'rgba(255,212,184,0.22)',
+    desc: 'Acceso completo 12 meses. Todo desbloqueado.',
     features: [
-      { icon: '📅', label: 'DURACIÓN', val: '12 meses' },
-      { icon: '🌐', label: 'ACCESO', val: 'TODOS los planes' },
+      { icon: '♾️', label: 'ACCESO', val: 'Todos los planes' },
       { icon: '🏦', label: 'VIP', val: 'Incluido' },
       { icon: '🎮', label: 'GAMING', val: 'Incluido' },
       { icon: '⚡', label: 'TURBO', val: 'Incluido' },
-      { icon: '🆘', label: 'SOPORTE', val: 'VIP 24/7' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Prioritario' },
     ],
-    cta: '♾️ Ir Anual',
+    price: 12000,
+    usdt: '20.00',
+    duration: '12 meses',
+    cta: 'Activar ahora',
   },
 };
 
 function openModal(key) {
-  const p = plans[key];
+  const p = PLAN_CONFIG[key];
+  if (!p) return;
   const content = document.getElementById('modalContent');
   content.innerHTML = `
     <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
-    <div class="modal-plan-name">${p.name}</div>
+    <div class="modal-plan-name">${p.title}</div>
     <div class="modal-plan-desc">${p.desc}</div>
     <div class="modal-features-grid">
       ${p.features.map(f => `
@@ -1232,13 +1200,22 @@ function closeModalOutside(e) {
 
 function handleCTA(key) {
   closeModal();
-  // In real Telegram Mini App: window.Telegram.WebApp.sendData(key)
-  const tg = window.Telegram?.WebApp;
-  if (tg) {
-    tg.sendData(JSON.stringify({ action: 'select_plan', plan: key }));
-  } else {
-    alert(`✅ Plan "${plans[key].name}" seleccionado.\n\nContacta @L0quen2 en Telegram para activar.`);
+
+  if (key === 'trial') {
+    const payload = JSON.stringify({ action: 'request_trial', plan: 'vip_cuba', userId });
+    if (tg?.sendData) {
+      tg.sendData(payload);
+    } else {
+      alert('Prueba seleccionada. Abre este archivo dentro de Telegram para continuar.');
+    }
+    return;
   }
+
+  const plan = key;
+  const price = PLAN_CONFIG[key]?.price ?? '';
+  const usdt = PLAN_CONFIG[key]?.usdt ?? '';
+  const url = `payment.html?plan=${encodeURIComponent(plan)}&price=${encodeURIComponent(price)}&usdtAmount=${encodeURIComponent(usdt)}&userId=${encodeURIComponent(userId || '')}`;
+  window.location.href = url;
 }
 
 function toggleFaq(el) {
@@ -1251,14 +1228,13 @@ function scrollTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Telegram Mini App init
 window.addEventListener('load', () => {
-  const tg = window.Telegram?.WebApp;
-  if (tg) {
-    tg.ready();
-    tg.expand();
-    tg.setHeaderColor('#080a0f');
-    tg.setBackgroundColor('#080a0f');
+  const tgapp = window.Telegram?.WebApp;
+  if (tgapp) {
+    tgapp.ready();
+    tgapp.expand();
+    tgapp.setHeaderColor('#080a0f');
+    tgapp.setBackgroundColor('#080a0f');
   }
 });
 </script>
