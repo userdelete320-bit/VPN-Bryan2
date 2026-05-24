@@ -905,7 +905,7 @@ body::after {
           </div>
           <div class="ps-row" id="ps-disc-row" style="display:none">
             <span class="ps-key ps-discount">Descuento ref. 20%</span>
-            <span class="ps-val ps-discount" id="ps-disc">−2,400 CUP</span>
+            <span class="ps-val ps-discount" id="ps-disc-val">−2,400 CUP</span>
           </div>
           <div class="ps-row total">
             <span class="ps-key">Total a pagar</span>
@@ -1243,7 +1243,7 @@ const planData = {
   },
   gaming: {
     tag:'GAMING · QoS PRIORITARIO', name:'GAMING', sub:'Latencia mínima · MLBB · CoD · Free Fire',
-    price:'1,600 CUP', mobile:'700 CUP', usdt:'2.3 USDT', duration:'1 MES',
+    price:'1,500 CUP', mobile:'700 CUP', usdt:'2.3 USDT', duration:'1 MES',
     sumPlan:'Plan Gaming', sumDuration:'1 mes',
     features:[['🎮','MLBB·CoD·FF'],['⚡','<25ms latencia'],['🎯','QoS traffic'],['📦','~0% loss'],['🔒','AES-256'],['🆘','Soporte']],
     accentColor:'#ff6eb4', tagBg:'rgba(255,110,180,0.08)', tagBorder:'rgba(255,110,180,0.25)',
@@ -1284,7 +1284,7 @@ const PLAN_BASE = {
   basic: { cup: 900, mobile: 400, usdt: 1.5 },
   advanced: { cup: 1800, mobile: 900, usdt: 2.8 },
   vip: { cup: 1200, mobile: 500, usdt: 1.9 },
-  gaming: { cup: 1600, mobile: 700, usdt: 2.3 },
+  gaming: { cup: 1500, mobile: 700, usdt: 2.3 },
   anual: { cup: 15000, mobile: 10000, usdt: 25 },
   trial: { cup: 0, mobile: 0, usdt: 0 }
 };
@@ -1601,7 +1601,7 @@ async function sendOrder() {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page4').classList.add('active');
     document.getElementById('conf-plan').textContent = planData[currentPlan].name;
-    document.getElementById('conf-price').textContent = formatCUP(finalCup);
+    document.getElementById('comp-price').textContent = formatCUP(finalCup);
     document.getElementById('movilAmount').textContent = p.mobile ? formatCUP(finalMobile) : '—';
     document.getElementById('usdtAmount').textContent = finalUsdt + ' USDT';
     updateDiscountBanner();
