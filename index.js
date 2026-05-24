@@ -14,16 +14,51 @@ const db = require('./supabase');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
-const PLAN_TYPES = ['basico', 'avanzado', 'premium', 'anual'];
+const PLAN_TYPES = ['basico', 'avanzado', 'vip', 'premium', 'anual'];
+
+function normalizePlanType(planType) {
+  const raw = String(planType || 'basico').trim().toLowerCase();
+  if (raw === 'cuba_vip') return 'vip';
+  if (PLAN_TYPES.includes(raw)) return raw;
+  return 'basico';
+}
 
 // ==================== STUB MÉTODOS TRIAL FILES (uno por plan) ====================
 // Cada función acepta planType para operar sobre la tabla/bucket correcto.
 // Las tablas en Supabase se llaman: trial_files_basico, trial_files_avanzado,
-// trial_files_premium, trial_files_anual
+// trial_files_vip, trial_files_premium, trial_files_anual
 
 function getTrialTableName(planType) {
-  const valid = ['basico', 'avanzado', 'premium', 'anual'];
-  return valid.includes(planType) ? `trial_files_${planType}` : 'trial_files_basico';
+  const normalized = normalizePlanType(planType);
+  return `trial_files_${normalized}`;
+}
+
+function listLocalTrialFiles(planType) {
+  try {
+    const dir = TRIAL_DIRS?.[planType];
+    if (!dir || !fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter(name => !name.startsWith('index') && !name.endsWith('.tmp'))
+      .map(name => {
+        const local_path = path.join(dir, name);
+        const stat = fs.statSync(local_path);
+        return {
+          id: name,
+          original_name: name,
+          local_path,
+          public_url: null,
+          label: name,
+          uploaded_by: null,
+          is_active: true,
+          uploaded_at: stat.mtime.toISOString(),
+          updated_at: stat.mtime.toISOString(),
+        };
+      })
+      .sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
+  } catch (error) {
+    console.warn(`⚠️ listLocalTrialFiles(${planType}) falló:`, error.message);
+    return [];
+  }
 }
 
 function getSbClient() {
@@ -42,7 +77,7 @@ if (!db.getTrialFilesByPlan) {
       const { data, error } = await sb.from(table).select('*').order('uploaded_at', { ascending: false });
       if (error) throw error;
       return data || [];
-    } catch(e) { console.warn(`⚠️ trial_files_${planType} tabla no existe aún:`, e.message); return []; }
+    } catch(e) { console.warn(`⚠️ trial_files_${planType} tabla no existe aún:`, e.message); return listLocalTrialFiles(planType); }
   };
 }
 
@@ -54,7 +89,7 @@ if (!db.getTrialFileByPlan) {
       const { data, error } = await sb.from(table).select('*').eq('id', id).single();
       if (error) throw error;
       return data;
-    } catch(e) { return null; }
+    } catch(e) { const local = listLocalTrialFiles(planType).find(f => String(f.id) === String(id)); return local || null; }
   };
 }
 
@@ -78,7 +113,7 @@ if (!db.updateTrialFileByPlan) {
       const { data, error } = await sb.from(table).update({ ...updateData, updated_at: new Date().toISOString() }).eq('id', id).select().single();
       if (error) throw error;
       return data;
-    } catch(e) { return null; }
+    } catch(e) { const local = listLocalTrialFiles(planType).find(f => String(f.id) === String(id)); return local || null; }
   };
 }
 
@@ -123,6 +158,7 @@ const USDT_CONFIG = {
 const USDT_PRICES = {
     'basico': '0.7',
     'avanzado': '1.4',
+    'vip': '2.0',
     'cuba_vip': '2.0',
     'premium': '1.1',
     'anual': '30'
@@ -349,28 +385,31 @@ if (!fs.existsSync('public')) fs.mkdirSync('public', { recursive: true });
 
 // Ruta de fallback (archivo de plan individual para trial legacy)
 const TRIAL_CURRENT_FILE = path.join(UPLOADS_DIR, 'trial_files_basico', 'trial_current');
+const START_BANNER_GIF = path.join(__dirname, 'attached_assets', 'vpncuba-premium.gif');
 
 function getPlanName(planType) {
+  const normalized = normalizePlanType(planType);
   const plans = {
     'basico': 'Básico (1 mes)',
     'avanzado': 'Avanzado (2 meses)',
-    'cuba_vip': 'Cuba VIP (1 mes)',
+    'vip': 'VIP Cuba (1 mes)',
     'premium': 'Gaming (1 mes)',
     'anual': 'Anual (12 meses)',
     'trial': 'Prueba Gratuita'
   };
-  return plans[planType] || planType;
+  return plans[normalized] || planType;
 }
 
 function getPlanLabel(planType) {
+  const normalized = normalizePlanType(planType);
   const labels = {
     'basico': '🌐 Básico',
     'avanzado': '🌟 Avanzado',
-    'cuba_vip': '🇨🇺 Cuba VIP',
+    'vip': '🇨🇺 VIP Cuba',
     'premium': '🎮 Gaming',
     'anual': '📅 Anual'
   };
-  return labels[planType] || planType;
+  return labels[normalized] || planType;
 }
 
 function generateUniqueUsdtAddress() { return USDT_CONFIG.WALLET_ADDRESS; }
@@ -393,10 +432,10 @@ function calcularDiasRestantes(user) {
     const fechaInicio = new Date(user.vip_since);
     const fechaActual = new Date();
     let duracionDias;
-    switch(user.plan.toLowerCase()) {
+    switch(normalizePlanType(user.plan)) {
         case 'basico': duracionDias = 30; break;
         case 'avanzado': duracionDias = 60; break;
-        case 'cuba_vip': duracionDias = 30; break;
+        case 'vip': duracionDias = 30; break;
         case 'premium': duracionDias = 30; break;
         case 'anual': duracionDias = 365; break;
         default: duracionDias = 30;
@@ -445,7 +484,7 @@ async function createBucketViaAPI(bucketName, isPublic = true) {
 
 async function verifyStorageBuckets() {
   try {
-    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual'];
+    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-vip', 'trial-files-premium', 'trial-files-anual'];
     for (const bucketName of buckets) {
       try {
         const { data, error } = await supabaseAdmin.storage.from(bucketName).list();
@@ -464,6 +503,7 @@ async function initializeStorageBuckets() {
     { name: 'plan-files', public: true },
     { name: 'trial-files-basico', public: true },
     { name: 'trial-files-avanzado', public: true },
+    { name: 'trial-files-vip', public: true },
     { name: 'trial-files-premium', public: true },
     { name: 'trial-files-anual', public: true }
   ];
@@ -480,7 +520,7 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
     const gameServer = user.trial_game_server || 'No especificado';
     const connectionType = user.trial_connection_type || 'No especificado';
     // Determinar qué pool usar según el plan que pidió el usuario
-    const trialPlanType = user.trial_plan_type || 'basico';
+    const trialPlanType = normalizePlanType(user.trial_plan_type || 'basico');
     const planLabel = getPlanLabel(trialPlanType);
 
     let filePath = null;
@@ -1190,13 +1230,14 @@ app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
     const { plan, adminId } = req.body;
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
     if (!req.file) return res.status(400).json({ error: 'Archivo requerido' });
-    if (!plan || !['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'].includes(plan)) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Plan inválido' }); }
+    const normalizedPlan = normalizePlanType(plan);
+    if (!plan || !PLAN_TYPES.includes(normalizedPlan)) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Plan inválido' }); }
     const fileName = req.file.originalname.toLowerCase();
     if (!fileName.endsWith('.zip') && !fileName.endsWith('.rar') && !fileName.endsWith('.conf')) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Solo .conf, .zip o .rar' }); }
     const fileBuffer = fs.readFileSync(req.file.path);
     const uploadResult = await db.uploadPlanFile(fileBuffer, plan, req.file.originalname);
     fs.unlink(req.file.path, () => {});
-    const savedFile = await db.savePlanFile({ plan, storage_filename: uploadResult.filename, original_name: uploadResult.originalName, public_url: uploadResult.publicUrl, uploaded_by: adminId, uploaded_at: new Date().toISOString() });
+    const savedFile = await db.savePlanFile({ plan: normalizedPlan, storage_filename: uploadResult.filename, original_name: uploadResult.originalName, public_url: uploadResult.publicUrl, uploaded_by: adminId, uploaded_at: new Date().toISOString() });
     res.json({ success: true, message: `Archivo de plan ${getPlanName(plan)} subido`, file: savedFile });
   } catch (error) { if (req.file?.path) fs.unlink(req.file.path, () => {}); res.status(500).json({ error: 'Error: ' + error.message }); }
 });
@@ -1210,7 +1251,7 @@ app.post('/api/trial-files/upload', upload.single('file'), async (req, res) => {
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
     if (!req.file) return res.status(400).json({ error: 'Archivo requerido' });
 
-    const targetPlan = PLAN_TYPES.includes(planType) ? planType : 'basico';
+    const targetPlan = normalizePlanType(planType);
     const fileName = req.file.originalname.toLowerCase();
     if (!fileName.endsWith('.zip') && !fileName.endsWith('.rar') && !fileName.endsWith('.conf')) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Solo .conf, .zip o .rar' }); }
 
@@ -1250,7 +1291,7 @@ app.post('/api/trial-files/upload', upload.single('file'), async (req, res) => {
 // Obtener archivos del pool de un plan específico
 app.get('/api/trial-files/:planType', async (req, res) => {
   try {
-    const planType = PLAN_TYPES.includes(req.params.planType) ? req.params.planType : 'basico';
+    const planType = normalizePlanType(req.params.planType);
     const files = await db.getTrialFilesByPlan(planType);
     res.json((files || []).map(f => ({ ...f, local_exists: f.local_path ? fs.existsSync(f.local_path) : false })));
   } catch (error) { res.status(500).json({ error: 'Error obteniendo archivos' }); }
@@ -1272,7 +1313,7 @@ app.put('/api/trial-files/:planType/:id/toggle', async (req, res) => {
   try {
     const { adminId, is_active } = req.body;
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
-    const planType = PLAN_TYPES.includes(req.params.planType) ? req.params.planType : 'basico';
+    const planType = normalizePlanType(req.params.planType);
     const updated = await db.updateTrialFileByPlan(planType, req.params.id, { is_active: !!is_active });
     res.json({ success: true, file: updated });
   } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
@@ -1282,7 +1323,7 @@ app.delete('/api/trial-files/:planType/:id', async (req, res) => {
   try {
     const { adminId } = req.body;
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
-    const planType = PLAN_TYPES.includes(req.params.planType) ? req.params.planType : 'basico';
+    const planType = normalizePlanType(req.params.planType);
     const file = await db.getTrialFileByPlan(planType, req.params.id);
     if (!file) return res.status(404).json({ error: 'Archivo no encontrado' });
     if (file.local_path && fs.existsSync(file.local_path)) fs.unlinkSync(file.local_path);
@@ -1600,7 +1641,22 @@ bot.start(async (ctx) => {
         await db.saveUser(userId.toString(), userData);
     } catch (error) { console.error('Error guardando usuario:', error); }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
-    let welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
+    const welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
+
+    try {
+        if (fs.existsSync(START_BANNER_GIF)) {
+            await bot.telegram.sendAnimation(
+                ctx.chat.id,
+                { source: fs.createReadStream(START_BANNER_GIF) },
+                { parse_mode: 'Markdown', caption: welcomeMessage, ...keyboard }
+            );
+            return;
+        }
+        console.warn('⚠️ Banner GIF no encontrado en attached_assets/vpncuba-premium.gif, enviando texto normal.');
+    } catch (bannerError) {
+        console.error('❌ Error enviando banner GIF:', bannerError);
+    }
+
     await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
 });
 
@@ -1668,7 +1724,7 @@ app.listen(PORT, '0.0.0.0', async () => {
         ]);
     } catch (error) { console.error('❌ Error configurando comandos:', error); }
     startKeepAlive();
-    console.log(`🎯 Pool de pruebas: separado por plan (basico/avanzado/cuba_vip/premium/anual)`);
+    console.log(`🎯 Pool de pruebas: separado por plan (basico/avanzado/vip/premium/anual)`);
     console.log(`💰 Sistema USDT: MODO MANUAL`);
 });
 
