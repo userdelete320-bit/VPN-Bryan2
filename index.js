@@ -171,17 +171,26 @@ bot.use(async (ctx, next) => {
         const userId = ctx.from.id.toString();
         const banned = await isUserBanned(userId);
         if (banned) {
-            // Si es un mensaje de texto, respondemos con un mensaje genérico
             if (ctx.message?.text) {
-                try {
-                    await ctx.reply('⛔ Has sido baneado de este bot. No puedes usar sus funciones.');
-                } catch (e) {}
+                try { await ctx.reply('⛔ Has sido baneado de este bot. No puedes usar sus funciones.'); } catch (e) {}
             }
-            return; // No pasa al siguiente middleware
+            return;
         }
     }
     return next();
 });
+
+// Middleware de API para rutas protegidas (bloquea a baneados)
+async function requireNotBanned(req, res, next) {
+    const telegramId = req.body.telegramId || req.params.telegramId || req.query.telegramId;
+    if (!telegramId) {
+        return next();
+    }
+    if (await isUserBanned(telegramId)) {
+        return res.status(403).json({ error: 'Has sido baneado. No puedes realizar esta acción.' });
+    }
+    next();
+}
 
 async function canSendMessageToUser(telegramId) {
     try {
@@ -696,7 +705,7 @@ app.get('/api/check-admin/:telegramId', (req, res) => {
   res.json({ isAdmin: isAdmin(req.params.telegramId) });
 });
 
-app.post('/api/accept-terms', async (req, res) => {
+app.post('/api/accept-terms', requireNotBanned, async (req, res) => {
   try {
     const { telegramId, username, firstName, referrerId, referrerUsername } = req.body;
     const userData = { telegram_id: telegramId, username, first_name: firstName, accepted_terms: true, terms_date: new Date().toISOString(), is_active: true };
@@ -716,7 +725,7 @@ app.get('/api/check-terms/:telegramId', async (req, res) => {
   } catch (error) { res.json({ accepted: false }); }
 });
 
-app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
+app.post('/api/payment', requireNotBanned, upload.single('screenshot'), async (req, res) => {
   try {
     const { telegramId, plan, price, notes, method, couponCode } = req.body;
     if (!telegramId || !plan || !price) return res.status(400).json({ error: 'Datos incompletos' });
@@ -1001,7 +1010,7 @@ app.get('/api/check-trial-eligibility/:telegramId', async (req, res) => {
 });
 
 // ==================== SOLICITUD DE PRUEBA ====================
-app.post('/api/request-trial', async (req, res) => {
+app.post('/api/request-trial', requireNotBanned, async (req, res) => {
   try {
     const { telegramId, username, firstName, trialType = '1h', gameServer, connectionType, trialPlanType } = req.body;
 
@@ -1597,7 +1606,7 @@ app.delete('/api/coupons/:code', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
 });
 
-app.post('/api/coupons/verify/:code', async (req, res) => {
+app.post('/api/coupons/verify/:code', requireNotBanned, async (req, res) => {
   try {
     const { telegramId } = req.body;
     const code = req.params.code.toUpperCase();
@@ -1832,9 +1841,7 @@ bot.command('ban', async (ctx) => {
     try {
         const updated = await banUser(targetId, userId);
         await ctx.reply(`✅ Usuario ${targetId} ha sido baneado.`);
-        try {
-            await bot.telegram.sendMessage(targetId, '⛔ Has sido baneado de VPN Cuba Bot. No puedes usar el bot.');
-        } catch (e) {}
+        try { await bot.telegram.sendMessage(targetId, '⛔ Has sido baneado de VPN Cuba Bot. No puedes usar el bot.'); } catch (e) {}
     } catch (error) {
         await ctx.reply(`❌ Error: ${error.message}`);
     }
@@ -1853,9 +1860,7 @@ bot.command('unban', async (ctx) => {
     try {
         const updated = await unbanUser(targetId);
         await ctx.reply(`✅ Usuario ${targetId} ha sido desbaneado.`);
-        try {
-            await bot.telegram.sendMessage(targetId, '✅ Has sido desbaneado. Ya puedes usar el bot.');
-        } catch (e) {}
+        try { await bot.telegram.sendMessage(targetId, '✅ Has sido desbaneado. Ya puedes usar el bot.'); } catch (e) {}
     } catch (error) {
         await ctx.reply(`❌ Error: ${error.message}`);
     }
