@@ -852,8 +852,8 @@ body::after {
           <span class="detail-key">SALDO MÓVIL</span>
           <span class="detail-val blue" id="sumMobile">—</span>
         </div>
-        <div class="detail-row">
-          <span class="detail-key">USDT</span>
+        <div class="detail-row" id="sumUSDTrow">
+          <span class="detail-key">USDT (BEP-20)</span>
           <span class="detail-val" id="sumUSDT" style="color:var(--yellow)">—</span>
         </div>
         <div class="detail-row">
@@ -960,7 +960,7 @@ body::after {
       <!-- METROPOLITANA -->
       <div class="method-panel" id="tab-metropolitan">
         <div class="payment-info-box">
-          <div class="pib-label">NÚMERO DE TARJETA METROPOLITANA # A CONFIRMAR</div>
+          <div class="pib-label">NÚMERO DE TARJETA METROPOLITANA</div>
           <div class="pib-val">9238-9598-7118-1386</div>
           <button class="copy-btn" onclick="copyText('9238959871181386',this)">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -1009,9 +1009,9 @@ body::after {
       <!-- USDT -->
       <div class="method-panel" id="tab-usdt">
         <div class="payment-info-box">
-          <div class="pib-label">RED / WALLET TRC-20</div>
-          <div class="pib-val" style="font-size:11px;word-break:break-all">TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</div>
-          <button class="copy-btn" onclick="copyText('TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',this)">
+          <div class="pib-label">WALLET USDT (RED BEP-20)</div>
+          <div class="pib-val" style="font-size:11px;word-break:break-all">0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2</div>
+          <button class="copy-btn" onclick="copyText('0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2',this)">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             COPIAR WALLET
           </button>
@@ -1020,11 +1020,15 @@ body::after {
           <div class="pib-label">MONTO EXACTO</div>
           <div class="pib-val" id="usdtAmount">—</div>
         </div>
-        <div class="method-info-note">
+        <div class="warning-note">
+          ⚠️ <strong>IMPORTANTE:</strong> Envía <strong>SOLO a través de la red BEP-20 (Binance Smart Chain)</strong>. No uses otras redes o perderás los fondos.
+        </div>
+        <div class="method-info-note mt8">
           <span class="ni">ℹ</span>
-          Red TRON (TRC-20). Envía el monto exacto e incluye el hash de la transacción en el comprobante.
+          Incluye el hash de la transacción en el comprobante de pago.
         </div>
       </div>
+
     </div>
 
     <button class="next-btn green" onclick="goToStep(3)" style="margin-top:4px">
@@ -1294,8 +1298,6 @@ let referralSpent = Number(localStorage.getItem(`vpncuba_referral_spent_${curren
 let appliedCouponValue = 0;
 let appliedCouponCode = '';
 
-
-
 function formatCUP(value) {
   return Number(value || 0).toLocaleString('es-ES') + ' CUP';
 }
@@ -1353,24 +1355,36 @@ function updatePricing() {
 
   setText('ps-base', formatCUP(p.cup));
   setText('ps-total', formatCUP(priceCup));
-
+  
+  // Actualizar montos en resumen
+  setText('sumCUP', formatCUP(priceCup));
+  setText('sumMobile', p.mobile ? formatCUP(priceMobile) : '—');
+  setText('sumUSDT', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
+  
+  // Actualizar monto en pestaña USDT
+  setText('usdtAmount', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
+  
+  // Actualizar monto en pestaña Saldo Móvil
   const mobileAmountEl = document.getElementById('movilAmount');
-  const mobileRow = document.getElementById('sumMobileRow');
   if (p.mobile) {
-    mobileRow.style.display = 'flex';
     if (mobileAmountEl) mobileAmountEl.textContent = formatCUP(priceMobile);
   } else {
-    mobileRow.style.display = 'none';
     if (mobileAmountEl) mobileAmountEl.textContent = '—';
   }
 
-  const usdtRow = document.querySelector('#sumUSDT')?.closest('.detail-row');
-  if (p.usdt) {
-    if (usdtRow) usdtRow.style.display = 'flex';
-    setText('usdtAmount', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
+  // Controlar visibilidad de filas
+  const mobileRow = document.getElementById('sumMobileRow');
+  if (p.mobile) {
+    mobileRow.style.display = 'flex';
   } else {
-    if (usdtRow) usdtRow.style.display = 'none';
-    setText('usdtAmount', '—');
+    mobileRow.style.display = 'none';
+  }
+  
+  const usdtRow = document.getElementById('sumUSDTrow');
+  if (p.usdt) {
+    usdtRow.style.display = 'flex';
+  } else {
+    usdtRow.style.display = 'none';
   }
 
   if (effective > 0) {
@@ -1385,7 +1399,6 @@ function updatePricing() {
   const compPrice = document.getElementById('comp-price');
   if (compPrice) compPrice.style.color = planData[currentPlan].accentColor;
 }
-
 
 function updateTrialMode() {
   const isTrial = currentPlan === 'trial';
@@ -1442,6 +1455,11 @@ function selectPlan(key) {
   document.getElementById('sumID').textContent = Math.floor(Math.random()*9000000000)+1000000000;
   document.getElementById('heroTag2').textContent = p.heroTag2;
 
+  // Actualizar valores base en resumen
+  setText('sumCUP', p.price);
+  setText('sumMobile', p.mobile);
+  setText('sumUSDT', p.usdt);
+
   const mrow = document.getElementById('sumMobileRow');
   const mval = document.getElementById('sumMobile');
   if(!p.mobile || p.mobile === '—') { mrow.style.display='none'; }
@@ -1449,8 +1467,6 @@ function selectPlan(key) {
 
   const grid = document.getElementById('featureGrid');
   grid.innerHTML = p.features.map(f=>`<div class="feat-chip"><span class="fi">${f[0]}</span>${f[1]}</div>`).join('');
-  setText('sumCUP', p.price);
-  setText('sumMobile', p.mobile);
 
   updateDiscountBanner();
   updatePricing();
@@ -1461,11 +1477,9 @@ function selectPlan(key) {
 
 function goToStep(n) {
   if(n < 1 || n > 4) return;
-  // hide all pages
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page'+n).classList.add('active');
 
-  // update steps
   for(let i=1;i<=4;i++){
     const s = document.getElementById('step'+i);
     const c = document.getElementById('sc'+i);
@@ -1479,7 +1493,6 @@ function goToStep(n) {
     }
   }
 
-  // demo selector visible only on step 1
   document.getElementById('demoSelector').style.display = n===1 ? 'flex' : 'none';
 
   currentStep = n;
@@ -1549,7 +1562,6 @@ function handleFile(input) {
   document.getElementById('sendBtn').disabled = false;
   document.getElementById('sendBtn').style.opacity='1';
 
-  // show image preview if possible
   const reader = new FileReader();
   reader.onload = e => {
     const thumb = document.getElementById('previewThumb');
