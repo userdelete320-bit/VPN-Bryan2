@@ -14,24 +14,31 @@
     --surface2: #161c2e;
     --border: rgba(255,255,255,0.06);
     --border-glow: rgba(168,220,255,0.2);
+
     --neon-blue: #5bf0ff;
     --neon-purple: #b16fff;
     --neon-green: #39ffa0;
     --neon-pink: #ff6eb4;
     --neon-yellow: #ffe566;
+
     --pastel-blue: #a8dcff;
     --pastel-purple: #d4b8ff;
     --pastel-mint: #b8ffd9;
     --pastel-pink: #ffc2e2;
     --pastel-peach: #ffd4b8;
+
     --text: #e8edf5;
     --text-muted: #6b7a99;
     --text-dim: #3d4a63;
+
     --radius: 20px;
     --radius-sm: 12px;
   }
+
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
   html { scroll-behavior: smooth; }
+
   body {
     background: var(--bg);
     color: var(--text);
@@ -40,6 +47,8 @@
     overflow-x: hidden;
     position: relative;
   }
+
+  /* === GRAIN OVERLAY === */
   body::before {
     content: '';
     position: fixed;
@@ -49,6 +58,8 @@
     z-index: 1000;
     opacity: 0.4;
   }
+
+  /* === AMBIENT GLOW BG === */
   .bg-ambient {
     position: fixed;
     inset: 0;
@@ -77,13 +88,17 @@
   }
   @keyframes drift1 { 0% { transform: translate(0,0); } 100% { transform: translate(5%,8%); } }
   @keyframes drift2 { 0% { transform: translate(0,0); } 100% { transform: translate(-5%,-8%); } }
+
+  /* === LAYOUT === */
   .app {
     position: relative;
     z-index: 1;
     max-width: 430px;
     margin: 0 auto;
-    padding: 0 0 40px;
+    padding: 0 0 100px;
   }
+
+  /* === HEADER === */
   .header {
     padding: 40px 24px 24px;
     position: relative;
@@ -111,6 +126,7 @@
     animation: pulse 2s ease infinite;
   }
   @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.8); } }
+
   .header-title {
     font-family: 'Syne', sans-serif;
     font-size: 32px;
@@ -132,6 +148,8 @@
     font-weight: 300;
     animation: fadeSlideDown 0.6s 0.2s ease both;
   }
+
+  /* === STATS ROW === */
   .stats-row {
     display: flex;
     gap: 10px;
@@ -159,6 +177,8 @@
     margin-top: 2px;
     font-family: 'Space Mono', monospace;
   }
+
+  /* === SECTION LABEL === */
   .section-label {
     font-family: 'Space Mono', monospace;
     font-size: 10px;
@@ -168,6 +188,8 @@
     margin-bottom: 14px;
     text-transform: uppercase;
   }
+
+  /* === NEW BADGE === */
   .new-badge {
     display: inline-block;
     background: linear-gradient(135deg, var(--neon-green), #00d080);
@@ -182,6 +204,8 @@
     margin-left: 6px;
     text-transform: uppercase;
   }
+
+  /* === TURBO CARD (FEATURED) === */
   .turbo-card {
     margin: 0 24px 16px;
     position: relative;
@@ -318,267 +342,241 @@
     gap: 4px;
   }
   .turbo-spec span { color: var(--neon-green); }
-  /* Plan cards con video */
+
+  /* === PLAN CARDS SCROLL === */
+  .plans-scroll {
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
   .plan-card {
-    margin: 0 16px 16px;
-    position: relative;
-    border-radius: var(--radius);
-    overflow: hidden;
     background: var(--surface);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
     transition: transform 0.2s, border-color 0.2s;
     animation: fadeSlideDown 0.5s ease both;
   }
   .plan-card:active { transform: scale(0.98); }
-  .plan-video-box {
-    position: relative;
-    width: 100%;
-    overflow: hidden;
-    border-radius: var(--radius);
-  }
-  .plan-video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 0;
-    transition: transform 0.5s ease, filter 0.5s ease;
-  }
-  .plan-card:hover .plan-video {
-    transform: scale(1.04);
-    filter: brightness(1.05) saturate(1.06);
-  }
-  .plan-scrim {
+
+  .plan-card::before {
+    content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.8) 100%);
-    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.3s;
     pointer-events: none;
   }
-  .plan-overlay {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 20px;
-    min-height: 460px;
-  }
-  .freq-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.15em;
-    color: var(--accent, var(--neon-blue));
-    text-transform: uppercase;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .freq-label::before {
+
+  /* Color accents per plan */
+  .plan-card.basic { --accent: var(--pastel-blue); --accent-glow: rgba(168,220,255,0.12); }
+  .plan-card.advanced { --accent: var(--pastel-purple); --accent-glow: rgba(212,184,255,0.12); }
+  .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); }
+  .plan-card.gaming { --accent: var(--neon-pink); --accent-glow: rgba(255,110,180,0.12); }
+  .plan-card.anual { --accent: var(--pastel-peach); --accent-glow: rgba(255,212,184,0.12); }
+
+  .plan-card::after {
     content: '';
-    width: 20px;
+    position: absolute;
+    top: 0; left: 0;
+    right: 0;
     height: 1px;
-    background: var(--accent, var(--neon-blue));
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
     opacity: 0.6;
   }
-  .plan-top {
+
+  .plan-card-glow {
+    position: absolute;
+    top: -30%;
+    right: -20%;
+    width: 60%;
+    height: 100%;
+    background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .plan-row1 {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
-  .plan-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 26px;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-  }
-  .plan-sub {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-  .price-block {
-    text-align: right;
-  }
-  .price-main {
-    font-family: 'Syne', sans-serif;
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--accent, var(--neon-blue));
-    line-height: 1;
-  }
-  .price-mobile {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--text-dim);
-    margin-top: 4px;
-  }
-  .price-usdt {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--accent, var(--neon-blue));
-    opacity: 0.7;
-  }
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 16px;
-  }
-  .chip {
-    background: rgba(0,0,0,0.5);
-    border: 1px solid var(--border);
-    padding: 4px 10px;
-    font-family: 'Space Mono', monospace;
-    font-size: 8px;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-  }
-  .chip.hi {
-    border-color: var(--accent, var(--neon-blue));
-    color: var(--accent, var(--neon-blue));
-  }
-  .features {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 20px;
-  }
-  .feature {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: rgba(255,255,255,0.7);
-    background: rgba(0,0,0,0.3);
-    padding: 8px 12px;
-    border-left: 1px solid rgba(255,255,255,0.1);
-  }
-  .feature i {
-    width: 14px;
-    color: var(--accent, var(--neon-blue));
-  }
-  .action {
-    width: 100%;
-    padding: 12px;
-    background: transparent;
-    border: 1px solid var(--accent, var(--neon-blue));
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--accent, var(--neon-blue));
-    cursor: pointer;
+  .plan-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    transition: all 0.2s;
-    border-radius: 100px;
+    font-size: 18px;
   }
-  .action:active { transform: scale(0.96); }
-  .plan-card.basic { --accent: var(--pastel-blue); }
-  .plan-card.advanced { --accent: var(--pastel-purple); }
-  .plan-card.vip { --accent: var(--neon-yellow); }
-  .plan-card.gaming { --accent: var(--neon-pink); }
-  .plan-card.anual { --accent: var(--pastel-peach); }
-  .coupon-checker {
-    margin: 20px 24px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 16px;
+  .plan-price-block { text-align: right; }
+  .plan-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
   }
-  .coupon-checker-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    color: var(--text-dim);
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .coupon-checker-title i { color: var(--neon-green); }
-  .coupon-input-row {
-    display: flex;
-    gap: 8px;
-  }
-  .coupon-input {
-    flex: 1;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xs);
-    color: var(--text);
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    padding: 10px 12px;
-    outline: none;
-  }
-  .coupon-input:focus { border-color: var(--neon-green); }
-  .coupon-btn {
-    padding: 10px 16px;
-    background: rgba(57,255,160,0.08);
-    border: 1px solid rgba(57,255,160,0.3);
-    border-radius: var(--radius-xs);
-    color: var(--neon-green);
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .coupon-btn:active { background: rgba(57,255,160,0.15); }
-  .coupon-result {
-    margin-top: 10px;
-    padding: 10px;
-    font-family: 'Space Mono', monospace;
+  .plan-price-period {
     font-size: 11px;
-    border-radius: var(--radius-xs);
-    display: none;
-  }
-  .coupon-result.success {
-    display: block;
-    background: rgba(57,255,160,0.05);
-    border-left: 2px solid var(--neon-green);
-    color: var(--neon-green);
-  }
-  .coupon-result.error {
-    display: block;
-    background: rgba(255,77,77,0.05);
-    border-left: 2px solid #ff4d4d;
-    color: #ff8888;
-  }
-  .trust-strip {
-    margin: 0 24px 28px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  .trust-item {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 14px 10px;
-    text-align: center;
-  }
-  .trust-item .icon { font-size: 22px; margin-bottom: 6px; }
-  .trust-item .label {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
     color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .plan-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 3px;
+  }
+  .plan-tagline {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
     line-height: 1.4;
   }
+
+  .plan-features {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .plan-feature {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .plan-feature .check {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--accent);
+    font-size: 9px;
+  }
+
+  .plan-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .plan-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .plan-btn:active { background: rgba(255,255,255,0.1); }
+
+  .plan-popular {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .plan-popular .dot {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 4px var(--accent);
+  }
+
+  /* VIP highlight card */
+  .plan-card.vip {
+    border-color: rgba(255,229,102,0.2);
+    background: linear-gradient(135deg, #111520, #141208);
+  }
+  .plan-card.gaming {
+    border-color: rgba(255,110,180,0.15);
+  }
+
+  /* === COMPARISON === */
+  .compare-section {
+    margin: 0 24px 32px;
+    animation: fadeSlideDown 0.5s 0.5s ease both;
+  }
+  .compare-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .compare-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .compare-header {
+    display: grid;
+    grid-template-columns: 1fr repeat(3, 70px);
+    gap: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .compare-header div {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+  .compare-header div:first-child { text-align: left; }
+  .compare-row {
+    display: grid;
+    grid-template-columns: 1fr repeat(3, 70px);
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    transition: background 0.15s;
+  }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-row:hover { background: rgba(255,255,255,0.02); }
+  .compare-row div {
+    text-align: center;
+    font-size: 13px;
+  }
+  .compare-row div:first-child {
+    text-align: left;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .chk { color: var(--neon-green); font-size: 14px; }
+  .nope { color: var(--text-dim); font-size: 14px; }
+  .val-sm { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--pastel-blue); }
+
+  /* === FAQ === */
   .faq-section {
     margin: 0 24px 32px;
   }
@@ -619,11 +617,73 @@
     max-height: 200px;
     padding: 0 16px 14px;
   }
+
+  /* === TRUST STRIP === */
+  .trust-strip {
+    margin: 0 24px 28px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    animation: fadeSlideDown 0.5s 0.6s ease both;
+  }
+  .trust-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .trust-item .icon { font-size: 22px; margin-bottom: 6px; }
+  .trust-item .label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  /* === BOTTOM NAV === */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 430px;
+    background: rgba(8,10,15,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    padding: 12px 32px 20px;
+    display: flex;
+    justify-content: space-around;
+    z-index: 100;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+  }
+  .nav-item.active { opacity: 1; }
+  .nav-item svg { width: 22px; height: 22px; }
+  .nav-item .nav-lbl {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+  .nav-item.active .nav-lbl { color: var(--pastel-blue); }
+  .nav-item.active svg { color: var(--neon-blue); filter: drop-shadow(0 0 4px var(--neon-blue)); }
+
+  /* === MODAL OVERLAY === */
   .modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.7);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 500;
     display: flex;
     align-items: flex-end;
@@ -656,53 +716,80 @@
     border-radius: 100px;
     margin: 14px auto 24px;
   }
-  .plan-selector {
+  .modal-plan-icon { font-size: 36px; margin-bottom: 12px; }
+  .modal-plan-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .modal-plan-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .modal-features-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 24px;
   }
-  .plan-option {
-    padding: 10px;
+  .modal-feat {
+    background: var(--surface);
     border: 1px solid var(--border);
-    background: rgba(255,255,255,0.02);
-    border-radius: var(--radius-xs);
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
+    border-radius: var(--radius-sm);
+    padding: 12px;
   }
-  .plan-option.selected {
-    border-color: var(--neon-green);
-    background: rgba(57,255,160,0.08);
-    color: var(--neon-green);
-  }
-  .plan-opt-name {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 14px;
-    display: block;
-  }
-  .plan-opt-price {
+  .modal-feat .mf-icon { font-size: 18px; margin-bottom: 6px; }
+  .modal-feat .mf-label {
     font-family: 'Space Mono', monospace;
     font-size: 9px;
     color: var(--text-dim);
+    margin-bottom: 2px;
+  }
+  .modal-feat .mf-val {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
   }
   .modal-cta {
     width: 100%;
     padding: 16px;
     border-radius: var(--radius-sm);
     border: none;
-    background: linear-gradient(135deg, var(--neon-green), #00c070);
-    color: #000;
     font-family: 'Syne', sans-serif;
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
   }
+  .modal-cta:active { transform: scale(0.98); }
+  .modal-close-area {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 50px;
+    cursor: pointer;
+  }
+
+  /* === ANIMATIONS === */
+  @keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .plans-scroll .plan-card:nth-child(1) { animation-delay: 0.4s; }
+  .plans-scroll .plan-card:nth-child(2) { animation-delay: 0.45s; }
+  .plans-scroll .plan-card:nth-child(3) { animation-delay: 0.5s; }
+  .plans-scroll .plan-card:nth-child(4) { animation-delay: 0.55s; }
+  .plans-scroll .plan-card:nth-child(5) { animation-delay: 0.6s; }
+
+  /* Ticker */
   .ticker-wrap {
     background: rgba(91,240,255,0.05);
     border-top: 1px solid rgba(91,240,255,0.1);
@@ -731,26 +818,8 @@
     0% { transform: translateX(0); }
     100% { transform: translateX(-50%); }
   }
-  #notification {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: var(--surface);
-    border-left: 4px solid var(--neon-green);
-    padding: 12px 20px;
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    color: var(--text);
-    z-index: 10000;
-    transform: translateX(160%);
-    transition: transform 0.3s;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    max-width: 320px;
-  }
-  @keyframes fadeSlideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+
+  /* Scrollbar */
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -762,6 +831,7 @@
 
 <div class="app">
 
+  <!-- HEADER -->
   <div class="header">
     <div class="header-badge">
       <span class="dot"></span>
@@ -771,12 +841,23 @@
     <p class="header-sub">Planes diseñados para Cuba. Sin límites reales.</p>
   </div>
 
+  <!-- STATS -->
   <div class="stats-row">
-    <div class="stat-pill"><div class="val">99.8%</div><div class="lbl">UPTIME</div></div>
-    <div class="stat-pill"><div class="val">&lt;25ms</div><div class="lbl">LATENCIA</div></div>
-    <div class="stat-pill"><div class="val">WG</div><div class="lbl">PROTOCOL</div></div>
+    <div class="stat-pill">
+      <div class="val">99.8%</div>
+      <div class="lbl">UPTIME</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val">&lt;25ms</div>
+      <div class="lbl">LATENCIA</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val">WG</div>
+      <div class="lbl">PROTOCOL</div>
+    </div>
   </div>
 
+  <!-- TICKER -->
   <div class="ticker-wrap">
     <div class="ticker">
       <div class="ticker-item">🟢 NODO TURBO <span>ONLINE</span></div>
@@ -785,6 +866,7 @@
       <div class="ticker-item">🇨🇺 IP RESIDENCIAL CU</div>
       <div class="ticker-item">🎮 GAMING PRIORITY</div>
       <div class="ticker-item">📡 MTU 1280 OPTIMIZADO</div>
+      <!-- repeat for seamless loop -->
       <div class="ticker-item">🟢 NODO TURBO <span>ONLINE</span></div>
       <div class="ticker-item">⚡ WireGuard UDP:80</div>
       <div class="ticker-item">🔒 AES-256 CIFRADO</div>
@@ -794,446 +876,370 @@
     </div>
   </div>
 
-  <!-- Tarjeta Nodo Turbo (Prueba gratuita) -->
-  <div class="section-label">// PRUEBA GRATUITA</div>
-  <div class="turbo-card" onclick="openTrialModal()">
+  <!-- TURBO CARD -->
+  <div class="section-label">// LANZAMIENTO HOY</div>
+  <div class="turbo-card" onclick="openModal('turbo')">
     <div class="turbo-inner">
-      <div class="turbo-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> NODO TURBO · 1 HORA GRATIS</div>
-      <div class="turbo-name"><em>Prueba Gratis</em> Nodo Turbo</div>
-      <div class="turbo-desc">Acceso completo por 1 hora. Sin costo, sin tarjeta. Elige el plan que quieres probar.</div>
+      <div class="turbo-tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        NUEVO · 21 MAYO
+      </div>
+      <div class="turbo-name"><em>Prueba</em> Download</div>
+      <div class="turbo-desc">Acceso de prueba por plan. Elige el tipo de prueba y revisa la calidad antes de comprar.</div>
       <div class="turbo-price-row">
-        <div><div class="turbo-price"><sup>$</sup>0<sub>/1h</sub></div></div>
-        <button class="turbo-cta">Solicitar prueba <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+        <div>
+          <div class="turbo-price"><sup>$</sup>0<sub>/prueba</sub></div>
+        </div>
+        <button class="turbo-cta">
+          Activar ahora
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
       </div>
       <div class="turbo-specs">
-        <div class="turbo-spec">⚡ <span>1 HORA</span> ILIMITADA</div>
-        <div class="turbo-spec">🎮 <span>PRUEBA</span> CUALQUIER PLAN</div>
-        <div class="turbo-spec">🔒 <span>MISMA</span> SEGURIDAD</div>
-        <div class="turbo-spec">🆘 <span>SOPORTE</span> INMEDIATO</div>
+        <div class="turbo-spec">⚡ <span>VELOCIDAD</span> ILIMITADA</div>
+        <div class="turbo-spec">📦 <span>TORRENT</span> OK</div>
+        <div class="turbo-spec">☁️ <span>CLOUD</span> SYNC</div>
+        <div class="turbo-spec">🔄 <span>24/7</span> UPTIME</div>
       </div>
     </div>
   </div>
 
-  <!-- Planes regulares con video -->
+  <!-- PLANES REGULARES -->
   <div class="section-label" style="margin-top:24px">// PLANES DISPONIBLES</div>
+  <div class="plans-scroll">
 
-  <!-- BÁSICO -->
-  <div class="plan-card basic" data-plan-key="basico" onclick="selectPlanHandler('basico', 900, 1.5)">
-    <div class="plan-video-box" style="height: 480px;">
-      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-        <source src="videos/basic.mp4" type="video/mp4">
-      </video>
-      <div class="plan-scrim"></div>
-      <div class="plan-overlay">
-        <div class="freq-label">freq·01 · 1 mes</div>
-        <div class="plan-top">
-          <div>
-            <div class="plan-title">Básico</div>
-            <div class="plan-sub">navegación · streaming</div>
-          </div>
-          <div class="price-block">
-            <div class="price-main" id="price-basico">900 CUP</div>
-            <div class="price-mobile">📱 400 CUP móvil</div>
-            <div class="price-usdt">≈ 1.5 USDT</div>
-          </div>
+    <!-- BÁSICO -->
+    <div class="plan-card basic" onclick="openModal('basic')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🌐</div>
+        <div class="plan-price-block">
+          <div class="plan-price">$XX</div>
+          <div class="plan-price-period">/mes</div>
         </div>
-        <div class="chips">
-          <span class="chip hi">entrada</span>
-          <span class="chip">estable</span>
-          <span class="chip">saldo móvil</span>
-        </div>
-        <div class="features">
-          <div class="feature"><i class="fas fa-bolt"></i><span>Baja latencia para streaming</span></div>
-          <div class="feature"><i class="fas fa-infinity"></i><span>Ancho de banda ilimitado</span></div>
-          <div class="feature"><i class="fas fa-headset"></i><span>Soporte prioritario</span></div>
-          <div class="feature"><i class="fas fa-server"></i><span>4 servidores disponibles</span></div>
-        </div>
-        <button class="action"><i class="fas fa-arrow-right"></i> Activar señal</button>
+      </div>
+      <div class="plan-name">Básico</div>
+      <div class="plan-tagline">Navega y streamea USA. Perfecto para el día a día.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Streaming USA (Netflix, Hulu, Prime)</div>
+        <div class="plan-feature"><span class="check">✓</span> Velocidad hasta 2 Mbps</div>
+        <div class="plan-feature"><span class="check">✓</span> WireGuard encriptado</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Más popular</div>
       </div>
     </div>
-  </div>
 
-  <!-- AVANZADO (Precio actualizado: 1600 CUP) -->
-  <div class="plan-card advanced" data-plan-key="avanzado" onclick="selectPlanHandler('avanzado', 1600, 2.5)">
-    <div class="plan-video-box" style="height: 480px;">
-      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-        <source src="videos/advanced.mp4" type="video/mp4">
-      </video>
-      <div class="plan-scrim"></div>
-      <div class="plan-overlay">
-        <div class="freq-label">freq·02 · 2 meses</div>
-        <div class="plan-top">
-          <div>
-            <div class="plan-title">Avanzado</div>
-            <div class="plan-sub">equilibrio · precisión</div>
-          </div>
-          <div class="price-block">
-            <div class="price-main" id="price-avanzado">1600 CUP</div>
-            <div class="price-mobile">📱 800 CUP móvil</div>
-            <div class="price-usdt">≈ 2.5 USDT</div>
-          </div>
+    <!-- AVANZADO -->
+    <div class="plan-card advanced" onclick="openModal('advanced')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🚀</div>
+        <div class="plan-price-block">
+          <div class="plan-price">$1600</div>
+          <div class="plan-price-period">2 meses</div>
         </div>
-        <div class="chips"><span class="chip hi">mejor equilibrio</span><span class="chip">ahorro real</span><span class="chip">saldo móvil</span></div>
-        <div class="features">
-          <div class="feature"><i class="fas fa-check-circle"></i><span>Todo lo del plan básico</span></div>
-          <div class="feature"><i class="fas fa-clock"></i><span>2 meses de servicio</span></div>
-          <div class="feature"><i class="fas fa-life-ring"></i><span>Soporte 24/7</span></div>
-          <div class="feature"><i class="fas fa-shield-alt"></i><span>Protección avanzada</span></div>
-        </div>
-        <button class="action"><i class="fas fa-arrow-right"></i> Activar señal</button>
+      </div>
+      <div class="plan-name">Avanzado</div>
+      <div class="plan-tagline">2 meses del plan Básico. La opción inteligente.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Todo del plan Básico</div>
+        <div class="plan-feature"><span class="check">✓</span> 2 meses continuos</div>
+        <div class="plan-feature"><span class="check">✓</span> Ahorro garantizado</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Mejor precio</div>
       </div>
     </div>
-  </div>
 
-  <!-- VIP CUBA -->
-  <div class="plan-card vip" data-plan-key="cuba_vip" onclick="selectPlanHandler('cuba_vip', 1200, 1.9)">
-    <div class="plan-video-box" style="height: 480px;">
-      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-        <source src="videos/cuba_vip.mp4" type="video/mp4">
-      </video>
-      <div class="plan-scrim"></div>
-      <div class="plan-overlay">
-        <div class="freq-label">freq·cu · ip residencial</div>
-        <div class="plan-top">
-          <div>
-            <div class="plan-title">VIP Cuba</div>
-            <div class="plan-sub">ip residencial cubana · acceso local</div>
-          </div>
-          <div class="price-block">
-            <div class="price-main" id="price-vip">1200 CUP</div>
-            <div class="price-mobile">📱 500 CUP móvil</div>
-            <div class="price-usdt">≈ 1.9 USDT</div>
-          </div>
+    <!-- VIP -->
+    <div class="plan-card vip" onclick="openModal('vip')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🏦</div>
+        <div class="plan-price-block">
+          <div class="plan-price">$XX</div>
+          <div class="plan-price-period">/mes</div>
         </div>
-        <div class="chips"><span class="chip hi">cubano real</span><span class="chip">sin bloqueos</span><span class="chip">trámites .cu</span></div>
-        <div class="features">
-          <div class="feature"><i class="fas fa-map-marker-alt"></i><span>Acceso a Enzona, Transfermóvil y Banca Remota</span></div>
-          <div class="feature"><i class="fas fa-shield-alt"></i><span>Evita bloqueos geográficos y alertas sospechosas</span></div>
-          <div class="feature"><i class="fas fa-globe"></i><span>Gestiona sitios .cu como usuario local</span></div>
-          <div class="feature"><i class="fas fa-lock"></i><span>Seguridad bancaria reforzada</span></div>
-        </div>
-        <button class="action"><i class="fas fa-star"></i> Activar acceso VIP</button>
+      </div>
+      <div class="plan-name">VIP Cuba <span class="new-badge">ÚNICO</span></div>
+      <div class="plan-tagline">IP Residencial Cubana para Enzona y Transfermóvil.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> IP residencial 🇨🇺 real</div>
+        <div class="plan-feature"><span class="check">✓</span> Compatible Enzona</div>
+        <div class="plan-feature"><span class="check">✓</span> Compatible Transfermóvil</div>
+        <div class="plan-feature"><span class="check">✓</span> Acceso banca online Cuba</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Exclusivo</div>
       </div>
     </div>
-  </div>
 
-  <!-- GAMING -->
-  <div class="plan-card gaming" data-plan-key="premium" onclick="selectPlanHandler('premium', 1500, 2.3)">
-    <div class="plan-video-box" style="height: 480px;">
-      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-        <source src="videos/gaming.mp4" type="video/mp4">
-      </video>
-      <div class="plan-scrim"></div>
-      <div class="plan-overlay">
-        <div class="freq-label">freq·max · gaming</div>
-        <div class="plan-top">
-          <div>
-            <div class="plan-title">Gaming</div>
-            <div class="plan-sub">latencia mínima · 1 mes</div>
-          </div>
-          <div class="price-block">
-            <div class="price-main" id="price-premium">1500 CUP</div>
-            <div class="price-mobile">📱 700 CUP móvil</div>
-            <div class="price-usdt">≈ 2.3 USDT</div>
-          </div>
+    <!-- GAMING -->
+    <div class="plan-card gaming" onclick="openModal('gaming')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🎮</div>
+        <div class="plan-price-block">
+          <div class="plan-price">$XX</div>
+          <div class="plan-price-period">/mes</div>
         </div>
-        <div class="chips"><span class="chip hi">baja latencia</span><span class="chip">servidor privado</span><span class="chip">saldo móvil</span></div>
-        <div class="features">
-          <div class="feature"><i class="fas fa-check-double"></i><span>Todo lo del plan avanzado</span></div>
-          <div class="feature"><i class="fas fa-tachometer-alt"></i><span>Menor latencia para juegos</span></div>
-          <div class="feature"><i class="fas fa-bolt"></i><span>Mayor velocidad de respuesta</span></div>
-          <div class="feature"><i class="fas fa-server"></i><span>Servidor privado optimizado</span></div>
-        </div>
-        <button class="action"><i class="fas fa-crosshairs"></i> Activar señal</button>
+      </div>
+      <div class="plan-name">Gaming</div>
+      <div class="plan-tagline">QoS prioritario. Latencia mínima para MLBB, CoD, Free Fire.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Tráfico gaming prioritario</div>
+        <div class="plan-feature"><span class="check">✓</span> Latencia &lt;25ms optimizada</div>
+        <div class="plan-feature"><span class="check">✓</span> Sin packet loss</div>
+        <div class="plan-feature"><span class="check">✓</span> MLBB · CoD · Free Fire</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Pro players</div>
       </div>
     </div>
-  </div>
 
-  <!-- ANUAL -->
-  <div class="plan-card anual" data-plan-key="anual" onclick="selectPlanHandler('anual', 15000, 25)">
-    <div class="plan-video-box" style="height: 480px;">
-      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-        <source src="videos/annual.mp4" type="video/mp4">
-      </video>
-      <div class="plan-scrim"></div>
-      <div class="plan-overlay">
-        <div class="freq-label">freq·full · anual</div>
-        <div class="plan-top">
-          <div>
-            <div class="plan-title">Anual</div>
-            <div class="plan-sub">exclusivo · 12 meses</div>
-          </div>
-          <div class="price-block">
-            <div class="price-main" id="price-anual">15000 CUP</div>
-            <div class="price-mobile">📱 10000 CUP móvil</div>
-            <div class="price-usdt">≈ 25 USDT</div>
-          </div>
+    <!-- ANUAL -->
+    <div class="plan-card anual" onclick="openModal('anual')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">♾️</div>
+        <div class="plan-price-block">
+          <div class="plan-price">$XX</div>
+          <div class="plan-price-period">/año</div>
         </div>
-        <div class="chips"><span class="chip hi">máximo valor</span><span class="chip">exclusivo</span><span class="chip">saldo móvil</span></div>
-        <div class="features">
-          <div class="feature"><i class="fas fa-crown"></i><span>Servidor privado exclusivo</span></div>
-          <div class="feature"><i class="fas fa-headset"></i><span>Atención prioritaria 24/7</span></div>
-          <div class="feature"><i class="fas fa-shield-alt"></i><span>Máxima seguridad</span></div>
-          <div class="feature"><i class="fas fa-calendar-alt"></i><span>12 meses completos</span></div>
-        </div>
-        <button class="action"><i class="fas fa-lock-open"></i> Activar acceso total</button>
+      </div>
+      <div class="plan-name">Anual Total</div>
+      <div class="plan-tagline">Acceso completo 12 meses. Todo desbloqueado.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Acceso a TODOS los planes</div>
+        <div class="plan-feature"><span class="check">✓</span> 12 meses continuos</div>
+        <div class="plan-feature"><span class="check">✓</span> Máximo ahorro del año</div>
+        <div class="plan-feature"><span class="check">✓</span> Soporte prioritario</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Máximo ahorro</div>
       </div>
     </div>
+
   </div>
 
-  <!-- Cupón checker -->
-  <div class="coupon-checker">
-    <div class="coupon-checker-title"><i class="fas fa-tag"></i> Consultar usos de un cupón</div>
-    <div class="coupon-input-row">
-      <input type="text" id="couponCheckInput" class="coupon-input" placeholder="Escribe el código..." maxlength="20">
-      <button class="coupon-btn" id="couponCheckBtn" onclick="checkCouponUsage()"><span><i class="fas fa-search"></i> Consultar</span></button>
-    </div>
-    <div id="couponResult" class="coupon-result"></div>
-  </div>
+  
 
+  <!-- TRUST STRIP -->
   <div class="trust-strip">
-    <div class="trust-item"><div class="icon">🔒</div><div class="label">AES-256<br>Cifrado</div></div>
-    <div class="trust-item"><div class="icon">⚡</div><div class="label">WireGuard<br>Protocol</div></div>
-    <div class="trust-item"><div class="icon">🛡️</div><div class="label">Sin logs<br>No tracking</div></div>
+    <div class="trust-item">
+      <div class="icon">🔒</div>
+      <div class="label">AES-256<br>Cifrado</div>
+    </div>
+    <div class="trust-item">
+      <div class="icon">⚡</div>
+      <div class="label">WireGuard<br>Protocol</div>
+    </div>
+    <div class="trust-item">
+      <div class="icon">🛡️</div>
+      <div class="label">Sin logs<br>No tracking</div>
+    </div>
   </div>
 
+  <!-- FAQ -->
   <div class="faq-section">
     <div class="section-label" style="padding:0;margin-bottom:14px">// FAQ</div>
-    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿Funciona tras apagones? <span class="arr">+</span></div><div class="faq-a">Sí. Recomendamos desactivar Fast Startup en Windows y limpiar caché DNS tras un apagón. Nuestro soporte tiene guías paso a paso para reconectar en segundos.</div></div>
-    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿Qué puerto usa? <span class="arr">+</span></div><div class="faq-a">Puerto 80 UDP con WireGuard. MTU 1280 y PersistentKeepalive 25, configurados automáticamente para Cuba.</div></div>
-    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿Cómo activo el plan VIP? <span class="arr">+</span></div><div class="faq-a">Contáctanos en el canal oficial @L0quen2. IP residencial cubana activada en menos de 1 hora. Compatible con Enzona y Transfermóvil.</div></div>
-    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿El Gaming plan reduce lag? <span class="arr">+</span></div><div class="faq-a">Usamos QoS (Quality of Service) en MikroTik para priorizar paquetes de juego. Latencia optimizada para MLBB, CoD Mobile y Free Fire.</div></div>
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-q">¿Funciona tras apagones? <span class="arr">+</span></div>
+      <div class="faq-a">Sí. Recomendamos desactivar Fast Startup en Windows y limpiar caché DNS tras un apagón. Nuestro soporte tiene guías paso a paso para reconectar en segundos.</div>
+    </div>
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-q">¿Qué puerto usa? <span class="arr">+</span></div>
+      <div class="faq-a">Puerto 80 UDP con WireGuard. MTU 1280 y PersistentKeepalive 25, configurados automáticamente para Cuba.</div>
+    </div>
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-q">¿Cómo activo el plan VIP? <span class="arr">+</span></div>
+      <div class="faq-a">Contáctanos en el canal oficial @L0quen2. IP residencial cubana activada en menos de 1 hora. Compatible con Enzona y Transfermóvil.</div>
+    </div>
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-q">¿El Gaming plan reduce lag? <span class="arr">+</span></div>
+      <div class="faq-a">Usamos QoS (Quality of Service) en MikroTik para priorizar paquetes de juego. Latencia optimizada para MLBB, CoD Mobile y Free Fire.</div>
+    </div>
   </div>
 
 </div>
 
-<!-- Modal de prueba múltiple (por plan) -->
-<div class="modal-overlay" id="trialModal" onclick="closeModalOutside(event)">
-  <div class="modal-sheet">
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <div class="nav-item active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="nav-lbl">Planes</span>
+  </div>
+  <div class="nav-item" onclick="scrollTop()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>
+    <span class="nav-lbl">Estado</span>
+  </div>
+  <div class="nav-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <span class="nav-lbl">Soporte</span>
+  </div>
+  <div class="nav-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    <span class="nav-lbl">Mi cuenta</span>
+  </div>
+</nav>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+  <div class="modal-sheet" id="modalSheet">
     <div class="modal-handle"></div>
-    <div class="modal-plan-icon" style="font-size:36px; text-align:center">⚡</div>
-    <div class="modal-plan-name" style="text-align:center">Solicitar Prueba <span style="font-size:14px;color:var(--neon-green);">Nodo Turbo</span></div>
-    <div class="modal-plan-desc" style="text-align:center">Elige el plan que quieres probar (puedes probar uno de cada tipo).</div>
-    <form id="trialForm">
-      <div class="plan-selector" id="planSelector">
-        <div class="plan-option selected" data-plan="basico" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Básico</span><span class="plan-opt-price">1 mes · 900 CUP</span></div>
-        <div class="plan-option" data-plan="avanzado" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Avanzado</span><span class="plan-opt-price">2 meses · 1600 CUP</span></div>
-        <div class="plan-option" data-plan="cuba_vip" onclick="selectTrialPlan(this)"><span class="plan-opt-name">VIP Cuba</span><span class="plan-opt-price">1 mes · 1200 CUP</span></div>
-        <div class="plan-option" data-plan="premium" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Gaming</span><span class="plan-opt-price">1 mes · 1500 CUP</span></div>
-        <div class="plan-option" data-plan="anual" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Anual</span><span class="plan-opt-price">12 meses · 15000 CUP</span></div>
-      </div>
-      <input type="text" id="gameServer" class="coupon-input" placeholder="Juego / Servidor (ej: Free Fire — EE.UU.)" required style="width:100%; margin-bottom:16px">
-      <select id="connectionType" class="coupon-input" required style="width:100%; margin-bottom:16px">
-        <option value="">Tipo de conexión</option>
-        <option value="WiFi">WiFi</option>
-        <option value="Cable Ethernet">Cable Ethernet</option>
-        <option value="Datos Móviles">Datos Móviles</option>
-      </select>
-      <textarea id="additionalInfo" class="coupon-input" rows="2" placeholder="Info adicional (opcional)" style="resize:none; width:100%; margin-bottom:20px"></textarea>
-      <button type="submit" class="modal-cta"><i class="fas fa-paper-plane"></i> Enviar solicitud</button>
-    </form>
+    <div id="modalContent"></div>
   </div>
 </div>
 
-<div id="notification"></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 <script>
-const tg = window.Telegram?.WebApp ?? { expand(){}, MainButton:{ hide(){} }, initDataUnsafe:{} };
-tg.expand?.();
-tg.MainButton?.hide?.();
-
-const urlParams = new URLSearchParams(window.location.search);
-const userId = urlParams.get('userId');
-const USDT_ADDRESS = '0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2';
-
-let userReferralDiscount = 0;
-
-const BASE_PRICES = {
-  basico:   { cup: 900,   mobile: 400,  usdt: 1.5 },
-  avanzado: { cup: 1600,  mobile: 800,  usdt: 2.5 },
-  cuba_vip: { cup: 1200,  mobile: 500,  usdt: 1.9 },
-  premium:  { cup: 1500,  mobile: 700,  usdt: 2.3 },
-  anual:    { cup: 15000, mobile: 10000, usdt: 25 }
+const plans = {
+  turbo: {
+    icon: '⚡',
+    name: 'Prueba',
+    color: '#39ffa0',
+    shadowColor: 'rgba(57,255,160,0.3)',
+    desc: 'El plan definitivo para descargas masivas. Sin límite de velocidad, sin restricciones. Torrent, cloud sync, backups: todo fluye al máximo.',
+    features: [
+      { icon: '🚀', label: 'VELOCIDAD', val: 'ILIMITADA' },
+      { icon: '📡', label: 'PROTOCOLO', val: 'WireGuard' },
+      { icon: '📦', label: 'TORRENT', val: 'Permitido' },
+      { icon: '🔄', label: 'UPTIME', val: '99.9%' },
+      { icon: '☁️', label: 'CLOUD', val: 'Sync OK' },
+      { icon: '🛡️', label: 'CIFRADO', val: 'AES-256' },
+    ],
+    cta: '🧪 Solicitar prueba',
+  },
+  basic: {
+    icon: '🌐',
+    name: 'Plan Básico',
+    color: '#a8dcff',
+    shadowColor: 'rgba(168,220,255,0.3)',
+    desc: 'La puerta de entrada a internet sin censura. Ideal para streaming y navegación cotidiana con conexión estable.',
+    features: [
+      { icon: '📺', label: 'STREAMING', val: 'USA · Netflix · Hulu' },
+      { icon: '⚡', label: 'VELOCIDAD', val: '2 Mbps' },
+      { icon: '📡', label: 'PROTOCOLO', val: 'WireGuard' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '📱', label: 'DISPOSITIVOS', val: '1 activo' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+    ],
+    cta: '🌐 Elegir Básico',
+  },
+  advanced: {
+    icon: '🚀',
+    name: 'Plan Avanzado',
+    color: '#d4b8ff',
+    shadowColor: 'rgba(212,184,255,0.3)',
+    desc: '2 meses completos del plan Básico. La elección inteligente para quienes planean. Más tiempo, mejor precio.',
+    features: [
+      { icon: '📅', label: 'DURACIÓN', val: '2 meses' },
+      { icon: '📺', label: 'STREAMING', val: 'USA incluido' },
+      { icon: '⚡', label: 'VELOCIDAD', val: '2 Mbps' },
+      { icon: '💰', label: 'AHORRO', val: 'vs. mensual' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+    ],
+    cta: '🚀 Elegir Avanzado',
+  },
+  vip: {
+    icon: '🏦',
+    name: 'VIP Cuba',
+    color: '#ffe566',
+    shadowColor: 'rgba(255,229,102,0.3)',
+    desc: 'El único plan con IP Residencial Cubana real. Accede a Enzona, Transfermóvil y banca online desde cualquier lugar.',
+    features: [
+      { icon: '🇨🇺', label: 'IP ORIGEN', val: 'Residencial CU' },
+      { icon: '🏦', label: 'ENZONA', val: 'Compatible' },
+      { icon: '📲', label: 'TRANSFERMÓVIL', val: 'Compatible' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '⚡', label: 'VELOCIDAD', val: '5 Mbps' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Prioritario' },
+    ],
+    cta: '🏦 Activar VIP',
+  },
+  gaming: {
+    icon: '🎮',
+    name: 'Plan Gaming',
+    color: '#ff6eb4',
+    shadowColor: 'rgba(255,110,180,0.3)',
+    desc: 'Diseñado para gamers cubanos. QoS prioritario para paquetes de juego, latencia mínima garantizada.',
+    features: [
+      { icon: '⚡', label: 'LATENCIA', val: '<25ms' },
+      { icon: '🎯', label: 'QoS', val: 'Tráfico prioritario' },
+      { icon: '🎮', label: 'JUEGOS', val: 'MLBB · CoD · FF' },
+      { icon: '📦', label: 'PACKET LOSS', val: '~0%' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+    ],
+    cta: '🎮 Activar Gaming',
+  },
+  anual: {
+    icon: '♾️',
+    name: 'Plan Anual',
+    color: '#ffd4b8',
+    shadowColor: 'rgba(255,212,184,0.3)',
+    desc: '12 meses de acceso total. Todos los planes, todas las funciones. El mayor ahorro posible. La libertad completa.',
+    features: [
+      { icon: '📅', label: 'DURACIÓN', val: '12 meses' },
+      { icon: '🌐', label: 'ACCESO', val: 'TODOS los planes' },
+      { icon: '🏦', label: 'VIP', val: 'Incluido' },
+      { icon: '🎮', label: 'GAMING', val: 'Incluido' },
+      { icon: '⚡', label: 'TURBO', val: 'Incluido' },
+      { icon: '🆘', label: 'SOPORTE', val: 'VIP 24/7' },
+    ],
+    cta: '♾️ Ir Anual',
+  },
 };
 
-function showNotification(msg, type = 'info') {
-  const n = document.getElementById('notification');
-  n.textContent = msg;
-  n.style.borderLeftColor = type === 'success' ? 'var(--neon-green)' : type === 'error' ? '#ff4d4d' : 'var(--neon-blue)';
-  n.style.transform = 'translateX(0)';
-  clearTimeout(window.__nTimer);
-  window.__nTimer = setTimeout(() => { n.style.transform = 'translateX(160%)'; }, 3800);
-}
-
-async function loadReferralDiscount() {
-  if (!userId) return 0;
-  try {
-    const res = await fetch(`/api/user-info/${userId}`);
-    if (!res.ok) return 0;
-    const data = await res.json();
-    userReferralDiscount = data.referral_discount || 0;
-    if (userReferralDiscount > 0) {
-      applyDiscountToAllPlans(userReferralDiscount);
-      showNotification(`✅ Descuento por referidos del ${userReferralDiscount}% aplicado`, 'success');
-    }
-    return userReferralDiscount;
-  } catch (e) { return 0; }
-}
-
-function applyDiscountToAllPlans(discountPercent) {
-  if (discountPercent <= 0) return;
-  const factor = (100 - discountPercent) / 100;
-  const priceMap = {
-    basico: document.getElementById('price-basico'),
-    avanzado: document.getElementById('price-avanzado'),
-    vip: document.getElementById('price-vip'),
-    premium: document.getElementById('price-premium'),
-    anual: document.getElementById('price-anual')
-  };
-  for (const [planKey, priceEl] of Object.entries(priceMap)) {
-    if (priceEl) {
-      const base = BASE_PRICES[planKey === 'vip' ? 'cuba_vip' : planKey];
-      if (base) {
-        const newCup = Math.round(base.cup * factor);
-        priceEl.textContent = newCup.toLocaleString() + ' CUP';
-        // guardar precio con descuento en data attribute para el handler
-        const card = document.querySelector(`.plan-card[data-plan-key="${planKey === 'vip' ? 'cuba_vip' : planKey}"]`);
-        if (card) card.dataset.discountedPrice = newCup;
-      }
-    }
-  }
-}
-
-function selectPlanHandler(planType, originalPrice, usdtAmount) {
-  if (!userId) { alert('Error: no se pudo identificar el usuario.'); return; }
-  let finalPrice = originalPrice;
-  let finalUsdt = usdtAmount;
-  let discountApplied = userReferralDiscount;
-  // si el precio ya fue modificado en la UI por el descuento, lo usamos
-  const card = document.querySelector(`.plan-card[data-plan-key="${planType}"]`);
-  if (card && card.dataset.discountedPrice) {
-    finalPrice = parseInt(card.dataset.discountedPrice);
-    finalUsdt = (usdtAmount * (100 - discountApplied) / 100).toFixed(2);
-  } else if (discountApplied > 0) {
-    finalPrice = Math.round(originalPrice * (100 - discountApplied) / 100);
-    finalUsdt = (usdtAmount * (100 - discountApplied) / 100).toFixed(2);
-  }
-  localStorage.setItem('selectedPlan', JSON.stringify({
-    type: planType,
-    originalPrice,
-    finalPrice,
-    finalUsdt,
-    discountApplied,
-    usdtAddress: USDT_ADDRESS,
-    userId,
-    timestamp: new Date().toISOString()
-  }));
-  showNotification('Redirigiendo al pago...', 'info');
-  setTimeout(() => {
-    window.location.href = `/payment.html?userId=${encodeURIComponent(userId)}&plan=${encodeURIComponent(planType)}&price=${encodeURIComponent(finalPrice)}&usdtAmount=${encodeURIComponent(finalUsdt)}&usdtAddress=${encodeURIComponent(USDT_ADDRESS)}&discount=${encodeURIComponent(discountApplied)}`;
-  }, 700);
-}
-
-// ── Prueba múltiple (por plan) ──
-let selectedTrialPlan = 'basico';
-
-function selectTrialPlan(el) {
-  document.querySelectorAll('#planSelector .plan-option').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedTrialPlan = el.dataset.plan;
-}
-
-async function openTrialModal() {
-  if (!userId) { alert('Error: no se pudo identificar el usuario.'); return; }
-  // No verificamos elegibilidad global, solo por plan. El backend hará la comprobación.
-  document.getElementById('trialModal').classList.add('open');
+function openModal(key) {
+  const p = plans[key];
+  const content = document.getElementById('modalContent');
+  content.innerHTML = `
+    <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
+    <div class="modal-plan-name">${p.name}</div>
+    <div class="modal-plan-desc">${p.desc}</div>
+    <div class="modal-features-grid">
+      ${p.features.map(f => `
+        <div class="modal-feat">
+          <div class="mf-icon">${f.icon}</div>
+          <div class="mf-label">${f.label}</div>
+          <div class="mf-val">${f.val}</div>
+        </div>
+      `).join('')}
+    </div>
+    <button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor}" onclick="handleCTA('${key}')">
+      ${p.cta}
+    </button>
+  `;
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-  document.getElementById('trialModal').classList.remove('open');
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 function closeModalOutside(e) {
-  if (e.target === document.getElementById('trialModal')) closeModal();
+  if (e.target === document.getElementById('modal')) closeModal();
 }
 
-document.getElementById('trialForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const gameServer = document.getElementById('gameServer').value.trim();
-  const connectionType = document.getElementById('connectionType').value;
-  const additionalInfo = document.getElementById('additionalInfo').value.trim();
-  if (!gameServer || !connectionType) return;
-  const btn = e.target.querySelector('button[type="submit"]');
-  const orig = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-  try {
-    const res = await fetch(`${window.location.origin}/api/request-trial`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        telegramId: userId,
-        username: tg.initDataUnsafe?.user?.username || '',
-        firstName: tg.initDataUnsafe?.user?.first_name || 'Usuario',
-        trialType: '1h',
-        trialPlanType: selectedTrialPlan,
-        gameServer,
-        connectionType,
-        additionalInfo
-      })
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      showNotification('✅ Solicitud enviada. Recibirás la configuración en minutos.', 'success');
-      closeModal();
-    } else {
-      throw new Error(data.error || 'Error inesperado');
-    }
-  } catch (err) {
-    showNotification('❌ ' + err.message, 'error');
-  } finally {
-    btn.innerHTML = orig;
-    btn.disabled = false;
-  }
-});
-
-// ── Cupón checker ──
-async function checkCouponUsage() {
-  const input = document.getElementById('couponCheckInput');
-  const btn = document.getElementById('couponCheckBtn');
-  const result = document.getElementById('couponResult');
-  const code = input.value.trim().toUpperCase();
-  if (!code) {
-    result.className = 'coupon-result error';
-    result.innerHTML = '⚠️ Ingresa un código de cupón';
-    return;
-  }
-  btn.disabled = true;
-  result.className = 'coupon-result';
-  result.innerHTML = '';
-  try {
-    const res = await fetch(`/api/coupons/public/${encodeURIComponent(code)}/usage`);
-    const data = await res.json();
-    if (!res.ok) {
-      result.className = 'coupon-result error';
-      result.innerHTML = `❌ ${data.error || 'Cupón no encontrado'}`;
-    } else {
-      const statusLabel = { active: '✅ Activo', inactive: '⏸ Inactivo', expired: '❌ Expirado' }[data.status] || data.status;
-      result.className = 'coupon-result success';
-      result.innerHTML = `<strong>// ${data.code}</strong><div style="display:flex;justify-content:space-between;margin-top:4px"><span>Estado</span><span>${statusLabel}</span></div><div style="display:flex;justify-content:space-between"><span>Descuento</span><span>${data.discount}%</span></div><div style="display:flex;justify-content:space-between"><span>Veces usado</span><span>${data.used}</span></div><div style="display:flex;justify-content:space-between"><span>Stock restante</span><span>${data.stock_remaining}</span></div>`;
-    }
-  } catch (err) {
-    result.className = 'coupon-result error';
-    result.innerHTML = '❌ Error al consultar. Intenta de nuevo.';
-  } finally {
-    btn.disabled = false;
+function handleCTA(key) {
+  closeModal();
+  // In real Telegram Mini App: window.Telegram.WebApp.sendData(key)
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.sendData(JSON.stringify({ action: 'select_plan', plan: key }));
+  } else {
+    alert(`✅ Plan "${plans[key].name}" seleccionado.\n\nContacta @L0quen2 en Telegram para activar.`);
   }
 }
-
-document.getElementById('couponCheckInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') checkCouponUsage();
-});
 
 function toggleFaq(el) {
   const wasOpen = el.classList.contains('open');
@@ -1241,15 +1247,20 @@ function toggleFaq(el) {
   if (!wasOpen) el.classList.add('open');
 }
 
-function checkTermsAccepted(uid) {
-  if (!uid) return false;
-  return localStorage.getItem(`termsAccepted_${uid}`) === 'true';
-}
-if (userId && !checkTermsAccepted(userId)) {
-  window.location.href = `/index.html?userId=${encodeURIComponent(userId)}`;
+function scrollTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-loadReferralDiscount();
+// Telegram Mini App init
+window.addEventListener('load', () => {
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor('#080a0f');
+    tg.setBackgroundColor('#080a0f');
+  }
+});
 </script>
 </body>
 </html>
