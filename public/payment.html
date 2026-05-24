@@ -1,1459 +1,1347 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VPN CUBA — Checkout</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>VPN Cuba — Pago</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Azeret+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
 <style>
+/* ═══════════════════════════════════════════
+   SIGNAL PAYMENT — VPN Cuba
+   Tema adaptativo por plan
+═══════════════════════════════════════════ */
+
 :root {
-  --bg: #06080e;
-  --bg2: #0a0d16;
-  --surface: #0f1320;
-  --surface2: #141828;
-  --surface3: #1a2035;
-  --border: rgba(255,255,255,0.055);
-  --border-mid: rgba(255,255,255,0.1);
+  --black:  #000000;
+  --deep:   #030305;
+  --panel:  #080810;
+  --ink:    #0d0d18;
+  --wire:   rgba(255,255,255,.055);
+  --wire-hi:rgba(255,255,255,.12);
+  --txt:    #eeeef5;
+  --txt-2:  #7a7a96;
+  --txt-3:  #3a3a52;
 
-  --neon: #39ffa0;
-  --neon-dim: rgba(57,255,160,0.15);
-  --neon-glow: rgba(57,255,160,0.25);
-  --blue: #5bf0ff;
-  --purple: #b16fff;
-  --yellow: #ffe566;
-  --pink: #ff6eb4;
-  --pastel-blue: #a8dcff;
+  --f-head: 'Bebas Neue', sans-serif;
+  --f-body: 'Cabinet Grotesk', sans-serif;
+  --f-mono: 'Azeret Mono', monospace;
 
-  --text: #dde4f0;
-  --text-muted: #5a6882;
-  --text-dim: #2e3a52;
-
-  --radius: 18px;
-  --radius-sm: 12px;
-  --radius-xs: 8px;
+  /* Default = basic (cyan) */
+  --sig:      #00d4ff;
+  --glow:     rgba(0,212,255,.18);
+  --sig-soft: rgba(0,212,255,.08);
+  --sig-line: rgba(0,212,255,.22);
+  --btn-bg:   linear-gradient(160deg, #05122a 0%, #0a2850 50%, #1a6bcc 100%);
+  --btn-txt:  #e8f4ff;
 }
 
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html { scroll-behavior:smooth; }
+/* Per-plan overrides applied via JS on <html data-plan="..."> */
+html[data-plan="trial"] {
+  --sig:      #f5c542;
+  --glow:     rgba(245,197,66,.18);
+  --sig-soft: rgba(245,197,66,.08);
+  --sig-line: rgba(245,197,66,.22);
+  --btn-bg:   linear-gradient(160deg, #2a1f10 0%, #4a3318 50%, #c9a96e 100%);
+  --btn-txt:  #fff8ee;
+}
+html[data-plan="basico"] {
+  --sig:      #00d4ff;
+  --glow:     rgba(0,212,255,.18);
+  --sig-soft: rgba(0,212,255,.08);
+  --sig-line: rgba(0,212,255,.22);
+  --btn-bg:   linear-gradient(160deg, #05122a 0%, #0a2850 50%, #1a6bcc 100%);
+  --btn-txt:  #e8f4ff;
+}
+html[data-plan="avanzado"] {
+  --sig:      #c8e8ff;
+  --glow:     rgba(200,232,255,.14);
+  --sig-soft: rgba(200,232,255,.07);
+  --sig-line: rgba(200,232,255,.20);
+  --btn-bg:   linear-gradient(160deg, #020d14 0%, #072030 50%, #0a4a70 100%);
+  --btn-txt:  #e2f5ff;
+}
+html[data-plan="cuba_vip"] {
+  --sig:      #ffb300;
+  --glow:     rgba(255,179,0,.22);
+  --sig-soft: rgba(255,179,0,.08);
+  --sig-line: rgba(255,179,0,.26);
+  --btn-bg:   linear-gradient(160deg, #1c1200 0%, #4b2f00 50%, #ff9f1a 100%);
+  --btn-txt:  #fff7e6;
+}
+html[data-plan="premium"] {
+  --sig:      #ff4d2e;
+  --glow:     rgba(255,77,46,.22);
+  --sig-soft: rgba(255,77,46,.08);
+  --sig-line: rgba(255,77,46,.24);
+  --btn-bg:   linear-gradient(160deg, #1a0800 0%, #3a1200 50%, #c03200 100%);
+  --btn-txt:  #fff4ee;
+}
+html[data-plan="anual"] {
+  --sig:      #00ff88;
+  --glow:     rgba(0,255,136,.18);
+  --sig-soft: rgba(0,255,136,.07);
+  --sig-line: rgba(0,255,136,.20);
+  --btn-bg:   linear-gradient(160deg, #011208 0%, #032a10 50%, #0a6622 100%);
+  --btn-txt:  #edfff2;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
+  background: var(--black);
+  color: var(--txt);
+  font-family: var(--f-body);
+  -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  min-height: 100vh;
 }
 
-/* Grain */
+/* Scanlines */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.07) 2px, rgba(0,0,0,.07) 4px);
+  opacity: .3;
+}
+
+/* Ambient glow behind content */
 body::after {
-  content:'';
-  position:fixed; inset:0;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-  pointer-events:none; z-index:999; opacity:0.35;
+  content: '';
+  position: fixed;
+  top: -30vh; left: -20vw;
+  width: 80vw; height: 80vh;
+  background: radial-gradient(circle, var(--glow), transparent 70%);
+  opacity: .4;
+  pointer-events: none;
+  z-index: 0;
+  transition: background 1s ease;
 }
 
-/* Ambient */
-.ambient {
-  position:fixed; inset:0; pointer-events:none; z-index:0;
-  background:
-    radial-gradient(ellipse 50% 40% at 80% 10%, rgba(57,255,160,0.04) 0%, transparent 100%),
-    radial-gradient(ellipse 40% 30% at 10% 80%, rgba(91,240,255,0.03) 0%, transparent 100%);
+.wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+  position: relative;
+  z-index: 2;
 }
 
-/* ===== LAYOUT ===== */
-.app {
-  position:relative; z-index:1;
-  max-width:430px; margin:0 auto;
-  min-height:100vh;
-  display:flex; flex-direction:column;
+/* ── TICKER ─────────────────────────────── */
+.ticker-bar {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  background: var(--deep);
+  border-bottom: 1px solid var(--wire-hi);
+  overflow: hidden;
+  height: 30px;
+  display: flex;
+  align-items: center;
+}
+.ticker-inner {
+  display: flex;
+  white-space: nowrap;
+  animation: ticker-scroll 24s linear infinite;
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--txt-2);
+}
+.ticker-inner span { padding: 0 2rem; }
+.ticker-inner .hi { color: var(--sig); }
+.ticker-fade { position: absolute; right: 0; top: 0; bottom: 0; width: 50px; background: linear-gradient(270deg, var(--deep) 40%, transparent); z-index: 2; }
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 
-/* ===== TOP BAR ===== */
-.topbar {
-  display:flex; align-items:center; justify-content:space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border);
-  position:sticky; top:0;
-  background: rgba(6,8,14,0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  z-index:50;
-}
-.topbar-back {
-  width:36px; height:36px;
-  background: var(--surface);
-  border:1px solid var(--border);
-  border-radius:10px;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; color:var(--text-muted);
-  transition: border-color 0.2s, color 0.2s;
-}
-.topbar-back:active { border-color:var(--neon); color:var(--neon); }
-.topbar-logo {
-  font-family:'Space Mono', monospace;
-  font-size:11px; color:var(--text-muted);
-  letter-spacing:0.08em;
-  display:flex; align-items:center; gap:6px;
-}
-.topbar-logo .dot {
-  width:6px; height:6px; border-radius:50%;
-  background:var(--neon); box-shadow:0 0 6px var(--neon);
-  animation: blink 2s ease infinite;
-}
-@keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
-.topbar-help {
-  width:36px; height:36px;
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:10px;
-  display:flex; align-items:center; justify-content:center;
-  font-family:'Space Mono',monospace; font-size:12px;
-  color:var(--text-muted); cursor:pointer;
+/* ── HEADER ─────────────────────────────── */
+.hero {
+  text-align: center;
+  padding: 28px 10px 20px;
 }
 
-/* ===== STEP PROGRESS ===== */
-.progress-wrap {
-  padding: 16px 20px;
-  animation: fadeUp 0.4s ease both;
-}
-.steps {
-  display:flex; align-items:center; gap:0;
-  position:relative;
-}
-.step {
-  display:flex; flex-direction:column; align-items:center; gap:5px;
-  flex:1; position:relative; cursor:pointer;
-}
-.step-line {
-  position:absolute; top:14px; left:50%; right:-50%;
-  height:1px;
-  background: var(--border);
-  z-index:0;
-}
-.step-line.done { background: var(--neon); }
-.step:last-child .step-line { display:none; }
-
-.step-circle {
-  width:28px; height:28px; border-radius:50%;
-  border:1.5px solid var(--border);
-  background:var(--surface);
-  display:flex; align-items:center; justify-content:center;
-  font-family:'Space Mono',monospace; font-size:10px;
-  color:var(--text-dim);
-  position:relative; z-index:1;
-  transition: all 0.3s;
-}
-.step.active .step-circle {
-  border-color:var(--neon);
-  background:rgba(57,255,160,0.08);
-  color:var(--neon);
-  box-shadow:0 0 12px rgba(57,255,160,0.2);
-}
-.step.done .step-circle {
-  border-color:var(--neon);
-  background:var(--neon);
-  color:#000;
-  font-weight:700;
-}
-.step-lbl {
-  font-family:'Space Mono',monospace;
-  font-size:8px; color:var(--text-dim);
-  letter-spacing:0.05em; text-align:center;
-  transition:color 0.3s;
-}
-.step.active .step-lbl { color:var(--neon); }
-.step.done .step-lbl { color:var(--text-muted); }
-
-/* ===== PAGES ===== */
-.page { display:none; animation:fadeUp 0.35s ease both; }
-.page.active { display:block; }
-@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-
-/* ===== SHARED SECTION ===== */
-.section {
-  margin: 0 16px 12px;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  overflow:hidden;
-}
-.section-head {
-  display:flex; align-items:center; gap:8px;
-  padding:14px 16px;
-  border-bottom:1px solid var(--border);
-  background:var(--surface2);
-}
-.section-head .ico { font-size:14px; }
-.section-head .lbl {
-  font-family:'Space Mono',monospace;
-  font-size:10px; letter-spacing:0.12em;
-  color:var(--text-muted);
-  text-transform:uppercase;
-}
-.section-head .lbl em { color:var(--neon); font-style:normal; }
-.section-body { padding:16px; }
-
-/* ===== PAGE 1: RESUMEN ===== */
-.plan-hero {
-  margin:16px 16px 12px;
-  border-radius:var(--radius);
-  overflow:hidden;
-  position:relative;
-  animation:fadeUp 0.4s ease both;
-}
-.plan-hero-inner {
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:20px;
-  position:relative;
-  overflow:hidden;
-}
-.plan-hero-glow {
-  position:absolute; top:-40%; right:-20%;
-  width:70%; height:80%;
-  pointer-events:none;
-}
-.plan-hero-tag {
-  display:inline-flex; align-items:center; gap:5px;
-  border-radius:100px; padding:3px 10px;
-  font-family:'Space Mono',monospace; font-size:9px;
-  letter-spacing:0.08em; margin-bottom:12px;
-}
-.plan-hero-name {
-  font-family:'Syne',sans-serif;
-  font-size:28px; font-weight:800;
-  letter-spacing:-0.02em; color:#fff;
-  margin-bottom:4px; line-height:1.1;
-}
-.plan-hero-sub {
-  font-size:12px; color:var(--text-muted);
-  margin-bottom:18px;
-}
-.plan-hero-price-row {
-  display:flex; align-items:flex-end;
-  justify-content:space-between;
-}
-.plan-hero-price {
-  font-family:'Syne',sans-serif;
-  font-size:14px; color:var(--text-muted);
-  margin-bottom:2px;
-}
-.plan-hero-price strong {
-  font-size:32px; font-weight:800;
-  display:block; line-height:1;
-}
-.plan-hero-duration {
-  font-family:'Space Mono',monospace;
-  font-size:10px; color:var(--text-dim);
-  padding:6px 12px;
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:100px;
+.plan-freq {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .8rem;
+  border: 1px solid var(--sig-line);
+  background: var(--sig-soft);
+  font-family: var(--f-mono);
+  font-size: .62rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--sig);
+  margin-bottom: 16px;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  box-shadow: 0 0 10px var(--glow);
 }
 
-.detail-row {
-  display:flex; justify-content:space-between;
-  align-items:center;
-  padding:11px 0;
-  border-bottom:1px solid var(--border);
-}
-.detail-row:last-child { border-bottom:none; }
-.detail-key {
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-dim);
-  letter-spacing:0.06em; text-transform:uppercase;
-}
-.detail-val {
-  font-size:13px; font-weight:500; color:var(--text);
-  text-align:right;
-}
-.detail-val.green { color:var(--neon); font-family:'Space Mono',monospace; font-weight:700; }
-.detail-val.blue { color:var(--pastel-blue); }
-
-.referral-banner {
-  margin:0 16px 12px;
-  background:linear-gradient(135deg, rgba(57,255,160,0.06), rgba(57,255,160,0.02));
-  border:1px solid rgba(57,255,160,0.2);
-  border-radius:var(--radius-sm);
-  padding:12px 14px;
-  display:flex; align-items:flex-start; gap:10px;
-  animation:fadeUp 0.4s 0.1s ease both;
-}
-.referral-banner .icon { font-size:18px; flex-shrink:0; margin-top:1px; }
-.referral-banner p { font-size:12px; color:var(--text-muted); line-height:1.5; }
-.referral-banner strong { color:var(--neon); }
-
-.features-grid {
-  display:grid; grid-template-columns:1fr 1fr;
-  gap:8px; padding:16px;
-}
-.feat-chip {
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-xs);
-  padding:10px;
-  display:flex; align-items:center; gap:7px;
-  font-size:11px; color:var(--text-muted);
-}
-.feat-chip .fi { font-size:14px; }
-
-.next-btn {
-  margin:16px;
-  width:calc(100% - 32px);
-  padding:16px;
-  border-radius:var(--radius-sm);
-  border:none;
-  font-family:'Syne',sans-serif;
-  font-size:15px; font-weight:700;
-  cursor:pointer;
-  display:flex; align-items:center; justify-content:center; gap:8px;
-  transition:transform 0.15s, box-shadow 0.2s;
-  letter-spacing:0.01em;
-}
-.next-btn:active { transform:scale(0.97); }
-.next-btn.green {
-  background:linear-gradient(135deg, var(--neon), #00d080);
-  color:#000;
-  box-shadow:0 0 30px rgba(57,255,160,0.25);
-}
-.next-btn.outline {
-  background:transparent;
-  border:1px solid var(--border);
-  color:var(--text-muted);
+.plan-freq .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--sig);
+  box-shadow: 0 0 6px var(--sig);
+  animation: dot-blink 1.8s ease-in-out infinite;
 }
 
-/* ===== PAGE 2: PAGO ===== */
-.method-tabs {
-  display:flex; gap:6px;
-  padding:12px 16px;
-  border-bottom:1px solid var(--border);
-  overflow-x:auto;
-  scrollbar-width:none;
-}
-.method-tabs::-webkit-scrollbar { display:none; }
-.method-tab {
-  flex-shrink:0;
-  padding:7px 14px;
-  border-radius:100px;
-  border:1px solid var(--border);
-  background:transparent;
-  font-family:'Space Mono',monospace;
-  font-size:10px; color:var(--text-muted);
-  cursor:pointer;
-  transition:all 0.2s;
-  white-space:nowrap;
-}
-.method-tab.active {
-  background:rgba(57,255,160,0.08);
-  border-color:rgba(57,255,160,0.35);
-  color:var(--neon);
+@keyframes dot-blink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .2; }
 }
 
-.method-panel { display:none; padding:16px; }
-.method-panel.active { display:block; }
-
-.payment-info-box {
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  padding:14px;
-  margin-bottom:10px;
-}
-.pib-label {
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-dim);
-  letter-spacing:0.1em; text-transform:uppercase;
-  margin-bottom:6px;
-  display:flex; align-items:center; gap:6px;
-}
-.pib-label svg { color:var(--neon); }
-.pib-val {
-  font-family:'Space Mono',monospace;
-  font-size:15px; font-weight:700; color:#fff;
-  letter-spacing:0.03em; margin-bottom:10px;
-}
-.copy-btn {
-  width:100%; padding:9px;
-  background:rgba(57,255,160,0.07);
-  border:1px solid rgba(57,255,160,0.2);
-  border-radius:var(--radius-xs);
-  color:var(--neon);
-  font-family:'Space Mono',monospace;
-  font-size:10px; letter-spacing:0.08em;
-  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
-  transition:background 0.2s;
-}
-.copy-btn:active { background:rgba(57,255,160,0.15); }
-.copy-btn.copied { background:rgba(57,255,160,0.15); color:#fff; }
-
-.method-info-note {
-  display:flex; align-items:flex-start; gap:8px;
-  background:rgba(91,240,255,0.04);
-  border:1px solid rgba(91,240,255,0.12);
-  border-radius:var(--radius-xs);
-  padding:10px 12px;
-  margin-top:10px;
-  font-size:11px; color:var(--text-muted);
-  line-height:1.5;
-}
-.method-info-note .ni { color:var(--blue); flex-shrink:0; font-size:14px; margin-top:1px; }
-
-.warning-note {
-  display:flex; align-items:flex-start; gap:8px;
-  background:rgba(255,229,102,0.04);
-  border:1px solid rgba(255,229,102,0.15);
-  border-left:3px solid var(--yellow);
-  border-radius:var(--radius-xs);
-  padding:10px 12px;
-  margin-top:10px;
-  font-size:11px; color:rgba(255,229,102,0.7);
-  line-height:1.5;
+.hero-title {
+  font-family: var(--f-head);
+  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  letter-spacing: .08em;
+  line-height: .9;
+  color: var(--txt);
+  margin-bottom: 6px;
 }
 
+.hero-plan {
+  font-family: var(--f-head);
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: .14em;
+  color: var(--sig);
+  text-shadow: 0 0 20px var(--glow);
+  animation: plan-pulse 3s ease-in-out infinite;
+}
+
+@keyframes plan-pulse {
+  0%,100% { text-shadow: 0 0 20px var(--glow); }
+  50%      { text-shadow: 0 0 40px var(--glow), 0 0 60px var(--glow); }
+}
+
+.h-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--sig-line), transparent);
+  margin: 20px 0;
+  position: relative;
+}
+.h-line::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: -2px;
+  transform: translateX(-50%);
+  width: 50px; height: 5px;
+  background: linear-gradient(90deg, transparent, var(--sig), transparent);
+  filter: blur(3px);
+}
+
+/* ── CARDS ──────────────────────────────── */
+.card {
+  background: var(--deep);
+  border: 1px solid var(--sig-line);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+  position: relative;
+  transition: border-color .3s, box-shadow .3s;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--sig), transparent);
+  opacity: .4;
+}
+
+.card:hover {
+  border-color: var(--sig);
+  box-shadow: 0 0 20px var(--glow);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--wire);
+}
+
+.card-head i {
+  color: var(--sig);
+  font-size: .9rem;
+  opacity: .8;
+}
+
+.card-title {
+  font-family: var(--f-head);
+  font-size: 1.1rem;
+  letter-spacing: .1em;
+  color: var(--txt);
+}
+
+.card-freq {
+  font-family: var(--f-mono);
+  font-size: .58rem;
+  color: var(--sig);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  margin-left: auto;
+  opacity: .7;
+}
+
+/* ── SUMMARY ────────────────────────────── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.summary-item {
+  background: rgba(255,255,255,.02);
+  border: 1px solid var(--wire);
+  border-left: 2px solid var(--sig);
+  padding: 10px 12px;
+  transition: background .2s;
+}
+
+.summary-item:hover { background: var(--sig-soft); }
+
+.s-label {
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--txt-3);
+  margin-bottom: 4px;
+}
+
+.s-value {
+  font-family: var(--f-body);
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--txt);
+}
+
+.s-value.price {
+  font-family: var(--f-head);
+  font-size: 1.4rem;
+  letter-spacing: .04em;
+  color: var(--sig);
+  text-shadow: 0 0 12px var(--glow);
+}
+
+/* ── COUPON ─────────────────────────────── */
 .coupon-row {
-  display:flex; gap:8px; margin-bottom:12px;
+  display: flex;
+  gap: 10px;
 }
+
 .coupon-input {
-  flex:1; padding:12px 14px;
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-xs);
-  color:var(--text);
-  font-family:'Space Mono',monospace;
-  font-size:12px;
-  outline:none;
-  transition:border-color 0.2s;
+  flex: 1;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--wire-hi);
+  color: var(--txt);
+  font-family: var(--f-mono);
+  font-size: .8rem;
+  padding: .75rem 1rem;
+  letter-spacing: .06em;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
 }
-.coupon-input::placeholder { color:var(--text-dim); }
-.coupon-input:focus { border-color:rgba(57,255,160,0.3); }
+
+.coupon-input:focus {
+  border-color: var(--sig);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+.coupon-input::placeholder { color: var(--txt-3); }
+
 .coupon-btn {
-  padding:12px 16px;
-  background:rgba(57,255,160,0.08);
-  border:1px solid rgba(57,255,160,0.25);
-  border-radius:var(--radius-xs);
-  color:var(--neon);
-  font-family:'Space Mono',monospace;
-  font-size:10px; letter-spacing:0.06em;
-  cursor:pointer; white-space:nowrap;
-  transition:background 0.2s;
-}
-.coupon-btn:active { background:rgba(57,255,160,0.15); }
-
-.price-summary {
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  padding:14px;
-}
-.ps-row {
-  display:flex; justify-content:space-between;
-  align-items:center; padding:5px 0;
-}
-.ps-key { font-size:12px; color:var(--text-muted); }
-.ps-val { font-family:'Space Mono',monospace; font-size:12px; color:var(--text); }
-.ps-row.total { margin-top:8px; padding-top:12px; border-top:1px solid var(--border); }
-.ps-row.total .ps-key { font-weight:600; color:var(--text); font-size:14px; }
-.ps-row.total .ps-val { color:var(--neon); font-size:16px; font-weight:700; }
-.ps-discount { color:var(--neon); }
-
-/* ===== PAGE 3: COMPROBANTE ===== */
-.upload-zone {
-  border:1.5px dashed rgba(57,255,160,0.2);
-  border-radius:var(--radius-sm);
-  padding:36px 20px;
-  text-align:center;
-  background:rgba(57,255,160,0.02);
-  cursor:pointer;
-  transition:border-color 0.2s, background 0.2s;
-  margin-bottom:12px;
-  position:relative;
-  overflow:hidden;
-}
-.upload-zone:active, .upload-zone.drag { border-color:var(--neon); background:rgba(57,255,160,0.05); }
-.upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; }
-.upload-icon {
-  width:52px; height:52px;
-  background:rgba(57,255,160,0.08);
-  border:1px solid rgba(57,255,160,0.2);
-  border-radius:16px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:22px; margin:0 auto 14px;
-}
-.upload-title {
-  font-family:'Syne',sans-serif;
-  font-size:15px; font-weight:700;
-  color:#fff; margin-bottom:4px;
-}
-.upload-sub {
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-dim);
-  letter-spacing:0.08em;
+  background: var(--sig-soft);
+  border: 1px solid var(--sig);
+  color: var(--sig);
+  font-family: var(--f-mono);
+  font-size: .7rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 0 1.2rem;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color .25s;
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
 }
 
-.upload-preview {
-  display:none;
-  background:var(--surface2);
-  border:1px solid rgba(57,255,160,0.2);
-  border-radius:var(--radius-sm);
-  padding:14px;
-  margin-bottom:12px;
-  align-items:center; gap:12px;
-}
-.upload-preview.show { display:flex; }
-.preview-thumb {
-  width:52px; height:52px;
-  border-radius:var(--radius-xs);
-  object-fit:cover;
-  border:1px solid var(--border);
-  flex-shrink:0;
-}
-.preview-thumb-placeholder {
-  width:52px; height:52px;
-  border-radius:var(--radius-xs);
-  background:var(--surface3);
-  border:1px solid var(--border);
-  display:flex; align-items:center; justify-content:center;
-  font-size:22px; flex-shrink:0;
-}
-.preview-info { flex:1; }
-.preview-name {
-  font-size:12px; font-weight:500;
-  color:var(--text); margin-bottom:3px;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;
-}
-.preview-size {
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-dim);
-}
-.preview-check {
-  width:28px; height:28px; border-radius:50%;
-  background:rgba(57,255,160,0.1);
-  border:1px solid var(--neon);
-  display:flex; align-items:center; justify-content:center;
-  color:var(--neon); font-size:12px;
-}
-.remove-btn {
-  background:none; border:none;
-  color:var(--text-dim); cursor:pointer;
-  font-size:16px; padding:4px;
-  transition:color 0.2s;
-}
-.remove-btn:active { color:var(--pink); }
-
-.order-mini {
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  padding:12px 14px;
-  display:flex; justify-content:space-between;
-  align-items:center; margin-bottom:12px;
-}
-.om-left { font-size:12px; color:var(--text-muted); }
-.om-left strong { color:var(--text); display:block; margin-top:2px; }
-.om-right {
-  font-family:'Space Mono',monospace;
-  font-size:16px; font-weight:700;
-  color:var(--neon);
+.coupon-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--sig);
+  transform: translateX(-100%);
+  transition: transform .3s cubic-bezier(.22,.8,.36,1);
+  z-index: 0;
 }
 
-.send-btn {
-  width:100%; padding:17px;
-  border-radius:var(--radius-sm);
-  border:none;
-  background:linear-gradient(135deg, var(--neon), #00c070);
-  color:#000;
-  font-family:'Syne',sans-serif;
-  font-size:16px; font-weight:800;
-  cursor:pointer; display:flex;
-  align-items:center; justify-content:center; gap:8px;
-  letter-spacing:0.01em;
-  box-shadow:0 0 40px rgba(57,255,160,0.2);
-  transition:transform 0.15s, box-shadow 0.2s;
+.coupon-btn:hover::before { transform: translateX(0); }
+.coupon-btn:hover { color: var(--black); }
+.coupon-btn span, .coupon-btn i { position: relative; z-index: 1; }
+.coupon-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.coupon-msg {
+  font-family: var(--f-mono);
+  font-size: .7rem;
+  margin-top: 8px;
+  letter-spacing: .06em;
 }
-.send-btn:active { transform:scale(0.97); }
-.send-btn:disabled {
-  background:var(--surface2);
-  color:var(--text-dim); box-shadow:none; cursor:not-allowed;
-}
-.send-info {
-  text-align:center; margin-top:12px;
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-dim);
-  letter-spacing:0.06em; line-height:1.6;
+.coupon-msg.ok  { color: #00ff88; }
+.coupon-msg.err { color: #ff4d4d; }
+
+.discount-box {
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0,0,0,.4);
+  border-left: 2px solid var(--sig);
 }
 
-/* ===== PAGE 4: CONFIRMACIÓN ===== */
-.confirm-hero {
-  padding:48px 24px 32px;
-  text-align:center;
-  animation:fadeUp 0.5s ease both;
-}
-.confirm-ring {
-  width:90px; height:90px;
-  border-radius:50%;
-  border:2px solid var(--neon);
-  background:rgba(57,255,160,0.06);
-  display:flex; align-items:center; justify-content:center;
-  margin:0 auto 24px;
-  font-size:36px;
-  box-shadow:0 0 40px rgba(57,255,160,0.15), inset 0 0 20px rgba(57,255,160,0.05);
-  animation:ringPulse 3s ease infinite;
-}
-@keyframes ringPulse {
-  0%,100%{box-shadow:0 0 40px rgba(57,255,160,0.15), inset 0 0 20px rgba(57,255,160,0.05)}
-  50%{box-shadow:0 0 60px rgba(57,255,160,0.25), inset 0 0 30px rgba(57,255,160,0.08)}
-}
-.confirm-title {
-  font-family:'Syne',sans-serif;
-  font-size:26px; font-weight:800;
-  color:#fff; margin-bottom:6px;
-}
-.confirm-sub {
-  font-size:13px; color:var(--text-muted);
-  line-height:1.6; max-width:280px; margin:0 auto 32px;
+.discount-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--f-mono);
+  font-size: .72rem;
+  padding: 4px 0;
+  color: var(--txt-2);
 }
 
-.confirm-grid {
-  display:grid; grid-template-columns:1fr 1fr;
-  gap:8px; margin:0 16px 12px;
-  animation:fadeUp 0.4s 0.2s ease both;
-}
-.cg-item {
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  padding:14px;
-  text-align:center;
-}
-.cg-item .ci-icon { font-size:22px; margin-bottom:6px; }
-.cg-item .ci-lbl {
-  font-family:'Space Mono',monospace;
-  font-size:8px; color:var(--text-dim);
-  letter-spacing:0.08em; margin-bottom:3px;
-}
-.cg-item .ci-val { font-size:13px; font-weight:500; color:var(--text); }
+.discount-row .val { color: var(--sig); font-weight: 500; }
+.discount-row .val.new-price { color: var(--txt); font-size: .9rem; }
+.discount-row .val.old-price { text-decoration: line-through; opacity: .5; }
 
-.timeline {
-  margin:0 16px 16px;
-  animation:fadeUp 0.4s 0.3s ease both;
+.remove-coupon {
+  background: none;
+  border: none;
+  color: #ff4d4d;
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  cursor: pointer;
+  margin-top: 6px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .7;
+  transition: opacity .2s;
 }
-.timeline-title {
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-dim);
-  letter-spacing:0.1em; text-transform:uppercase;
-  margin-bottom:12px; padding:0 4px;
-}
-.tl-item {
-  display:flex; gap:12px; align-items:flex-start;
-  padding-bottom:16px; position:relative;
-}
-.tl-item:last-child { padding-bottom:0; }
-.tl-dot-wrap {
-  display:flex; flex-direction:column; align-items:center; flex-shrink:0;
-}
-.tl-dot {
-  width:28px; height:28px; border-radius:50%;
-  border:1.5px solid var(--border);
-  background:var(--surface);
-  display:flex; align-items:center; justify-content:center;
-  font-size:12px; flex-shrink:0;
-}
-.tl-dot.done { border-color:var(--neon); background:rgba(57,255,160,0.08); }
-.tl-dot.active { border-color:var(--blue); background:rgba(91,240,255,0.06); animation:tlPulse 2s ease infinite; }
-@keyframes tlPulse { 0%,100%{box-shadow:0 0 0 0 rgba(91,240,255,0.2)}50%{box-shadow:0 0 0 6px rgba(91,240,255,0)} }
-.tl-line {
-  width:1px; flex:1; min-height:20px;
-  background:var(--border); margin-top:4px;
-}
-.tl-line.done { background:linear-gradient(to bottom, var(--neon), var(--border)); }
-.tl-item:last-child .tl-line { display:none; }
-.tl-content { flex:1; padding-top:4px; }
-.tl-label { font-size:13px; font-weight:500; color:var(--text); margin-bottom:2px; }
-.tl-sub { font-size:11px; color:var(--text-muted); line-height:1.4; }
-.tl-time {
-  font-family:'Space Mono',monospace; font-size:9px;
-  color:var(--text-dim); margin-top:4px;
+.remove-coupon:hover { opacity: 1; }
+
+/* ── REFERRAL DISCOUNT BANNER ───────────── */
+.referral-banner {
+  display: none;
+  background: var(--sig-soft);
+  border: 1px solid var(--sig-line);
+  border-left: 3px solid var(--sig);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-family: var(--f-mono);
+  font-size: .72rem;
+  color: var(--sig);
+  letter-spacing: .06em;
 }
 
-.confirm-btns {
-  display:flex; flex-direction:column; gap:8px;
-  padding:0 16px 32px;
-  animation:fadeUp 0.4s 0.4s ease both;
-}
-.cb-primary {
-  padding:15px;
-  background:linear-gradient(135deg, var(--neon), #00d080);
-  color:#000;
-  border:none; border-radius:var(--radius-sm);
-  font-family:'Syne',sans-serif;
-  font-size:14px; font-weight:700;
-  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-  box-shadow:0 0 30px rgba(57,255,160,0.2);
-  transition:transform 0.15s;
-}
-.cb-primary:active { transform:scale(0.97); }
-.cb-secondary {
-  padding:13px;
-  background:transparent;
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  font-family:'Space Mono',monospace;
-  font-size:10px; letter-spacing:0.08em;
-  color:var(--text-muted); cursor:pointer;
-  transition:border-color 0.2s;
-  display:flex; align-items:center; justify-content:center; gap:6px;
-}
-.cb-secondary:active { border-color:var(--text-muted); }
+.referral-banner i { margin-right: 6px; }
 
-.footer-note {
-  text-align:center; padding:0 24px 20px;
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-dim);
-  letter-spacing:0.05em; line-height:1.8;
+/* ── PAYMENT METHOD ─────────────────────── */
+.method-select {
+  width: 100%;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--wire-hi);
+  color: var(--txt);
+  font-family: var(--f-mono);
+  font-size: .8rem;
+  padding: .75rem 1rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7a96' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+.method-select:focus { border-color: var(--sig); }
+.method-select option { background: var(--ink); }
+
+.method-desc {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-3);
+  margin-top: 8px;
+  letter-spacing: .05em;
+}
+.method-desc i { color: var(--sig); margin-right: 4px; }
+
+/* Method info panels */
+.method-panel { display: none; margin-top: 14px; }
+.method-panel.active { display: block; }
+
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--wire);
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.info-row:last-child { border-bottom: none; }
+
+.info-label {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-2);
+  letter-spacing: .06em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.info-label i { color: var(--sig); width: 14px; text-align: center; }
+
+.info-value {
+  font-family: var(--f-mono);
+  font-size: .78rem;
+  color: var(--txt);
+  font-weight: 500;
+  word-break: break-all;
+  max-width: 220px;
 }
 
-/* ===== PLAN SELECTOR DEMO ===== */
-.demo-selector {
-  margin:12px 16px 0;
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  padding:12px;
-  display:flex; flex-wrap:wrap; gap:6px;
-  animation:fadeUp 0.3s ease both;
+.copy-btn {
+  background: var(--sig-soft);
+  border: 1px solid var(--sig-line);
+  color: var(--sig);
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.demo-chip {
-  padding:5px 12px;
-  border-radius:100px;
-  border:1px solid var(--border);
-  background:transparent;
-  font-family:'Space Mono',monospace;
-  font-size:9px; color:var(--text-muted);
-  cursor:pointer; transition:all 0.2s;
-  white-space:nowrap;
-}
-.demo-chip.active {
-  background:var(--neon-dim);
-  border-color:rgba(57,255,160,0.35);
-  color:var(--neon);
+.copy-btn:hover { background: var(--sig); color: var(--black); }
+
+.usdt-amount {
+  text-align: center;
+  padding: 14px;
+  border: 1px solid var(--sig-line);
+  background: rgba(0,0,0,.4);
+  margin: 10px 0;
 }
 
-/* Utils */
-.mt8 { margin-top:8px; }
-.mt12 { margin-top:12px; }
-.mono { font-family:'Space Mono',monospace; }
+.usdt-big {
+  font-family: var(--f-head);
+  font-size: 2.4rem;
+  letter-spacing: .06em;
+  color: var(--sig);
+  text-shadow: 0 0 20px var(--glow);
+}
+
+.usdt-sub {
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-2);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.mobile-price-box {
+  text-align: center;
+  padding: 12px;
+  background: rgba(37,211,102,.06);
+  border: 1px solid rgba(37,211,102,.2);
+  margin: 10px 0;
+}
+
+.mobile-big {
+  font-family: var(--f-head);
+  font-size: 2rem;
+  letter-spacing: .05em;
+  color: #25D366;
+}
+
+.note-box {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-2);
+  padding: 8px 12px;
+  background: rgba(255,255,255,.02);
+  border-left: 2px solid var(--sig);
+  margin-top: 10px;
+  letter-spacing: .04em;
+}
+.note-box i { color: var(--sig); margin-right: 5px; }
+
+/* ── UPLOAD ─────────────────────────────── */
+.upload-area {
+  border: 1px dashed var(--sig-line);
+  background: rgba(0,0,0,.3);
+  padding: 30px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .25s, background .25s;
+}
+
+.upload-area:hover, .upload-area.drag {
+  border-color: var(--sig);
+  background: var(--sig-soft);
+  box-shadow: 0 0 20px var(--glow);
+}
+
+.upload-area i {
+  font-size: 2.2rem;
+  color: var(--sig);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.upload-area .u-title {
+  font-family: var(--f-body);
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--txt);
+  margin-bottom: 4px;
+}
+
+.upload-area .u-sub {
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-3);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.preview-box {
+  display: none;
+  margin-top: 12px;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--txt-2);
+}
+
+.preview-img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border: 1px solid var(--sig-line);
+  display: block;
+}
+
+.remove-img {
+  background: rgba(255,77,77,.15);
+  border: 1px solid rgba(255,77,77,.4);
+  color: #f87171;
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.remove-img:hover { background: rgba(255,77,77,.3); }
+
+.warn-box {
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: #fbbf24;
+  padding: 8px 12px;
+  background: rgba(251,191,36,.07);
+  border-left: 2px solid #fbbf24;
+  margin-top: 10px;
+  letter-spacing: .04em;
+}
+.warn-box i { margin-right: 5px; }
+
+/* ── PROGRESS ───────────────────────────── */
+.progress-bar-wrap {
+  height: 2px;
+  background: var(--wire);
+  margin: 16px 0;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--sig), var(--sig));
+  box-shadow: 0 0 8px var(--sig);
+  transition: width .5s ease;
+  width: 33%;
+}
+
+.steps-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.step-lbl {
+  font-family: var(--f-mono);
+  font-size: .58rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--txt-3);
+  transition: color .3s;
+}
+
+.step-lbl.active { color: var(--sig); }
+
+/* ── SUBMIT ─────────────────────────────── */
+.submit-btn {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--sig);
+  background: transparent;
+  color: var(--sig);
+  font-family: var(--f-mono);
+  font-size: .8rem;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color .28s;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+}
+
+.submit-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--sig);
+  transform: translateX(-100%);
+  transition: transform .38s cubic-bezier(.22,.8,.36,1);
+  z-index: 0;
+}
+
+.submit-btn:hover::before { transform: translateX(0); }
+.submit-btn:hover { color: var(--black); }
+.submit-btn:disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+.submit-btn span, .submit-btn i { position: relative; z-index: 1; }
+
+.processing-note {
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-3);
+  text-align: center;
+  margin-top: 10px;
+  letter-spacing: .06em;
+}
+.processing-note i { color: var(--sig); margin-right: 4px; }
+
+/* ── NOTIFICATION ───────────────────────── */
+#notification {
+  position: fixed;
+  top: 20px; right: 20px;
+  background: var(--ink);
+  border: 1px solid var(--wire-hi);
+  border-left: 3px solid var(--sig);
+  padding: .75rem 1rem;
+  font-family: var(--f-mono);
+  font-size: .74rem;
+  letter-spacing: .04em;
+  color: var(--txt);
+  z-index: 3000;
+  transform: translateX(160%);
+  transition: transform .28s cubic-bezier(.22,.8,.36,1);
+  max-width: min(90vw, 320px);
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+}
+
+/* ── FOOTER ─────────────────────────────── */
+.footer {
+  text-align: center;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--wire);
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  color: var(--txt-3);
+  letter-spacing: .06em;
+}
+
+/* ── ANIMATE IN ─────────────────────────── */
+.card {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: card-in .45s cubic-bezier(.22,.8,.36,1) forwards;
+}
+.card:nth-child(1) { animation-delay: .05s; }
+.card:nth-child(2) { animation-delay: .12s; }
+.card:nth-child(3) { animation-delay: .19s; }
+.card:nth-child(4) { animation-delay: .26s; }
+.card:nth-child(5) { animation-delay: .33s; }
+.card:nth-child(6) { animation-delay: .40s; }
+
+@keyframes card-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .info-row { flex-direction: column; align-items: flex-start; }
+  .copy-btn { width: 100%; text-align: center; }
+}
 </style>
 </head>
+
 <body>
-<div class="ambient"></div>
 
-<div class="app">
+<!-- TICKER -->
+<div class="ticker-bar">
+  <div class="ticker-inner">
+    <span>VPN CUBA · Portal de Pago Seguro</span>
+    <span class="hi manual-highlight">Revisión manual · 1-12 horas</span>
+    <span>Pago en CUP · Saldo Móvil · USDT</span>
+    <span class="hi">Recibirás confirmación por Telegram</span>
+    <span>WireGuard Protocol · Cifrado avanzado</span>
+    <span class="hi">Soporte directo tras confirmación</span>
+    <!-- duplicate -->
+    <span>VPN CUBA · Portal de Pago Seguro</span>
+    <span class="hi manual-highlight">Revisión manual · 1-12 horas</span>
+    <span>Pago en CUP · Saldo Móvil · USDT</span>
+    <span class="hi">Recibirás confirmación por Telegram</span>
+    <span>WireGuard Protocol · Cifrado avanzado</span>
+    <span class="hi">Soporte directo tras confirmación</span>
+  </div>
+  <div class="ticker-fade"></div>
+</div>
 
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <div class="topbar-back" onclick="goBack()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    </div>
-    <div class="topbar-logo">
+<div id="notification"></div>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="plan-freq">
       <span class="dot"></span>
-      @L0QUE N2
+      <span id="freqLabel">FREQ·00 · PROCESANDO</span>
     </div>
-    <div class="topbar-help">?</div>
+    <div class="hero-title">VPN CUBA</div>
+    <div class="hero-plan" id="planTitle">PLAN</div>
+  </header>
+
+  <!-- referral discount banner -->
+  <div class="referral-banner" id="referralBanner">
+    <i class="fas fa-users"></i>
+    Tienes un <strong id="refDiscountPct">0%</strong> de descuento por referidos activo — se aplicará automáticamente al confirmar tu pago.
   </div>
 
-  <!-- STEP PROGRESS -->
-  <div class="progress-wrap">
-    <div class="steps">
-      <div class="step active" id="step1" onclick="goToStep(1)">
-        <div class="step-circle" id="sc1">01</div>
-        <div class="step-line" id="sl1"></div>
-        <div class="step-lbl">RESUMEN</div>
+  <!-- Progress -->
+  <div class="steps-row">
+    <span class="step-lbl active" id="lbl1">// Información</span>
+    <span class="step-lbl" id="lbl2">// Pago</span>
+    <span class="step-lbl" id="lbl3">// Confirmado</span>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-receipt"></i>
+      <span class="card-title">RESUMEN</span>
+      <span class="card-freq" id="cardFreq">FREQ·--</span>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="s-label">Plan</div>
+        <div class="s-value" id="sumPlan">—</div>
       </div>
-      <div class="step" id="step2" onclick="goToStep(2)">
-        <div class="step-circle" id="sc2">02</div>
-        <div class="step-line" id="sl2"></div>
-        <div class="step-lbl">PAGO</div>
+      <div class="summary-item">
+        <div class="s-label">Duración</div>
+        <div class="s-value" id="sumPeriod">—</div>
       </div>
-      <div class="step" id="step3" onclick="goToStep(3)">
-        <div class="step-circle" id="sc3">03</div>
-        <div class="step-line" id="sl3"></div>
-        <div class="step-lbl">ENVIAR</div>
+      <div class="summary-item">
+        <div class="s-label">Precio CUP</div>
+        <div class="s-value price" id="sumPrice">—</div>
       </div>
-      <div class="step" id="step4" onclick="goToStep(4)">
-        <div class="step-circle" id="sc4">04</div>
-        <div class="step-lbl">LISTO</div>
+      <div class="summary-item">
+        <div class="s-label">Saldo móvil</div>
+        <div class="s-value" id="sumMobile">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">USDT</div>
+        <div class="s-value" id="sumUsdt">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">ID</div>
+        <div class="s-value" id="sumId" style="font-size:.78rem;">—</div>
       </div>
     </div>
   </div>
 
-  <!-- DEMO PLAN SELECTOR (only shown in step 1) -->
-  <div class="demo-selector" id="demoSelector">
-    <button class="demo-chip" onclick="selectPlan('basic')">🌐 BÁSICO</button>
-    <button class="demo-chip active" onclick="selectPlan('anual')">♾️ ANUAL</button>
-    <button class="demo-chip" onclick="selectPlan('vip')">🏦 VIP</button>
-    <button class="demo-chip" onclick="selectPlan('gaming')">🎮 GAMING</button>
-    <button class="demo-chip" onclick="selectPlan('turbo')">⚡ TURBO</button>
-  </div>
-
-  <!-- ===================== PAGE 1: RESUMEN ===================== -->
-  <div class="page active" id="page1">
-
-    <div class="plan-hero" id="planHero">
-      <div class="plan-hero-inner">
-        <svg class="plan-hero-glow" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-          <defs><radialGradient id="hg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" id="hgStop" stop-color="#39ffa0" stop-opacity="0.1"/>
-            <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
-          </radialGradient></defs>
-          <circle cx="150" cy="150" r="150" fill="url(#hg)"/>
-        </svg>
-        <div class="plan-hero-tag" id="heroTag">
-          <span style="width:6px;height:6px;border-radius:50%;background:var(--neon);box-shadow:0 0 6px var(--neon);display:inline-block;margin-right:2px"></span>
-          FREQ·FULL · ACCESO TOTAL
-        </div>
-        <div class="plan-hero-name" id="heroName">ANUAL</div>
-        <div class="plan-hero-sub" id="heroSub">Exclusivo · 12 meses · Todo desbloqueado</div>
-        <div class="plan-hero-price-row">
-          <div>
-            <div class="plan-hero-price">Precio CUP</div>
-            <div class="plan-hero-price" style="margin-top:2px"><strong id="heroPrice" style="color:var(--neon)">12,000 CUP</strong></div>
-          </div>
-          <div class="plan-hero-duration" id="heroDuration">12 MESES</div>
-        </div>
-      </div>
+  <!-- COUPON -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-tag"></i>
+      <span class="card-title">CUPÓN DE DESCUENTO</span>
     </div>
-
-    <div class="referral-banner" id="refBanner">
-      <span class="icon">👥</span>
-      <p>Tienes un <strong>20% de descuento</strong> por referidos activo — se aplicará automáticamente al confirmar tu pago.</p>
-    </div>
-
-    <div class="section">
-      <div class="section-head">
-        <span class="ico">📋</span>
-        <span class="lbl">// <em>RESUMEN</em> DEL PEDIDO</span>
-        <span style="margin-left:auto;font-family:'Space Mono',monospace;font-size:9px;color:var(--text-dim)" id="heroTag2">FREQ·FULL</span>
-      </div>
-      <div class="section-body">
-        <div class="detail-row">
-          <span class="detail-key">PLAN</span>
-          <span class="detail-val" id="sumPlan">Plan Anual</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">DURACIÓN</span>
-          <span class="detail-val" id="sumDuration">12 meses</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">PRECIO CUP</span>
-          <span class="detail-val green" id="sumCUP">12,000 CUP</span>
-        </div>
-        <div class="detail-row" id="sumMobileRow">
-          <span class="detail-key">SALDO MÓVIL</span>
-          <span class="detail-val blue" id="sumMobile">1,000 CUP</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">USDT</span>
-          <span class="detail-val" id="sumUSDT" style="color:var(--yellow)">20 USDT</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">ID DE PEDIDO</span>
-          <span class="detail-val mono" style="font-size:11px;color:var(--text-muted)" id="sumID">6373481979</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="section" style="margin-top:0">
-      <div class="section-head">
-        <span class="ico">✨</span>
-        <span class="lbl">// <em>INCLUYE</em></span>
-      </div>
-      <div class="features-grid" id="featureGrid">
-        <div class="feat-chip"><span class="fi">♾️</span> Acceso total</div>
-        <div class="feat-chip"><span class="fi">🏦</span> VIP Cuba</div>
-        <div class="feat-chip"><span class="fi">🎮</span> Gaming QoS</div>
-        <div class="feat-chip"><span class="fi">⚡</span> Turbo Download</div>
-        <div class="feat-chip"><span class="fi">🔒</span> AES-256</div>
-        <div class="feat-chip"><span class="fi">🆘</span> Soporte 24/7</div>
-      </div>
-    </div>
-
-    <button class="next-btn green" onclick="goToStep(2)" style="margin-top:8px">
-      Continuar al pago
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-    </button>
-
-  </div>
-
-  <!-- ===================== PAGE 2: PAGO ===================== -->
-  <div class="page" id="page2">
-
-    <div class="section" style="margin-top:16px">
-      <div class="section-head">
-        <span class="ico">🏷️</span>
-        <span class="lbl">// CUPÓN DE <em>DESCUENTO</em></span>
-      </div>
-      <div class="section-body">
-        <div class="coupon-row">
-          <input class="coupon-input" type="text" placeholder="// código de descuento..." id="couponInput">
-          <button class="coupon-btn" onclick="applyCoupon()">✓ APLICAR</button>
-        </div>
-        <div class="price-summary">
-          <div class="ps-row">
-            <span class="ps-key">Precio base</span>
-            <span class="ps-val" id="ps-base">12,000 CUP</span>
-          </div>
-          <div class="ps-row" id="ps-disc-row" style="display:none">
-            <span class="ps-key ps-discount">Descuento ref. 20%</span>
-            <span class="ps-val ps-discount" id="ps-disc">−2,400 CUP</span>
-          </div>
-          <div class="ps-row total">
-            <span class="ps-key">Total a pagar</span>
-            <span class="ps-val" id="ps-total">12,000 CUP</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-head">
-        <span class="ico">💳</span>
-        <span class="lbl">// MÉTODO DE <em>PAGO</em></span>
-      </div>
-      <div class="method-tabs">
-        <button class="method-tab active" onclick="switchTab('bpa')">💳 Tarjeta BPA</button>
-        <button class="method-tab" onclick="switchTab('metropolitana')">🏦 Metropolitana</button>
-        <button class="method-tab" onclick="switchTab('movil')">📱 Saldo Móvil</button>
-        <button class="method-tab" onclick="switchTab('usdt')">₮ USDT</button>
-      </div>
-
-      <!-- BPA -->
-      <div class="method-panel active" id="tab-bpa">
-        <div class="payment-info-box">
-          <div class="pib-label">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            NÚMERO DE TARJETA
-          </div>
-          <div class="pib-val">9248-1299-7027-1730</div>
-          <button class="copy-btn" onclick="copyText('9248129970271730',this)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            COPIAR TARJETA
-          </button>
-        </div>
-        <div class="payment-info-box">
-          <div class="pib-label">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            # A CONFIRMAR
-          </div>
-          <div class="pib-val">63806513</div>
-          <button class="copy-btn" onclick="copyText('63806513',this)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            COPIAR NÚMERO
-          </button>
-        </div>
-        <div class="method-info-note">
-          <span class="ni">ℹ</span>
-          Incluye el número de confirmación de la transacción en el comprobante de pago.
-        </div>
-      </div>
-
-      <!-- Metropolitana -->
-      <div class="method-panel" id="tab-metropolitana">
-        <div class="payment-info-box">
-          <div class="pib-label">NÚMERO DE TARJETA Metropolitana</div>
-          <div class="pib-val">9225-4478-1234-5678</div>
-          <button class="copy-btn" onclick="copyText('9225447812345678',this)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            COPIAR TARJETA
-          </button>
-        </div>
-        <div class="method-info-note">
-          <span class="ni">ℹ</span>
-          Transfiere el monto exacto. El número de confirmación debe aparecer en el comprobante.
-        </div>
-      </div>
-
-      <!-- MÓVIL -->
-      <div class="method-panel" id="tab-movil">
-        <div class="payment-info-box">
-          <div class="pib-label">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/></svg>
-            NÚMERO PARA RECARGAR
-          </div>
-          <div class="pib-val">+53 63806513</div>
-          <button class="copy-btn" onclick="copyText('+5363806513',this)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            COPIAR
-          </button>
-        </div>
-        <div class="payment-info-box mt8">
-          <div class="pib-label">MONTO SALDO MÓVIL</div>
-          <div class="pib-val" id="movilAmount">1,000 CUP</div>
-        </div>
-        <div class="warning-note">
-          ⚠ Usa transferencia por Transfermóvil. Incluye tu número en el concepto de la recarga.
-        </div>
-      </div>
-
-      <!-- USDT -->
-      <div class="method-panel" id="tab-usdt">
-        <div class="payment-info-box">
-          <div class="pib-label">RED / WALLET TRC-20</div>
-          <div class="pib-val" style="font-size:11px;word-break:break-all">TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</div>
-          <button class="copy-btn" onclick="copyText('TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',this)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            COPIAR WALLET
-          </button>
-        </div>
-        <div class="payment-info-box mt8">
-          <div class="pib-label">MONTO EXACTO</div>
-          <div class="pib-val" id="usdtAmount">20.00 USDT</div>
-        </div>
-        <div class="method-info-note">
-          <span class="ni">ℹ</span>
-          Red TRON (TRC-20). Envía el monto exacto e incluye el hash de la transacción en el comprobante.
-        </div>
-      </div>
-    </div>
-
-    <button class="next-btn green" onclick="goToStep(3)" style="margin-top:4px">
-      Ya pagué — subir comprobante
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-    </button>
-    <button class="next-btn outline" onclick="goToStep(1)" style="margin-top:4px">
-      ← Volver al resumen
-    </button>
-
-  </div>
-
-  <!-- ===================== PAGE 3: COMPROBANTE ===================== -->
-  <div class="page" id="page3">
-
-    <div class="section" style="margin-top:16px">
-      <div class="section-head">
-        <span class="ico">📸</span>
-        <span class="lbl">// COMPROBANTE DE <em>PAGO</em></span>
-      </div>
-      <div class="section-body">
-
-        <div class="order-mini">
-          <div class="om-left">
-            Plan seleccionado
-            <strong id="comp-plan">Plan Anual · 12 meses</strong>
-          </div>
-          <div class="om-right" id="comp-price">12,000 CUP</div>
-        </div>
-
-        <div class="upload-zone" id="uploadZone" onclick="triggerUpload()">
-          <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this)">
-          <div class="upload-icon">📤</div>
-          <div class="upload-title">Arrastra o toca para subir</div>
-          <div class="upload-sub">JPG · PNG · GIF — MÁX. 5 MB</div>
-        </div>
-
-        <div class="upload-preview" id="uploadPreview">
-          <div class="preview-thumb-placeholder" id="previewThumb">🖼️</div>
-          <div class="preview-info">
-            <div class="preview-name" id="previewName">comprobante.jpg</div>
-            <div class="preview-size" id="previewSize">— KB</div>
-          </div>
-          <div class="preview-check">✓</div>
-          <button class="remove-btn" onclick="removeFile()">✕</button>
-        </div>
-
-        <div class="warning-note" style="margin-top:0">
-          ⚠ Si el envío falla, recorta o reduce el tamaño de la imagen.
-        </div>
-
-        <div class="method-info-note mt8">
-          <span class="ni">ℹ</span>
-          Asegúrate de que el número de confirmación sea visible en el comprobante antes de enviar.
-        </div>
-
-      </div>
-    </div>
-
-    <div style="padding:0 16px 4px">
-      <button class="send-btn" id="sendBtn" onclick="sendOrder()" disabled>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        ENVIAR COMPROBANTE
-      </button>
-      <div class="send-info">
-        🕐 REVISIÓN MANUAL · 1-12 HORAS<br>RECIBIRÁS CONFIRMACIÓN POR TELEGRAM
-      </div>
-    </div>
-
-    <button class="next-btn outline" onclick="goToStep(2)" style="margin-top:4px">
-      ← Volver a métodos de pago
-    </button>
-
-  </div>
-
-  <!-- ===================== PAGE 4: CONFIRMACIÓN ===================== -->
-  <div class="page" id="page4">
-
-    <div class="confirm-hero">
-      <div class="confirm-ring">✅</div>
-      <div class="confirm-title">Comprobante<br>enviado</div>
-      <div class="confirm-sub">Tu pago está en revisión. Recibirás el archivo WireGuard por Telegram en cuanto se verifique.</div>
-    </div>
-
-    <div class="confirm-grid">
-      <div class="cg-item">
-        <div class="ci-icon">📋</div>
-        <div class="ci-lbl">PLAN</div>
-        <div class="ci-val" id="conf-plan">Anual</div>
-      </div>
-      <div class="cg-item">
-        <div class="ci-icon">🆔</div>
-        <div class="ci-lbl">PEDIDO</div>
-        <div class="ci-val mono" style="font-size:11px" id="conf-id">6373481979</div>
-      </div>
-      <div class="cg-item">
-        <div class="ci-icon">⏱️</div>
-        <div class="ci-lbl">REVISIÓN</div>
-        <div class="ci-val">1-12 hrs</div>
-      </div>
-      <div class="cg-item">
-        <div class="ci-icon">📡</div>
-        <div class="ci-lbl">PROTOCOLO</div>
-        <div class="ci-val">WireGuard</div>
-      </div>
-    </div>
-
-    <div class="timeline">
-      <div class="timeline-title">// PRÓXIMOS PASOS</div>
-      <div class="tl-item">
-        <div class="tl-dot-wrap">
-          <div class="tl-dot done">✓</div>
-          <div class="tl-line done"></div>
-        </div>
-        <div class="tl-content">
-          <div class="tl-label">Comprobante recibido</div>
-          <div class="tl-sub">Tu pago fue enviado correctamente.</div>
-          <div class="tl-time">AHORA MISMO</div>
-        </div>
-      </div>
-      <div class="tl-item">
-        <div class="tl-dot-wrap">
-          <div class="tl-dot active">⋯</div>
-          <div class="tl-line"></div>
-        </div>
-        <div class="tl-content">
-          <div class="tl-label">Verificación manual</div>
-          <div class="tl-sub">Un administrador revisa tu pago.</div>
-          <div class="tl-time">1 - 12 HORAS</div>
-        </div>
-      </div>
-      <div class="tl-item">
-        <div class="tl-dot-wrap">
-          <div class="tl-dot"></div>
-          <div class="tl-line"></div>
-        </div>
-        <div class="tl-content">
-          <div class="tl-label">Archivo WireGuard enviado</div>
-          <div class="tl-sub">Recibirás el .conf directamente en Telegram.</div>
-          <div class="tl-time">TRAS VERIFICACIÓN</div>
-        </div>
-      </div>
-      <div class="tl-item">
-        <div class="tl-dot-wrap">
-          <div class="tl-dot"></div>
-        </div>
-        <div class="tl-content">
-          <div class="tl-label">¡Conectado!</div>
-          <div class="tl-sub">Importa el .conf en WireGuard y listo.</div>
-          <div class="tl-time">MTU 1280 · UDP:80</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="confirm-btns">
-      <button class="cb-primary" onclick="openTelegram()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        Ir al canal @L0quen2
-      </button>
-      <button class="cb-secondary" onclick="goToStep(1)">
-        ↺ HACER OTRO PEDIDO
+    <div class="coupon-row">
+      <input class="coupon-input" id="couponInput" type="text" placeholder="// código de descuento" maxlength="20">
+      <button class="coupon-btn" id="couponBtn" onclick="applyCoupon()">
+        <i class="fas fa-check"></i> <span>Aplicar</span>
       </button>
     </div>
-
-    <div class="footer-note">
-      © 2025 VPN CUBA · @L0quen2 · PAGO SEGURO<br>
-      Los archivos de configuración se envían manualmente tras la verificación.
+    <div class="coupon-msg" id="couponMsg"></div>
+    <div class="discount-box" id="discountBox">
+      <div class="discount-row"><span>Cupón:</span><span class="val" id="dCode">—</span></div>
+      <div class="discount-row"><span>Descuento:</span><span class="val" id="dPct">—</span></div>
+      <div class="discount-row"><span>Precio anterior:</span><span class="val old-price" id="dOld">—</span></div>
+      <div class="discount-row"><span>Precio final:</span><span class="val new-price" id="dNew">—</span></div>
+      <button class="remove-coupon" onclick="removeCoupon()"><i class="fas fa-times"></i> Quitar cupón</button>
     </div>
-
   </div>
 
-</div><!-- /app -->
+  <!-- PAYMENT METHOD -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-credit-card"></i>
+      <span class="card-title">MÉTODO DE PAGO</span>
+    </div>
+    <select class="method-select" id="methodSelect" onchange="onMethodChange()">
+      <option value="transfer">Tarjeta BPA</option>
+      <option value="metropolitan">Tarjeta Metropolitana</option>
+      <option value="mitransfer">Monedero MITRANSFER</option>
+      <option value="mobile">Saldo Móvil</option>
+      <option value="usdt">USDT (BEP20)</option>
+    </select>
+    <div class="method-desc" id="methodDesc"><i class="fas fa-info-circle"></i> Selecciona tu método de pago.</div>
+
+    <!-- BPA -->
+    <div class="method-panel active" id="panel-transfer">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-credit-card"></i> Número de tarjeta</div>
+        <div class="info-value">9248-1299-7027-1730</div>
+        <button class="copy-btn" onclick="copy('9248129970271730',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-mobile-alt"></i> # A confirmar</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="note-box"><i class="fas fa-info-circle"></i> Incluye el número de confirmación en el comprobante.</div>
+    </div>
+
+    <!-- Metropolitana -->
+    <div class="method-panel" id="panel-metropolitan">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-credit-card"></i> Número de tarjeta</div>
+        <div class="info-value">9238-9598-7118-1386</div>
+        <button class="copy-btn" onclick="copy('9238959871181386',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-mobile-alt"></i> # A confirmar</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+    </div>
+
+    <!-- MITRANSFER -->
+    <div class="method-panel" id="panel-mitransfer">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-wallet"></i> Número de teléfono</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+    </div>
+
+    <!-- Saldo Móvil -->
+    <div class="method-panel" id="panel-mobile">
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-mobile-alt"></i> Número de teléfono</div>
+        <div class="info-value">63806513</div>
+        <button class="copy-btn" onclick="copy('63806513',this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="mobile-price-box">
+        <div class="mobile-big" id="mobilePriceBig">— CUP</div>
+        <div class="usdt-sub">Precio con saldo móvil</div>
+      </div>
+      <div class="note-box"><i class="fas fa-info-circle"></i> Recarga el saldo exacto en el número indicado.</div>
+    </div>
+
+    <!-- USDT -->
+    <div class="method-panel" id="panel-usdt">
+      <div class="usdt-amount">
+        <div class="usdt-sub">Monto exacto a enviar</div>
+        <div class="usdt-big" id="usdtBig">— USDT</div>
+        <div class="usdt-sub">Red: BEP20 (Binance Smart Chain)</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label"><i class="fas fa-wallet"></i> Dirección BEP20</div>
+        <div class="info-value" id="usdtAddr">0x55B81bD7df1b0c6Db33fD532207CF2Bf137C1519</div>
+        <button class="copy-btn" onclick="copy(document.getElementById('usdtAddr').textContent,this)"><i class="far fa-copy"></i> Copiar</button>
+      </div>
+      <div class="note-box"><i class="fas fa-exclamation-triangle"></i> Envía solo por red BEP20. Monto exacto.</div>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="card">
+    <div class="card-head">
+      <i class="fas fa-camera"></i>
+      <span class="card-title">COMPROBANTE DE PAGO</span>
+    </div>
+    <div class="upload-area" id="uploadArea">
+      <i class="fas fa-cloud-upload-alt"></i>
+      <div class="u-title">Arrastra o toca para subir</div>
+      <div class="u-sub">JPG · PNG · GIF — Máx. 5 MB</div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" hidden>
+    <div class="warn-box"><i class="fas fa-crop-alt"></i> Si el envío falla, recorta o reduce el tamaño de la imagen.</div>
+    <div class="preview-box" id="previewBox">
+      <div class="preview-header">
+        <span><i class="fas fa-image"></i> Vista previa</span>
+        <button class="remove-img" onclick="removeImg()"><i class="fas fa-trash"></i> Eliminar</button>
+      </div>
+      <img class="preview-img" id="previewImg" alt="Vista previa">
+    </div>
+  </div>
+
+  <!-- SUBMIT -->
+  <div class="card">
+    <button class="submit-btn" id="submitBtn" disabled onclick="submitPayment()">
+      <i class="fas fa-paper-plane"></i> <span id="submitTxt">Enviar comprobante</span>
+    </button>
+    <div class="processing-note"><i class="fas fa-clock"></i> <span class="manual-pill">Revisión manual</span>: <span class="manual-highlight">1-12 horas</span>. Recibirás confirmación por Telegram.</div>
+  </div>
+
+  <footer class="footer">
+    <p>© 2025 VPN Cuba · Pago seguro</p>
+    <p style="margin-top:4px;">Los archivos de configuración se envían manualmente tras la verificación.</p>
+  </footer>
+
+</div>
 
 <script>
-// ===== STATE =====
-const planData = {
-  basic: {
-    tag:'BÁSICO · 1 MES', name:'BÁSICO', sub:'Streaming USA · Navegación libre',
-    price:'1,200 CUP', mobile:'600 CUP', usdt:'3.00 USDT', duration:'1 MES',
-    sumPlan:'Plan Básico', sumDuration:'1 mes',
-    features:[['🌐','Streaming USA'],['📺','Netflix/Hulu'],['⚡','2 Mbps'],['🔒','AES-256'],['📡','WireGuard'],['🆘','Soporte']],
-    accentColor:'#a8dcff', tagBg:'rgba(168,220,255,0.08)', tagBorder:'rgba(168,220,255,0.25)',
-    heroTag2:'BÁSICO', refBanner:false,
-  },
-  advanced: {
-    tag:'AVANZADO · 2 MESES', name:'AVANZADO', sub:'2 meses del plan básico · Mejor precio',
-    price:'2,000 CUP', mobile:'1,000 CUP', usdt:'5.00 USDT', duration:'2 MESES',
-    sumPlan:'Plan Avanzado', sumDuration:'2 meses',
-    features:[['🚀','2 meses'],['🌐','Streaming USA'],['⚡','2 Mbps'],['💰','Ahorro'],['🔒','AES-256'],['🆘','Soporte']],
-    accentColor:'#d4b8ff', tagBg:'rgba(212,184,255,0.08)', tagBorder:'rgba(212,184,255,0.25)',
-    heroTag2:'AVANZADO', refBanner:false,
-  },
-  anual: {
-    tag:'FREQ·FULL · ACCESO TOTAL', name:'ANUAL', sub:'Exclusivo · 12 meses · Todo desbloqueado',
-    price:'12,000 CUP', mobile:'1,000 CUP', usdt:'20.00 USDT', duration:'12 MESES',
-    sumPlan:'Plan Anual', sumDuration:'12 meses',
-    features:[['♾️','Acceso total'],['🏦','VIP Cuba'],['🎮','Gaming QoS'],['⚡','Turbo'],['🔒','AES-256'],['🆘','24/7']],
-    accentColor:'#ffd4b8', tagBg:'rgba(255,212,184,0.08)', tagBorder:'rgba(255,212,184,0.25)',
-    heroTag2:'FREQ·FULL', refBanner:true,
-  },
-  vip: {
-    tag:'VIP · IP RESIDENCIAL CUBANA', name:'VIP CUBA', sub:'IP Cubana real · Enzona · Transfermóvil',
-    price:'3,500 CUP', mobile:'—', usdt:'8.00 USDT', duration:'1 MES',
-    sumPlan:'Plan VIP Cuba', sumDuration:'1 mes',
-    features:[['🇨🇺','IP Cubana'],['🏦','Enzona'],['📲','Transfermóvil'],['🔒','AES-256'],['⚡','5 Mbps'],['🆘','Prioritario']],
-    accentColor:'#ffe566', tagBg:'rgba(255,229,102,0.08)', tagBorder:'rgba(255,229,102,0.3)',
-    heroTag2:'VIP', refBanner:false,
-  },
-  gaming: {
-    tag:'GAMING · QoS PRIORITARIO', name:'GAMING', sub:'Latencia mínima · MLBB · CoD · Free Fire',
-    price:'1,600 CUP', mobile:'800 CUP', usdt:'4.00 USDT', duration:'1 MES',
-    sumPlan:'Plan Gaming', sumDuration:'1 mes',
-    features:[['🎮','MLBB·CoD·FF'],['⚡','<25ms latencia'],['🎯','QoS traffic'],['📦','~0% loss'],['🔒','AES-256'],['🆘','Soporte']],
-    accentColor:'#ff6eb4', tagBg:'rgba(255,110,180,0.08)', tagBorder:'rgba(255,110,180,0.25)',
-    heroTag2:'GAMING', refBanner:false,
-  },
-  turbo: {
-    tag:'⚡ NODO TURBO · NUEVO HOY', name:'TURBO', sub:'Sin límite · Descargas masivas · Ilimitado',
-    price:'4,000 CUP', mobile:'—', usdt:'9.00 USDT', duration:'1 MES',
-    sumPlan:'Nodo Turbo Download', sumDuration:'1 mes',
-    features:[['⚡','Sin límite'],['📦','Torrent OK'],['☁️','Cloud sync'],['🔄','99.9% up'],['🔒','AES-256'],['🆘','Soporte']],
-    accentColor:'#39ffa0', tagBg:'rgba(57,255,160,0.08)', tagBorder:'rgba(57,255,160,0.3)',
-    heroTag2:'TURBO', refBanner:false,
-  },
+const tg = window.Telegram?.WebApp ?? { expand(){}, MainButton:{ hide(){} }, initDataUnsafe:{} };
+tg.expand?.();
+tg.MainButton?.hide?.();
+
+// ── CONFIG ────────────────────────────────
+const USDT_ADDRESS = '0x55B81bD7df1b0c6Db33fD532207CF2Bf137C1519';
+
+const PLANS = {
+  trial:    { name: 'Prueba Libre',  period: '1 hora',    cup: 0,     mobile: 0,    usdt: 0,    freq: 'FREQ·LIBRE' },
+  basico:   { name: 'Básico',        period: '1 mes',      cup: 900,   mobile: 400,  usdt: 1.5,  freq: 'FREQ·01' },
+  avanzado: { name: 'Avanzado',      period: '2 meses',    cup: 1800,   mobile: 900,  usdt: 2.8,  freq: 'FREQ·02' },
+  cuba_vip: { name: 'CUBA VIP',      period: '1 mes',      cup: 1200,  mobile: 500,  usdt: 1.9,  freq: 'FREQ·CU' },
+  premium:  { name: 'Gaming',        period: '1 mes',      cup: 1500,   mobile: 700,  usdt: 2.3,  freq: 'FREQ·MAX' },
+  anual:    { name: 'Plan Anual',    period: '12 meses',   cup: 15000, mobile: 10000, usdt: 25,   freq: 'FREQ·FULL' }
 };
 
-let currentPlan = 'anual';
-let currentStep = 1;
-let fileUploaded = false;
+const METHOD_DESC = {
+  transfer:     'Transfiere el monto exacto a la tarjeta BPA indicada.',
+  metropolitan: 'Transfiere a la tarjeta Metropolitana indicada.',
+  mitransfer:   'Envía al monedero MITRANSFER indicado.',
+  mobile:       'Recarga saldo móvil al número indicado (precio especial).',
+  usdt:         'Envía USDT exacto por red BEP20 a la dirección indicada.'
+};
 
-const qp = new URLSearchParams(window.location.search);
-const initialPlan = (qp.get('plan') || '').toLowerCase();
+let userId = null, planType = null, selectedFile = null, activeCoupon = null, currentMethod = 'transfer', referralDiscount = 0;
+let referralDiscountApplied = 0; // Para almacenar el descuento por referidos que viene de la URL
 
-// ===== SELECT PLAN =====
-function selectPlan(key) {
-  currentPlan = key;
-  const p = planData[key];
+// ── INIT ──────────────────────────────────
+function checkTerms(uid) {
+  if (!uid) return false;
+  return localStorage.getItem(`termsAccepted_${uid}`) === 'true';
+}
 
-  // Chips
-  document.querySelectorAll('.demo-chip').forEach((c,i) => {
-    c.classList.toggle('active', ['basic','anual','vip','gaming','turbo'][i] === key
-      || ['basic','advanced','anual','vip','gaming','turbo'].indexOf(key) === i);
-  });
-  // Quick fix: match by text
-  document.querySelectorAll('.demo-chip').forEach(c => {
-    const txt = c.textContent.trim().toLowerCase();
-    c.classList.toggle('active',
-      txt.includes(key) ||
-      (key==='anual' && txt.includes('anual')) ||
-      (key==='basic' && txt.includes('básico')) ||
-      (key==='vip' && txt.includes('vip')) ||
-      (key==='gaming' && txt.includes('gaming')) ||
-      (key==='turbo' && txt.includes('turbo')) ||
-      (key==='advanced' && txt.includes('avanzado'))
-    );
-  });
+async function init() {
+  const p = new URLSearchParams(window.location.search);
+  userId   = p.get('userId');
+  planType = p.get('plan') || 'basico';
+  let urlPrice = parseFloat(p.get('price'));
+  let urlUsdt = parseFloat(p.get('usdtAmount'));
+  referralDiscountApplied = parseFloat(p.get('discount')) || 0;
 
-  // Hero
-  document.getElementById('heroTag').childNodes[1].textContent = ' '+p.tag;
-  document.getElementById('heroName').textContent = p.name;
-  document.getElementById('heroSub').textContent = p.sub;
-  document.getElementById('heroPrice').textContent = p.price;
-  document.getElementById('heroDuration').textContent = p.duration;
-  document.getElementById('heroPrice').style.color = p.accentColor;
+  // Si no vienen por URL, intentar desde localStorage
+  if ((!urlPrice || isNaN(urlPrice)) && localStorage.getItem('selectedPlan')) {
+    try {
+      const stored = JSON.parse(localStorage.getItem('selectedPlan'));
+      planType = stored.type;
+      urlPrice = stored.finalPrice;
+      urlUsdt = stored.finalUsdt;
+      referralDiscountApplied = stored.discountApplied || 0;
+    } catch(e) {}
+  }
 
-  // Glow color
-  document.getElementById('hgStop').setAttribute('stop-color', p.accentColor);
+  if (!userId && tg.initDataUnsafe?.user) {
+    userId = tg.initDataUnsafe.user.id.toString();
+  }
+
+  if (!userId || !checkTerms(userId)) {
+    window.location.href = `/index.html${userId ? `?userId=${userId}` : ''}`;
+    return;
+  }
+
+  // Apply plan theme
+  document.documentElement.setAttribute('data-plan', planType);
+
+  const plan = PLANS[planType] || PLANS.basico;
+  let finalPrice = plan.cup;
+  let finalUsdt = plan.usdt;
+  if (referralDiscountApplied > 0) {
+    finalPrice = Math.round(plan.cup * (1 - referralDiscountApplied/100));
+    finalUsdt = parseFloat((plan.usdt * (1 - referralDiscountApplied/100)).toFixed(2));
+    document.getElementById('refDiscountPct').textContent = referralDiscountApplied + '%';
+    document.getElementById('referralBanner').style.display = 'block';
+  } else if (urlPrice && !isNaN(urlPrice)) {
+    finalPrice = urlPrice;
+    if (urlUsdt && !isNaN(urlUsdt)) finalUsdt = urlUsdt;
+  }
+
+  // Header
+  document.getElementById('freqLabel').textContent = plan.freq + ' · ' + plan.period.toUpperCase();
+  document.getElementById('planTitle').textContent  = plan.name.toUpperCase();
+  document.getElementById('cardFreq').textContent   = plan.freq;
 
   // Summary
-  document.getElementById('sumPlan').textContent = p.sumPlan;
-  document.getElementById('sumDuration').textContent = p.sumDuration;
-  document.getElementById('sumCUP').textContent = p.price;
-  document.getElementById('sumUSDT').textContent = p.usdt;
-  document.getElementById('sumID').textContent = Math.floor(Math.random()*9000000000)+1000000000;
-  document.getElementById('heroTag2').textContent = p.heroTag2;
+  document.getElementById('sumPlan').textContent   = plan.name;
+  document.getElementById('sumPeriod').textContent = plan.period;
+  document.getElementById('sumPrice').textContent  = finalPrice > 0 ? `${finalPrice.toLocaleString()} CUP` : 'Gratis';
+  document.getElementById('sumMobile').textContent = plan.mobile > 0 ? `${plan.mobile.toLocaleString()} CUP` : '—';
+  document.getElementById('sumUsdt').textContent   = finalUsdt > 0 ? `${finalUsdt} USDT` : '—';
+  document.getElementById('sumId').textContent     = userId;
 
-  const mrow = document.getElementById('sumMobileRow');
-  const mval = document.getElementById('sumMobile');
-  if(p.mobile === '—') { mrow.style.display='none'; }
-  else { mrow.style.display='flex'; mval.textContent = p.mobile; }
+  // Mobile & USDT fields
+  const mobilePrice = plan.mobile > 0 ? (referralDiscountApplied > 0 ? Math.round(plan.mobile * (1 - referralDiscountApplied/100)) : plan.mobile) : 0;
+  document.getElementById('mobilePriceBig').textContent = mobilePrice > 0 ? `${mobilePrice.toLocaleString()} CUP` : '—';
+  document.getElementById('usdtBig').textContent        = finalUsdt > 0 ? `${finalUsdt} USDT` : '—';
+  document.getElementById('usdtAddr').textContent       = USDT_ADDRESS;
 
-  // Referral banner
-  document.getElementById('refBanner').style.display = p.refBanner ? 'flex' : 'none';
+  // Save final prices for submit
+  window.finalPriceCUP = finalPrice;
+  window.finalUsdtAmount = finalUsdt;
 
-  // Features
-  const grid = document.getElementById('featureGrid');
-  grid.innerHTML = p.features.map(f=>`<div class="feat-chip"><span class="fi">${f[0]}</span>${f[1]}</div>`).join('');
+  // Saved coupon
+  loadSavedCoupon();
 
-  // Payment page
-  document.getElementById('ps-base').textContent = p.price;
-  document.getElementById('ps-total').textContent = p.price;
-  document.getElementById('movilAmount').textContent = p.mobile === '—' ? '—' : p.mobile;
-  document.getElementById('usdtAmount').textContent = p.usdt;
+  // Upload
+  setupUpload();
 
-  // Comprobante
-  document.getElementById('comp-plan').textContent = p.sumPlan+' · '+p.sumDuration;
-  document.getElementById('comp-price').textContent = p.price;
-  document.getElementById('comp-price').style.color = p.accentColor;
-
-  // Confirm
-  document.getElementById('conf-plan').textContent = p.name;
-
-  // Discount row (only anual has it as demo)
-  if(p.refBanner) {
-    document.getElementById('ps-disc-row').style.display='flex';
-    document.getElementById('ps-total').textContent = '9,600 CUP';
-    document.getElementById('ps-total').style.color = 'var(--neon)';
-  } else {
-    document.getElementById('ps-disc-row').style.display='none';
-    document.getElementById('ps-total').style.color = 'var(--neon)';
-    document.getElementById('ps-total').textContent = p.price;
-  }
+  updateSubmit();
 }
 
-// ===== NAVIGATION =====
-function goToStep(n) {
-  if(n < 1 || n > 4) return;
-  // hide all pages
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page'+n).classList.add('active');
+// ── METHOD ────────────────────────────────
+function onMethodChange() {
+  currentMethod = document.getElementById('methodSelect').value;
+  document.querySelectorAll('.method-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${currentMethod}`).classList.add('active');
+  document.getElementById('methodDesc').innerHTML = `<i class="fas fa-info-circle"></i> ${METHOD_DESC[currentMethod]}`;
+  document.getElementById('submitTxt').textContent = currentMethod === 'usdt' ? 'Enviar comprobante USDT' : 'Enviar comprobante';
+  updateSubmit();
+}
 
-  // update steps
-  for(let i=1;i<=4;i++){
-    const s = document.getElementById('step'+i);
-    const c = document.getElementById('sc'+i);
-    s.classList.remove('active','done');
-    if(i<n){ s.classList.add('done'); c.textContent='✓'; }
-    else if(i===n){ s.classList.add('active'); c.textContent='0'+i; }
-    else { c.textContent='0'+i; }
-    if(i<4){
-      const l=document.getElementById('sl'+i);
-      l.classList.toggle('done', i<n);
+// ── COUPON (aplica sobre precio ya descontado por referidos) ──
+async function applyCoupon() {
+  const code = document.getElementById('couponInput').value.trim().toUpperCase();
+  const msg  = document.getElementById('couponMsg');
+  if (!code) { msg.className='coupon-msg err'; msg.textContent='// introduce un código'; return; }
+
+  const btn = document.getElementById('couponBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Verificando...</span>';
+
+  try {
+    const res  = await fetch(`/api/coupons/verify/${code}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ telegramId:userId }) });
+    const data = await res.json();
+
+    if (data.success) {
+      activeCoupon = data.coupon;
+      showDiscount(data.coupon);
+      saveCoupon(data.coupon);
+      msg.className='coupon-msg ok';
+      msg.textContent=`// cupón "${code}" aplicado · ${data.coupon.discount}% de descuento`;
+      document.getElementById('couponInput').value = '';
+      showNotification(`✅ Descuento del ${data.coupon.discount}% aplicado`, 'success');
+    } else {
+      msg.className='coupon-msg err';
+      msg.textContent=`// ${data.error || 'cupón no válido'}`;
+      showNotification('❌ Cupón no válido', 'error');
     }
-  }
-
-  // demo selector visible only on step 1
-  document.getElementById('demoSelector').style.display = n===1 ? 'flex' : 'none';
-
-  currentStep = n;
-  window.scrollTo({top:0, behavior:'smooth'});
-}
-
-function goBack() {
-  if(currentStep > 1) goToStep(currentStep - 1);
-}
-
-// ===== METHOD TABS =====
-function switchTab(id) {
-  document.querySelectorAll('.method-tab').forEach((t,i)=>{
-    const ids=['bpa','metropolitana','movil','usdt'];
-    t.classList.toggle('active', ids[i]===id);
-  });
-  document.querySelectorAll('.method-panel').forEach(p=>p.classList.remove('active'));
-  document.getElementById('tab-'+id).classList.add('active');
-}
-
-// ===== COPY =====
-function copyText(text, btn) {
-  if(navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(()=>{});
-  }
-  const orig = btn.innerHTML;
-  btn.classList.add('copied');
-  btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> COPIADO';
-  setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('copied'); }, 2000);
-}
-
-// ===== COUPON =====
-function applyCoupon() {
-  const v = document.getElementById('couponInput').value.trim().toUpperCase();
-  if(v === 'CUBA20' || v === 'REF20') {
-    document.getElementById('ps-disc-row').style.display='flex';
-    document.getElementById('ps-total').textContent = '9,600 CUP';
-    document.getElementById('ps-total').style.color = 'var(--neon)';
-    document.getElementById('couponInput').style.borderColor='rgba(57,255,160,0.4)';
-  } else if(v) {
-    document.getElementById('couponInput').style.borderColor='rgba(255,100,100,0.4)';
+  } catch(e) {
+    msg.className='coupon-msg err';
+    msg.textContent='// error al verificar';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check"></i> <span>Aplicar</span>';
   }
 }
 
-// ===== FILE UPLOAD =====
-function triggerUpload() {
-  document.getElementById('fileInput').click();
+function showDiscount(coupon) {
+  const base = window.finalPriceCUP;
+  const saved = Math.round(base * coupon.discount / 100);
+  const final = base - saved;
+  document.getElementById('dCode').textContent = coupon.code;
+  document.getElementById('dPct').textContent  = coupon.discount + '%';
+  document.getElementById('dOld').textContent  = base.toLocaleString() + ' CUP';
+  document.getElementById('dNew').textContent  = final.toLocaleString() + ' CUP';
+  document.getElementById('discountBox').style.display = 'block';
+  // Update price display
+  document.getElementById('sumPrice').textContent = final.toLocaleString() + ' CUP';
+  window.finalPriceCUP = final; // actualizar precio final con cupón
 }
 
-function handleFile(input) {
-  if(!input.files || !input.files[0]) return;
-  const f = input.files[0];
-  const sizeKB = (f.size/1024).toFixed(0);
-  document.getElementById('previewName').textContent = f.name;
-  document.getElementById('previewSize').textContent = sizeKB + ' KB';
-  document.getElementById('uploadZone').style.display='none';
-  document.getElementById('uploadPreview').classList.add('show');
-  fileUploaded = true;
-  document.getElementById('sendBtn').disabled = false;
-  document.getElementById('sendBtn').style.opacity='1';
+function removeCoupon() {
+  activeCoupon = null;
+  document.getElementById('discountBox').style.display = 'none';
+  document.getElementById('couponMsg').textContent = '';
+  document.getElementById('sumPrice').textContent = (window.finalPriceCUPOriginal || window.finalPriceCUP).toLocaleString() + ' CUP';
+  window.finalPriceCUP = window.finalPriceCUPOriginal || window.finalPriceCUP;
+  localStorage.removeItem(`coupon_${userId}`);
+  showNotification('Cupón eliminado', 'info');
+}
 
-  // show image preview if possible
+function saveCoupon(c) { localStorage.setItem(`coupon_${userId}`, JSON.stringify({ ...c, ts: Date.now() })); }
+
+function loadSavedCoupon() {
+  try {
+    const s = localStorage.getItem(`coupon_${userId}`);
+    if (!s) return;
+    const c = JSON.parse(s);
+    if (Date.now() - c.ts > 86400000) { localStorage.removeItem(`coupon_${userId}`); return; }
+    activeCoupon = c;
+    showDiscount(c);
+    document.getElementById('couponMsg').className='coupon-msg ok';
+    document.getElementById('couponMsg').textContent=`// cupón "${c.code}" cargado`;
+  } catch(e) {}
+}
+
+// ── UPLOAD ────────────────────────────────
+function setupUpload() {
+  const area  = document.getElementById('uploadArea');
+  const input = document.getElementById('fileInput');
+  area.addEventListener('click', () => input.click());
+  area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag'); });
+  area.addEventListener('dragleave', () => area.classList.remove('drag'));
+  area.addEventListener('drop', e => { e.preventDefault(); area.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  input.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+}
+
+function handleFile(file) {
+  if (file.size > 5*1024*1024) { showNotification('❌ Máximo 5MB', 'error'); return; }
+  if (!['image/jpeg','image/png','image/gif','image/webp'].includes(file.type)) { showNotification('❌ Solo JPG, PNG, GIF, WEBP', 'error'); return; }
+  selectedFile = file;
   const reader = new FileReader();
   reader.onload = e => {
-    const thumb = document.getElementById('previewThumb');
-    thumb.outerHTML = `<img class="preview-thumb" id="previewThumb" src="${e.target.result}">`;
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('previewBox').style.display = 'block';
+    document.getElementById('progressFill').style.width = '66%';
+    document.getElementById('lbl2').classList.add('active');
+    updateSubmit();
+    showNotification('✅ Imagen cargada', 'success');
   };
-  reader.readAsDataURL(f);
+  reader.readAsDataURL(file);
 }
 
-function removeFile() {
-  document.getElementById('fileInput').value='';
-  document.getElementById('uploadPreview').classList.remove('show');
-  document.getElementById('uploadZone').style.display='block';
-  fileUploaded = false;
-  document.getElementById('sendBtn').disabled=true;
+function removeImg() {
+  selectedFile = null;
+  document.getElementById('previewBox').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('progressFill').style.width = '33%';
+  document.getElementById('lbl2').classList.remove('active');
+  updateSubmit();
 }
 
-// ===== SEND =====
-function sendOrder() {
-  if(!fileUploaded) return;
-  const btn = document.getElementById('sendBtn');
-  btn.disabled=true;
-  btn.innerHTML='<span style="display:inline-block;animation:spin 0.8s linear infinite">⋯</span> ENVIANDO...';
-  setTimeout(()=>{ goToStep(4); }, 1400);
+// ── SUBMIT ────────────────────────────────
+function updateSubmit() {
+  document.getElementById('submitBtn').disabled = !selectedFile;
 }
 
-function openTelegram() {
-  const tg = window.Telegram?.WebApp;
-  if(tg) { tg.close(); }
-  else { window.open('https://t.me/L0quen2','_blank'); }
+async function submitPayment() {
+  const btn = document.getElementById('submitBtn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Enviando...</span>';
+
+  try {
+    let finalPrice = window.finalPriceCUP;
+    // Si hay cupón activo, su descuento ya está incluido en window.finalPriceCUP
+    // No hacer doble descuento
+
+    const fd = new FormData();
+    fd.append('telegramId', userId);
+    fd.append('plan', planType);
+    fd.append('price', finalPrice);
+    fd.append('method', currentMethod);
+    fd.append('screenshot', selectedFile);
+    if (activeCoupon) { fd.append('couponCode', activeCoupon.code); }
+    if (currentMethod === 'usdt') fd.append('usdtAmount', window.finalUsdtAmount);
+
+    const res = await fetch('/api/payment', { method:'POST', body:fd });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
+
+    if (activeCoupon) localStorage.removeItem(`coupon_${userId}`);
+
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('lbl3').classList.add('active');
+    showNotification('✅ Captura recibida. No hace falta enviar otra foto.', 'success');
+
+    setTimeout(() => {
+      if (tg?.platform && tg.platform !== 'unknown') tg.close();
+      else window.location.href = 'https://t.me/vpncubaw_bot';
+    }, 3000);
+
+  } catch(e) {
+    showNotification('❌ Error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
 }
 
-// ===== INIT =====
-window.addEventListener('load', ()=>{
-  selectPlan(initialPlan || 'anual');
-  const tg = window.Telegram?.WebApp;
-  if(tg){ tg.ready(); tg.expand(); tg.setHeaderColor('#06080e'); tg.setBackgroundColor('#06080e'); }
+// ── COPY ──────────────────────────────────
+function copy(text, btn) {
+  navigator.clipboard.writeText(text.replace(/-/g,'')).then(() => {
+    const o = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Copiado';
+    setTimeout(() => { btn.innerHTML = o; }, 2000);
+    showNotification('Copiado al portapapeles', 'success');
+  }).catch(() => showNotification('Error al copiar', 'error'));
+}
+
+// ── NOTIFICATION ──────────────────────────
+function showNotification(msg, type='info') {
+  const n = document.getElementById('notification');
+  n.textContent = msg;
+  n.style.borderLeftColor = type==='success' ? '#00ff88' : type==='error' ? '#ff4d4d' : 'var(--sig)';
+  n.style.transform = 'translateX(0)';
+  clearTimeout(window.__nt);
+  window.__nt = setTimeout(() => { n.style.transform = 'translateX(160%)'; }, 3800);
+}
+
+// ── COUPON ENTER KEY ──────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  document.getElementById('couponInput').addEventListener('keypress', e => { if(e.key==='Enter') applyCoupon(); });
 });
-
-// Spin animation
-const style = document.createElement('style');
-style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
-document.head.appendChild(style);
 </script>
 </body>
-</html>
+   </html>
