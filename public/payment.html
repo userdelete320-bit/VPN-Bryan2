@@ -817,7 +817,7 @@ body::after {
         <div class="plan-hero-price-row">
           <div>
             <div class="plan-hero-price">Precio CUP</div>
-            <div class="plan-hero-price" style="margin-top:2px"><strong id="heroPrice" style="color:var(--neon)">12,000 CUP</strong></div>
+            <div class="plan-hero-price" style="margin-top:2px"><strong id="heroPrice" style="color:var(--neon)">—</strong></div>
           </div>
           <div class="plan-hero-duration" id="heroDuration">12 MESES</div>
         </div>
@@ -846,15 +846,15 @@ body::after {
         </div>
         <div class="detail-row">
           <span class="detail-key">PRECIO CUP</span>
-          <span class="detail-val green" id="sumCUP">12,000 CUP</span>
+          <span class="detail-val green" id="sumCUP">—</span>
         </div>
         <div class="detail-row" id="sumMobileRow">
           <span class="detail-key">SALDO MÓVIL</span>
-          <span class="detail-val blue" id="sumMobile">1,000 CUP</span>
+          <span class="detail-val blue" id="sumMobile">—</span>
         </div>
         <div class="detail-row">
           <span class="detail-key">USDT</span>
-          <span class="detail-val" id="sumUSDT" style="color:var(--yellow)">20 USDT</span>
+          <span class="detail-val" id="sumUSDT" style="color:var(--yellow)">—</span>
         </div>
         <div class="detail-row">
           <span class="detail-key">ID DE PEDIDO</span>
@@ -901,15 +901,15 @@ body::after {
         <div class="price-summary">
           <div class="ps-row">
             <span class="ps-key">Precio base</span>
-            <span class="ps-val" id="ps-base">12,000 CUP</span>
+            <span class="ps-val" id="ps-base">—</span>
           </div>
           <div class="ps-row" id="ps-disc-row" style="display:none">
             <span class="ps-key ps-discount">Descuento ref. 20%</span>
-            <span class="ps-val ps-discount" id="ps-disc-val">−2,400 CUP</span>
+            <span class="ps-val ps-discount" id="ps-disc">—</span>
           </div>
           <div class="ps-row total">
             <span class="ps-key">Total a pagar</span>
-            <span class="ps-val" id="ps-total">12,000 CUP</span>
+            <span class="ps-val" id="ps-total">—</span>
           </div>
         </div>
       </div>
@@ -999,7 +999,7 @@ body::after {
         </div>
         <div class="payment-info-box mt8">
           <div class="pib-label">MONTO SALDO MÓVIL</div>
-          <div class="pib-val" id="movilAmount">1,000 CUP</div>
+          <div class="pib-val" id="movilAmount">—</div>
         </div>
         <div class="warning-note">
           ⚠ Usa transferencia por Transfermóvil. Incluye tu número en el concepto de la recarga.
@@ -1018,7 +1018,7 @@ body::after {
         </div>
         <div class="payment-info-box mt8">
           <div class="pib-label">MONTO EXACTO</div>
-          <div class="pib-val" id="usdtAmount">20.00 USDT</div>
+          <div class="pib-val" id="usdtAmount">—</div>
         </div>
         <div class="method-info-note">
           <span class="ni">ℹ</span>
@@ -1052,7 +1052,7 @@ body::after {
             Plan seleccionado
             <strong id="comp-plan">Plan Anual · 12 meses</strong>
           </div>
-          <div class="om-right" id="comp-price">12,000 CUP</div>
+          <div class="om-right" id="comp-price">—</div>
         </div>
 
         <div class="upload-zone" id="uploadZone" onclick="triggerUpload()">
@@ -1300,6 +1300,11 @@ function formatCUP(value) {
   return Number(value || 0).toLocaleString('es-ES') + ' CUP';
 }
 
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
 function normalizePlan(key) {
   const k = (key || 'anual').toLowerCase();
   if (PLAN_KEYS[k]) return k;
@@ -1346,26 +1351,26 @@ function updatePricing() {
   const priceMobile = Math.max(0, Math.round((p.mobile || 0) * (100 - effective) / 100));
   const priceUsdt = Math.max(0, (p.usdt * (100 - effective) / 100));
 
-  document.getElementById('ps-base').textContent = formatCUP(p.cup);
-  document.getElementById('ps-total').textContent = formatCUP(priceCup);
+  setText('ps-base', formatCUP(p.cup));
+  setText('ps-total', formatCUP(priceCup));
 
   const mobileAmountEl = document.getElementById('movilAmount');
   const mobileRow = document.getElementById('sumMobileRow');
   if (p.mobile) {
     mobileRow.style.display = 'flex';
-    mobileAmountEl.textContent = formatCUP(priceMobile);
+    if (mobileAmountEl) mobileAmountEl.textContent = formatCUP(priceMobile);
   } else {
     mobileRow.style.display = 'none';
-    mobileAmountEl.textContent = '—';
+    if (mobileAmountEl) mobileAmountEl.textContent = '—';
   }
 
   const usdtRow = document.querySelector('#sumUSDT')?.closest('.detail-row');
   if (p.usdt) {
     if (usdtRow) usdtRow.style.display = 'flex';
-    document.getElementById('usdtAmount').textContent = priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT';
+    setText('usdtAmount', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
   } else {
     if (usdtRow) usdtRow.style.display = 'none';
-    document.getElementById('usdtAmount').textContent = '—';
+    setText('usdtAmount', '—');
   }
 
   if (effective > 0) {
@@ -1375,9 +1380,10 @@ function updatePricing() {
     document.getElementById('ps-disc-row').style.display = 'none';
   }
 
-  document.getElementById('comp-plan').textContent = planData[currentPlan].sumPlan + ' · ' + planData[currentPlan].sumDuration;
-  document.getElementById('comp-price').textContent = formatCUP(priceCup);
-  document.getElementById('comp-price').style.color = planData[currentPlan].accentColor;
+  setText('comp-plan', planData[currentPlan].sumPlan + ' · ' + planData[currentPlan].sumDuration);
+  setText('comp-price', formatCUP(priceCup));
+  const compPrice = document.getElementById('comp-price');
+  if (compPrice) compPrice.style.color = planData[currentPlan].accentColor;
 }
 
 
@@ -1423,7 +1429,8 @@ function selectPlan(key) {
     );
   });
 
-  document.getElementById('heroTag').childNodes[1].textContent = ' '+p.tag;
+  const heroTagText = document.getElementById('heroTag')?.childNodes?.[1];
+  if (heroTagText) heroTagText.textContent = ' '+p.tag;
   document.getElementById('heroName').textContent = p.name;
   document.getElementById('heroSub').textContent = p.sub;
   document.getElementById('heroPrice').textContent = p.price;
@@ -1438,16 +1445,18 @@ function selectPlan(key) {
   const mrow = document.getElementById('sumMobileRow');
   const mval = document.getElementById('sumMobile');
   if(!p.mobile || p.mobile === '—') { mrow.style.display='none'; }
-  else { mrow.style.display='flex'; mval.textContent = p.mobile; }
+  else { mrow.style.display='flex'; if (mval) mval.textContent = p.mobile; }
 
   const grid = document.getElementById('featureGrid');
   grid.innerHTML = p.features.map(f=>`<div class="feat-chip"><span class="fi">${f[0]}</span>${f[1]}</div>`).join('');
+  setText('sumCUP', p.price);
+  setText('sumMobile', p.mobile);
 
   updateDiscountBanner();
   updatePricing();
   updateTrialMode();
 
-  document.getElementById('conf-plan').textContent = p.name;
+  setText('conf-plan', p.name);
 }
 
 function goToStep(n) {
@@ -1600,10 +1609,10 @@ async function sendOrder() {
 
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page4').classList.add('active');
-    document.getElementById('conf-plan').textContent = planData[currentPlan].name;
-    document.getElementById('comp-price').textContent = formatCUP(finalCup);
-    document.getElementById('movilAmount').textContent = p.mobile ? formatCUP(finalMobile) : '—';
-    document.getElementById('usdtAmount').textContent = finalUsdt + ' USDT';
+    setText('conf-plan', planData[currentPlan].name);
+    setText('conf-price', formatCUP(finalCup));
+    setText('movilAmount', p.mobile ? formatCUP(finalMobile) : '—');
+    setText('usdtAmount', finalUsdt + ' USDT');
     updateDiscountBanner();
     updatePricing();
   } catch (err) {
@@ -1619,12 +1628,25 @@ function openTelegram() {
   else { window.open('https://t.me/L0quen2','_blank'); }
 }
 
-// ===== INIT =====
-window.addEventListener('load', ()=>{
-  selectPlan(urlParams.get('plan') || 'anual'); loadReferralDiscount();
-  const tg = window.Telegram?.WebApp;
-  if(tg){ tg.ready(); tg.expand(); tg.setHeaderColor('#06080e'); tg.setBackgroundColor('#06080e'); }
-});
+// ===== INICIALIZACIÓN INMEDIATA =====
+(function init() {
+  try {
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      tg.setHeaderColor('#06080e');
+      tg.setBackgroundColor('#06080e');
+    }
+
+    const planParam = urlParams.get('plan') || 'anual';
+    selectPlan(planParam);
+    loadReferralDiscount();
+  } catch (e) {
+    console.error('Error inicializando checkout:', e);
+    selectPlan('anual');
+  }
+})();
 
 // Spin animation
 const style = document.createElement('style');
