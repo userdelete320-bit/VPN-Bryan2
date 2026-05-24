@@ -142,6 +142,17 @@ select option{background:var(--ink)}
 .upload-zone .uz-title{font-family:var(--f-body);font-weight:700;font-size:.85rem;color:var(--txt)}
 .upload-zone .uz-sub{font-family:var(--f-mono);font-size:.6rem;color:var(--txt-3);margin-top:3px}
 
+.broadcast-media-wrap{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.broadcast-media-preview{display:none;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid var(--wire);padding:10px}
+.broadcast-media-preview.active{display:flex}
+.broadcast-media-thumb{width:56px;height:56px;border:1px solid var(--wire);background:var(--ink);object-fit:cover;flex-shrink:0}
+.broadcast-media-thumb.video{display:flex;align-items:center;justify-content:center;color:var(--sig);font-size:1.15rem}
+.broadcast-media-meta{flex:1;min-width:0}
+.broadcast-media-name{font-family:var(--f-mono);font-size:.68rem;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.broadcast-media-size{font-family:var(--f-mono);font-size:.58rem;color:var(--txt-3);margin-top:2px}
+.broadcast-media-remove{width:28px;height:28px;border:1px solid var(--wire);background:transparent;color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.broadcast-media-remove:hover{color:var(--red);border-color:var(--red)}
+
 /* ── POOL DE PRUEBAS POR PLAN ── */
 .plan-pools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
 .pool-card{background:rgba(255,255,255,.02);border:1px solid var(--wire);border-top:2px solid var(--col-basico);padding:0;overflow:hidden}
@@ -149,6 +160,10 @@ select option{background:var(--ink)}
 .pool-card[data-plan="avanzado"]{border-top-color:var(--col-avanzado)}
 .pool-card[data-plan="premium"]{border-top-color:var(--col-premium)}
 .pool-card[data-plan="anual"]{border-top-color:var(--col-anual)}
+.pool-card[data-plan="cuba_vip"]{border-top-color:var(--col-cuba)}
+.pool-card[data-plan="cuba_vip"] .plan-dot{background:var(--col-cuba);box-shadow:0 0 6px var(--col-cuba)}
+.pool-card[data-plan="cuba_vip"] .pool-upload-zone{border-color:rgba(255,179,0,.3);color:var(--col-cuba)}
+.pool-card[data-plan="cuba_vip"] .pool-upload-zone:hover{background:rgba(255,179,0,.06)}
 .pool-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--wire)}
 .pool-card-title{font-family:var(--f-head);font-size:.85rem;letter-spacing:.1em;color:var(--txt);display:flex;align-items:center;gap:6px}
 .pool-card-title .plan-dot{width:8px;height:8px;border-radius:50%}
@@ -407,11 +422,20 @@ select option{background:var(--ink)}
           <div class="form-group" style="margin-bottom:10px"><div class="form-label">Destinatarios</div>
           <select id="broadcastTarget"><option value="all">👥 Todos los usuarios</option><option value="vip">👑 Solo VIP</option><option value="non_vip">👤 No VIP</option><option value="trial_pending">⏳ Pruebas pendientes</option><option value="trial_received">✅ Pruebas recibidas</option><option value="active">📱 Activos (30d)</option><option value="with_referrals">🤝 Con referidos</option><option value="usdt_payers">💰 Pagos USDT</option></select></div>
           <div class="form-group" style="margin-bottom:10px"><div class="form-label">Mensaje</div><textarea id="broadcastMessage" rows="5" placeholder="// escribe el mensaje aquí..."></textarea></div>
+          <div class="broadcast-media-wrap">
+            <div class="upload-zone" id="broadcastUploadZone" onclick="document.getElementById('broadcastMediaInput').click()" style="padding:16px">
+              <i class="fas fa-photo-film"></i>
+              <div class="uz-title">Adjuntar imagen o video</div>
+              <div class="uz-sub">JPG · PNG · WEBP · GIF · MP4 · MOV</div>
+            </div>
+            <input type="file" id="broadcastMediaInput" accept="image/*,video/*" hidden onchange="handleBroadcastMediaChange(event)">
+            <div class="broadcast-media-preview" id="broadcastMediaPreview" aria-live="polite"></div>
+          </div>
           <button class="btn green" id="broadcastButton" onclick="sendBroadcast()"><i class="fas fa-paper-plane"></i> <span>Enviar broadcast</span></button>
         </div></div>
         <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-history"></i> Historial</div></div>
         <div class="card-body"><div class="loading" id="broadcastLoading"><div class="spinner"></div> Cargando...</div><div class="no-data" id="broadcastNoData" style="display:none"><i class="fas fa-bullhorn"></i>Sin broadcasts</div>
-        <div class="table-wrap" id="broadcastTableWrap" style="display:none"><table><thead><tr><th>ID</th><th>Mensaje</th><th>Target</th><th>Progreso</th><th>Estado</th><th>Fecha</th></tr></thead><tbody id="broadcastTableBody"></tbody></table></div></div></div>
+        <div class="table-wrap" id="broadcastTableWrap" style="display:none"><table><thead><tr><th>ID</th><th>Mensaje</th><th>Adjunto</th><th>Target</th><th>Progreso</th><th>Estado</th><th>Fecha</th></tr></thead><tbody id="broadcastTableBody"></tbody></table></div></div></div>
       </div>
 
       <!-- ── JUEGOS ── -->
@@ -500,7 +524,7 @@ let allUsers = [], filteredUsers = [], currentUsersPage = 1, usersPerPage = 50, 
 let allReferrals = [], filteredReferrals = [], currentReferralsPage = 1, referralsPerPage = 30;
 let allCoupons = [];
 
-const PLAN_TYPES = ['basico', 'avanzado', 'premium', 'anual'];
+const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
 const PLAN_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', anual: '📅 Anual' };
 const PLAN_NAMES  = { basico: 'Básico (1 mes)', avanzado: 'Avanzado (2 meses)', cuba_vip: 'Cuba VIP (1 mes)', premium: 'Gaming (1 mes)', anual: 'Anual (12 meses)', trial: 'Prueba Gratuita' };
 
@@ -741,7 +765,7 @@ async function loadAllTrialPools() {
   try {
     const res = await fetch('/api/trial-files');
     const data = await res.json();
-    // data es { basico: [...], avanzado: [...], premium: [...], anual: [...] }
+    // data es { basico: [...], avanzado: [...], cuba_vip: [...], premium: [...], anual: [...] }
     for (const pt of PLAN_TYPES) {
       const files = data[pt] || [];
       renderPoolList(pt, files);
@@ -1130,17 +1154,106 @@ async function deleteCoupon(code) {
 }
 
 // ── BROADCAST ────────────────────────────────────────
+let broadcastAttachment = null;
+let broadcastAttachmentUrl = '';
+
+function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined || Number.isNaN(Number(bytes))) return '—';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = Number(bytes);
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+function clearBroadcastAttachment() {
+  const input = document.getElementById('broadcastMediaInput');
+  const preview = document.getElementById('broadcastMediaPreview');
+  if (broadcastAttachmentUrl) {
+    URL.revokeObjectURL(broadcastAttachmentUrl);
+    broadcastAttachmentUrl = '';
+  }
+  broadcastAttachment = null;
+  if (input) input.value = '';
+  if (preview) {
+    preview.classList.remove('active');
+    preview.innerHTML = '';
+  }
+}
+
+function clearBroadcastMedia() {
+  clearBroadcastAttachment();
+}
+
+function handleBroadcastMediaChange(event) {
+  const file = event.target.files?.[0];
+  const preview = document.getElementById('broadcastMediaPreview');
+  if (!file) {
+    clearBroadcastAttachment();
+    return;
+  }
+  if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+    showNotification('❌ Solo se permiten imágenes o videos', 'error');
+    clearBroadcastAttachment();
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    showNotification('❌ El archivo supera 50MB', 'error');
+    clearBroadcastAttachment();
+    return;
+  }
+  if (broadcastAttachmentUrl) URL.revokeObjectURL(broadcastAttachmentUrl);
+  broadcastAttachment = file;
+  broadcastAttachmentUrl = URL.createObjectURL(file);
+  const isVideo = file.type.startsWith('video/');
+  preview.innerHTML = `
+    ${isVideo
+      ? `<video class="broadcast-media-thumb video" src="${broadcastAttachmentUrl}" muted playsinline controls></video>`
+      : `<img class="broadcast-media-thumb" src="${broadcastAttachmentUrl}" alt="Vista previa">`
+    }
+    <div class="broadcast-media-meta">
+      <div class="broadcast-media-name">${file.name}</div>
+      <div class="broadcast-media-size">${file.type || 'media'} · ${formatBytes(file.size)}</div>
+    </div>
+    <button class="broadcast-media-remove" type="button" onclick="clearBroadcastMedia()" title="Quitar adjunto">
+      <i class="fas fa-times"></i>
+    </button>
+  `;
+  preview.classList.add('active');
+}
+
 async function sendBroadcast() {
   const message = document.getElementById('broadcastMessage').value.trim();
   const target = document.getElementById('broadcastTarget').value;
-  if (!message) { showNotification('❌ Escribe mensaje', 'error'); return; }
-  if (!confirm(`¿Enviar broadcast a "${target}"?`)) return;
+  if (!message && !broadcastAttachment) { showNotification('❌ Escribe un mensaje o adjunta un archivo', 'error'); return; }
+  if (!confirm(`¿Enviar broadcast a "${target}"${broadcastAttachment ? ' con adjunto' : ''}?`)) return;
   const btn = document.getElementById('broadcastButton'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
   try {
-    const res = await fetch('/api/broadcast/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, target, adminId: currentUserId }) });
+    let res;
+    if (broadcastAttachment) {
+      const fd = new FormData();
+      fd.append('message', message);
+      fd.append('target', target);
+      fd.append('adminId', currentUserId);
+      fd.append('mediaFile', broadcastAttachment, broadcastAttachment.name);
+      fd.append('mediaType', broadcastAttachment.type || '');
+      fd.append('mediaName', broadcastAttachment.name || '');
+      res = await fetch('/api/broadcast/send', { method: 'POST', body: fd });
+    } else {
+      res = await fetch('/api/broadcast/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, target, adminId: currentUserId }) });
+    }
     const data = await res.json();
-    if (res.ok && data.success) { showNotification(`✅ Enviado a ${data.totalUsers||0} usuarios`, 'success'); document.getElementById('broadcastMessage').value = ''; loadBroadcasts(); }
-    else showNotification('❌ Error', 'error');
+    if (res.ok && data.success) {
+      showNotification(`✅ Enviado a ${data.totalUsers||0} usuarios`, 'success');
+      document.getElementById('broadcastMessage').value = '';
+      clearBroadcastAttachment();
+      loadBroadcasts();
+    } else {
+      showNotification(`❌ ${data.error||'Error al enviar broadcast'}`, 'error');
+    }
   } catch(e) { showNotification('Error', 'error'); }
   btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> <span>Enviar broadcast</span>';
 }
@@ -1148,15 +1261,23 @@ async function sendBroadcast() {
 async function loadBroadcasts() {
   document.getElementById('broadcastLoading').style.display = 'flex';
   document.getElementById('broadcastTableWrap').style.display = 'none';
+  document.getElementById('broadcastNoData').style.display = 'none';
   try {
     const broadcasts = await (await fetch('/api/broadcasts')).json();
     document.getElementById('broadcastLoading').style.display = 'none';
     if (!broadcasts?.length) { document.getElementById('broadcastNoData').style.display = 'block'; return; }
-    const targetNames = { all:'👥 Todos', vip:'👑 VIP', non_vip:'👤 No VIP', trial_pending:'⏳ Pruebas', trial_received:'✅ Recibidas', active:'📱 Activos' };
+    const targetNames = { all:'👥 Todos', vip:'👑 VIP', non_vip:'👤 No VIP', trial_pending:'⏳ Pruebas', trial_received:'✅ Recibidas', active:'📱 Activos', with_referrals:'🤝 Referidos', usdt_payers:'💰 USDT' };
     const tb = document.getElementById('broadcastTableBody'); tb.innerHTML = '';
     broadcasts.forEach(b => {
       const statusBadge = b.status === 'completed' ? '<span class="badge active">Completado</span>' : b.status === 'sending' ? '<span class="badge pending">Enviando</span>' : '<span class="badge expired">Fallido</span>';
-      tb.innerHTML += `<tr><td style="color:var(--sig)">${b.id}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${b.message}">${b.message?.substring(0,50)||'—'}</td><td>${targetNames[b.target_users]||b.target_users||'—'}</td><td>${b.sent_count||0}/${b.total_users||0}</td><td>${statusBadge}</td><td>${b.created_at?new Date(b.created_at).toLocaleDateString('es-ES'):'—'}</td></tr>`;
+      const mediaType = String(b.media_type || b.mediaType || b.attachment_type || '').toLowerCase();
+      const mediaLabel = mediaType.startsWith('video/')
+        ? '<span class="badge purple">Video</span>'
+        : mediaType.startsWith('image/')
+          ? '<span class="badge default">Imagen</span>'
+          : (b.media_url || b.attachment_url || b.has_media ? '<span class="badge bpa">Media</span>' : '—');
+      const safeMsg = (b.message || '—').substring(0, 50);
+      tb.innerHTML += `<tr><td style="color:var(--sig)">${b.id}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${(b.message||'').replace(/"/g, '&quot;')}">${safeMsg}</td><td>${mediaLabel}</td><td>${targetNames[b.target_users]||b.target_users||'—'}</td><td>${b.sent_count||0}/${b.total_users||0}</td><td>${statusBadge}</td><td>${b.created_at?new Date(b.created_at).toLocaleDateString('es-ES'):'—'}</td></tr>`;
     });
     document.getElementById('broadcastTableWrap').style.display = 'block';
   } catch(e) { document.getElementById('broadcastLoading').style.display = 'none'; showNotification('Error', 'error'); }
