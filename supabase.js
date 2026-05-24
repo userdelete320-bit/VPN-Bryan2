@@ -209,29 +209,14 @@ const db = {
 
   async getAllUsers(limit = 100, offset = 0) {
     try {
-      const totalLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 100;
-      const startOffset = Number.isFinite(Number(offset)) && Number(offset) >= 0 ? Number(offset) : 0;
-      const chunkSize = 1000;
-      const results = [];
-      let remaining = totalLimit;
-      let currentOffset = startOffset;
-
-      while (remaining > 0) {
-        const fetchSize = Math.min(chunkSize, remaining);
-        const { data, error } = await dbClient
-          .from('users')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(currentOffset, currentOffset + fetchSize - 1);
-        if (error) throw error;
-        const rows = data || [];
-        results.push(...rows);
-        if (rows.length < fetchSize) break;
-        currentOffset += rows.length;
-        remaining -= rows.length;
-      }
-
-      return results;
+      const safeLimit = Math.min(limit, 1000);
+      const { data, error } = await dbClient
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + safeLimit - 1);
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('❌ Error en getAllUsers:', error);
       return [];
@@ -326,6 +311,7 @@ const db = {
   async getReferralStats(telegramId) {
     try {
       const userId = String(telegramId).trim();
+      const user = await this.getUser(userId);
       const { data: level1, error: error1 } = await dbClient
         .from('referrals')
         .select('*')
@@ -342,12 +328,21 @@ const db = {
       const totalPaid = level1Paid + level2Paid;
       const discount = (level1Paid * 20) + (level2Paid * 10);
       const discountPercentage = discount > 100 ? 100 : discount;
+      let usedDiscount = 0;
+      try {
+        const payments = await this.getUserPayments(userId);
+        const countedPayments = (payments || []).filter(p => p.status && p.status !== 'rejected').length;
+        usedDiscount = Math.min(discountPercentage, countedPayments * 20);
+      } catch (e) {}
+      const finalDiscount = Math.max(0, discountPercentage - usedDiscount);
       return {
         level1: { total: level1?.length || 0, paid: level1Paid },
         level2: { total: level2?.length || 0, paid: level2Paid },
         total_referrals: totalReferrals,
         total_paid: totalPaid,
-        discount_percentage: discountPercentage,
+        discount_percentage: finalDiscount,
+        discount_base: discountPercentage,
+        discount_used: usedDiscount,
         paid_referrals: totalPaid
       };
     } catch (error) {
@@ -864,14 +859,8 @@ const db = {
       const today = new Date().toISOString().split('T')[0];
       const todayRequests = data?.filter(u => u.trial_requested_at && u.trial_requested_at.startsWith(today))?.length || 0;
       const trialByType = {
-        basico: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'basico')?.length || 0,
-        avanzado: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'avanzado')?.length || 0,
-        cuba_vip: data?.filter(u => {
-          const p = (u.trial_plan_type || '').toLowerCase();
-          return p === 'vip' || p === 'cuba_vip';
-        })?.length || 0,
-        premium: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'premium')?.length || 0,
-        anual: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'anual')?.length || 0
+        '1h': data?.filter(u => u.trial_plan_type === '1h')?.length || 0,
+        '24h': data?.filter(u => u.trial_plan_type === '24h')?.length || 0
       };
       return { total_requests: totalRequests, completed: completedTrials, pending: pendingTrials, today_requests: todayRequests, by_type: trialByType };
     } catch (error) {
@@ -918,23 +907,21 @@ const db = {
     }
   },
 
-  async checkTrialEligibility(telegramId, requestedPlanType = null) {
+  async checkTrialEligibility(telegramId) {
     try {
       const user = await this.getUser(telegramId);
       if (!user) return { eligible: true, reason: 'Nuevo usuario' };
-
-      const currentPlan = String(user.trial_plan_type || '').trim().toLowerCase();
-      const requestedPlan = String(requestedPlanType || '').trim().toLowerCase();
-
-      if (user.trial_requested && !user.trial_received) {
-        return { eligible: false, reason: 'Ya tiene una solicitud pendiente' };
+      if (!user.trial_requested) return { eligible: true, reason: 'Primera solicitud' };
+      if (user.trial_requested && !user.trial_received) return { eligible: false, reason: 'Ya tiene una solicitud pendiente' };
+      if (user.trial_received && user.trial_sent_at) {
+        const lastTrialDate = new Date(user.trial_sent_at);
+        const now = new Date();
+        const daysSinceLastTrial = Math.floor((now - lastTrialDate) / (1000 * 60 * 60 * 24));
+        if (daysSinceLastTrial < 30) {
+          return { eligible: false, reason: `Debe esperar ${30 - daysSinceLastTrial} días para solicitar otra prueba`, days_remaining: 30 - daysSinceLastTrial };
+        }
       }
-
-      if (user.trial_received && requestedPlan && currentPlan && requestedPlan === currentPlan) {
-        return { eligible: false, reason: 'Este plan ya fue probado' };
-      }
-
-      return { eligible: true, reason: 'Puede solicitar prueba de otro plan' };
+      return { eligible: true, reason: 'Puede solicitar nueva prueba' };
     } catch (error) {
       console.error('❌ Error en checkTrialEligibility:', error);
       return { eligible: false, reason: 'Error verificando elegibilidad' };
