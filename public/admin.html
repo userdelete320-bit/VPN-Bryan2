@@ -147,6 +147,7 @@ select option{background:var(--ink)}
 .pool-card{background:rgba(255,255,255,.02);border:1px solid var(--wire);border-top:2px solid var(--col-basico);padding:0;overflow:hidden}
 .pool-card[data-plan="basico"]{border-top-color:var(--col-basico)}
 .pool-card[data-plan="avanzado"]{border-top-color:var(--col-avanzado)}
+.pool-card[data-plan="cuba_vip"]{border-top-color:var(--col-cuba)}
 .pool-card[data-plan="premium"]{border-top-color:var(--col-premium)}
 .pool-card[data-plan="anual"]{border-top-color:var(--col-anual)}
 .pool-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--wire)}
@@ -154,6 +155,7 @@ select option{background:var(--ink)}
 .pool-card-title .plan-dot{width:8px;height:8px;border-radius:50%}
 .pool-card[data-plan="basico"] .plan-dot{background:var(--col-basico);box-shadow:0 0 6px var(--col-basico)}
 .pool-card[data-plan="avanzado"] .plan-dot{background:var(--col-avanzado);box-shadow:0 0 6px var(--col-avanzado)}
+.pool-card[data-plan="cuba_vip"] .plan-dot{background:var(--col-cuba);box-shadow:0 0 6px var(--col-cuba)}
 .pool-card[data-plan="premium"] .plan-dot{background:var(--col-premium);box-shadow:0 0 6px var(--col-premium)}
 .pool-card[data-plan="anual"] .plan-dot{background:var(--col-anual);box-shadow:0 0 6px var(--col-anual)}
 .pool-count{font-family:var(--f-mono);font-size:.6rem;color:var(--txt-3);padding:2px 8px;border:1px solid var(--wire)}
@@ -163,6 +165,8 @@ select option{background:var(--ink)}
 .pool-card[data-plan="basico"] .pool-upload-zone:hover{background:rgba(0,212,255,.06)}
 .pool-card[data-plan="avanzado"] .pool-upload-zone{border-color:rgba(232,232,255,.3);color:var(--col-avanzado)}
 .pool-card[data-plan="avanzado"] .pool-upload-zone:hover{background:rgba(232,232,255,.04)}
+.pool-card[data-plan="cuba_vip"] .pool-upload-zone{border-color:rgba(255,179,0,.3);color:var(--col-cuba)}
+.pool-card[data-plan="cuba_vip"] .pool-upload-zone:hover{background:rgba(255,179,0,.06)}
 .pool-card[data-plan="premium"] .pool-upload-zone{border-color:rgba(255,61,61,.3);color:var(--col-premium)}
 .pool-card[data-plan="premium"] .pool-upload-zone:hover{background:rgba(255,61,61,.06)}
 .pool-card[data-plan="anual"] .pool-upload-zone{border-color:rgba(0,255,136,.3);color:var(--col-anual)}
@@ -500,7 +504,7 @@ let allUsers = [], filteredUsers = [], currentUsersPage = 1, usersPerPage = 50, 
 let allReferrals = [], filteredReferrals = [], currentReferralsPage = 1, referralsPerPage = 30;
 let allCoupons = [];
 
-const PLAN_TYPES = ['basico', 'avanzado', 'premium', 'anual'];
+const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
 const PLAN_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', anual: '📅 Anual' };
 const PLAN_NAMES  = { basico: 'Básico (1 mes)', avanzado: 'Avanzado (2 meses)', cuba_vip: 'Cuba VIP (1 mes)', premium: 'Gaming (1 mes)', anual: 'Anual (12 meses)', trial: 'Prueba Gratuita' };
 
