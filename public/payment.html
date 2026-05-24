@@ -63,6 +63,29 @@ body::after {
   display:flex; flex-direction:column;
 }
 
+/* Pantalla de baneo */
+.ban-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  display: none;
+}
+
+.ban-screen.active {
+  display: flex;
+}
+
+/* ... resto del CSS sin cambios, igual que antes ... */
+/* (incluyo el CSS completo más abajo para que no falte) */
+
+/* ===== TOP BAR ===== */
 .topbar {
   display:flex; align-items:center; justify-content:space-between;
   padding: 16px 20px 12px;
@@ -104,6 +127,7 @@ body::after {
   color:var(--text-muted); cursor:pointer;
 }
 
+/* ===== STEP PROGRESS ===== */
 .progress-wrap {
   padding: 16px 20px;
   animation: fadeUp 0.4s ease both;
@@ -156,10 +180,12 @@ body::after {
 .step.active .step-lbl { color:var(--neon); }
 .step.done .step-lbl { color:var(--text-muted); }
 
+/* ===== PAGES ===== */
 .page { display:none; animation:fadeUp 0.35s ease both; }
 .page.active { display:block; }
 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
+/* ===== SHARED SECTION ===== */
 .section {
   margin: 0 16px 12px;
   background:var(--surface);
@@ -755,7 +781,14 @@ body::after {
 <div class="ambient"></div>
 <div class="toast" id="toast">✅ Comprobante subido correctamente</div>
 
-<div class="app">
+<!-- Pantalla de baneo -->
+<div class="ban-screen" id="banScreen">
+  <div style="font-size:48px; margin-bottom:16px;">🚫</div>
+  <div style="font-family:'Syne',sans-serif; font-size:24px; font-weight:800; color:#fff; margin-bottom:12px;">Acceso bloqueado</div>
+  <div style="color:var(--text-muted); font-size:14px; max-width:280px;">Has sido baneado y no puedes usar el servicio. Si crees que es un error, contacta con soporte.</div>
+</div>
+
+<div class="app" id="mainApp">
 
   <!-- TOP BAR -->
   <div class="topbar">
@@ -805,6 +838,8 @@ body::after {
 
   <!-- ===================== PAGE 1: RESUMEN ===================== -->
   <div class="page active" id="page1">
+    <!-- ... exactamente igual que antes ... -->
+    <!-- (incluyo la estructura completa para asegurar) -->
     <div class="plan-hero" id="planHero">
       <div class="plan-hero-inner">
         <svg class="plan-hero-glow" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
@@ -895,6 +930,7 @@ body::after {
         <button class="method-tab" onclick="switchTab('usdt')">₮ USDT</button>
       </div>
 
+      <!-- Paneles de métodos de pago (sin cambios) -->
       <div class="method-panel active" id="tab-bpa">
         <div class="payment-info-box">
           <div class="pib-label"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> NÚMERO DE TARJETA</div>
@@ -955,7 +991,7 @@ body::after {
     <button class="next-btn outline" onclick="goToStep(1)" style="margin-top:4px">← Volver al resumen</button>
   </div>
 
-  <!-- ===================== PAGE 3: COMPROBANTE ===================== -->
+  <!-- ===================== PAGE 3: COMPROBANTE (con vista previa mejorada) ===================== -->
   <div class="page" id="page3">
     <div class="section" style="margin-top:16px">
       <div class="section-head"><span class="ico">📸</span><span class="lbl">// COMPROBANTE DE <em>PAGO</em></span></div>
@@ -972,15 +1008,10 @@ body::after {
           <div class="upload-title">Arrastra o toca para subir</div>
           <div class="upload-sub">JPG · PNG · GIF · MP4 · WEBM — MÁX. 20 MB</div>
         </div>
-
-        <div class="warning-note" style="margin-top:0">
-          ⚠ Si el envío falla, recorta o reduce el tamaño de la imagen.
-        </div>
-        <div class="method-info-note mt8"><span class="ni">ℹ</span> Asegúrate de que el número de confirmación sea visible en el comprobante antes de enviar.</div>
       </div>
     </div>
 
-    <!-- Vista previa (aparece aquí, justo encima del botón) -->
+    <!-- Vista previa: justo debajo de la sección, encima del botón -->
     <div class="upload-preview" id="uploadPreview">
       <div class="preview-thumb-placeholder" id="previewThumb">🖼️</div>
       <div class="preview-info">
@@ -1004,6 +1035,7 @@ body::after {
 
   <!-- ===================== PAGE 4: CONFIRMACIÓN ===================== -->
   <div class="page" id="page4">
+    <!-- ... igual que antes ... -->
     <div class="confirm-hero">
       <div class="confirm-ring">✅</div>
       <div class="confirm-title">Comprobante<br>enviado</div>
@@ -1423,6 +1455,7 @@ function openTelegram() {
   else { window.open('https://t.me/L0quen2','_blank'); }
 }
 
+// ===== INICIALIZACIÓN (con verificación de baneo) =====
 (function init() {
   try {
     if (window.Telegram?.WebApp) {
@@ -1431,9 +1464,30 @@ function openTelegram() {
       window.Telegram.WebApp.setHeaderColor('#06080e');
       window.Telegram.WebApp.setBackgroundColor('#06080e');
     }
+
     const planParam = urlParams.get('plan') || 'anual';
-    selectPlan(planParam);
-    loadReferralDiscount();
+
+    if (currentUserId) {
+      fetch(`/api/user-info/${encodeURIComponent(currentUserId)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.banned) {
+            document.getElementById('banScreen').classList.add('active');
+            document.getElementById('mainApp').style.display = 'none';
+            return;
+          }
+          selectPlan(planParam);
+          loadReferralDiscount();
+        })
+        .catch(() => {
+          // Si falla la verificación, permitimos el uso
+          selectPlan(planParam);
+          loadReferralDiscount();
+        });
+    } else {
+      selectPlan(planParam);
+      loadReferralDiscount();
+    }
   } catch (e) {
     console.error('Error inicializando checkout:', e);
     selectPlan('anual');
