@@ -13,14 +13,9 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const db = require('./supabase');
 
 // ==================== PLAN TYPES ====================
-// Todos los tipos de plan con pool propio
 const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
 
 // ==================== STUB MÉTODOS TRIAL FILES (uno por plan) ====================
-// Cada función acepta planType para operar sobre la tabla/bucket correcto.
-// Las tablas en Supabase se llaman: trial_files_basico, trial_files_avanzado,
-// trial_files_cuba_vip, trial_files_premium, trial_files_anual
-
 function getTrialTableName(planType) {
   const valid = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
   return valid.includes(planType) ? `trial_files_${planType}` : 'trial_files_basico';
@@ -135,6 +130,59 @@ function isAdmin(userId) {
     return ADMIN_IDS.includes(userId.toString());
 }
 
+// ==================== FUNCIONES DE BANEO ====================
+async function isUserBanned(telegramId) {
+    try {
+        const user = await db.getUser(telegramId);
+        return user && user.banned === true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function banUser(telegramId, adminId) {
+    const user = await db.getUser(telegramId);
+    if (!user) throw new Error('Usuario no encontrado');
+    if (user.banned) throw new Error('El usuario ya está baneado');
+    const updated = await db.updateUser(telegramId, {
+        banned: true,
+        banned_at: new Date().toISOString(),
+        banned_by: adminId
+    });
+    return updated;
+}
+
+async function unbanUser(telegramId) {
+    const user = await db.getUser(telegramId);
+    if (!user) throw new Error('Usuario no encontrado');
+    if (!user.banned) throw new Error('El usuario no está baneado');
+    const updated = await db.updateUser(telegramId, {
+        banned: false,
+        banned_at: null,
+        banned_by: null
+    });
+    return updated;
+}
+
+// Middleware global anti-baneo (solo para chats privados)
+bot.use(async (ctx, next) => {
+    const chatType = ctx.chat?.type;
+    if (chatType === 'private' && ctx.from) {
+        const userId = ctx.from.id.toString();
+        const banned = await isUserBanned(userId);
+        if (banned) {
+            // Si es un mensaje de texto, respondemos con un mensaje genérico
+            if (ctx.message?.text) {
+                try {
+                    await ctx.reply('⛔ Has sido baneado de este bot. No puedes usar sus funciones.');
+                } catch (e) {}
+            }
+            return; // No pasa al siguiente middleware
+        }
+    }
+    return next();
+});
+
 async function canSendMessageToUser(telegramId) {
     try {
         await bot.telegram.sendChatAction(telegramId, 'typing');
@@ -159,8 +207,8 @@ const BUTTON_ICONS = {
     'VPN CANAL': '5771695636411847302',
     'POLÍTICAS': '6021738534916854774',
     'WHATSAPP': '5884179047482659474',
-    'WHATSAPP G1': '6019328362479097179',   // Nuevo: emoji custom para Grupo 1
-    'WHATSAPP G2': '6019328362479097179',   // Nuevo: emoji custom para Grupo 2
+    'WHATSAPP G1': '6019328362479097179',
+    'WHATSAPP G2': '6019328362479097179',
     'FAQ': '5879501875341955281',
     'PANEL ADMIN': '5839116473951328489',
     'WINDOWS': '5933679370202778681',
@@ -281,8 +329,8 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
             createButton("POLÍTICAS", { callback_data: "politicas" })
         ],
         [
-            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),   // 👈 sin emoji, solo texto
-            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK })    // 👈 sin emoji, solo texto
+            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),
+            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK })
         ],
         [createButton("FAQ", { callback_data: "faq" })]
     ];
@@ -336,7 +384,6 @@ const upload = multer({
 });
 
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
-// Carpetas por plan
 const TRIAL_DIRS = {};
 for (const pt of PLAN_TYPES) {
   TRIAL_DIRS[pt] = path.join(__dirname, `uploads/trial_files_${pt}`);
@@ -347,7 +394,6 @@ for (const pt of PLAN_TYPES) {
 }
 if (!fs.existsSync('public')) fs.mkdirSync('public', { recursive: true });
 
-// Ruta de fallback (archivo de plan individual para trial legacy)
 const TRIAL_CURRENT_FILE = path.join(UPLOADS_DIR, 'trial_files_basico', 'trial_current');
 
 function getPlanName(planType) {
@@ -480,7 +526,6 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
 
     const gameServer = user.trial_game_server || 'No especificado';
     const connectionType = user.trial_connection_type || 'No especificado';
-    // Determinar qué pool usar según el plan que pidió el usuario
     const trialPlanType = user.trial_plan_type || 'basico';
     const planLabel = getPlanLabel(trialPlanType);
 
@@ -488,7 +533,6 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
     let fileName = null;
     let fileId = null;
 
-    // 1. Intentar pool del plan correspondiente (BD)
     try {
       const trialFiles = await db.getTrialFilesByPlan(trialPlanType);
       const activeFiles = (trialFiles || []).filter(f => f.is_active !== false && f.local_path && fs.existsSync(f.local_path));
@@ -503,7 +547,6 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       console.warn(`⚠️ No se pudieron obtener archivos del pool ${trialPlanType}:`, dbErr.message);
     }
 
-    // 2. Fallback: archivo local legacy (ruta fija)
     if (!filePath) {
       const dir = TRIAL_DIRS[trialPlanType] || TRIAL_DIRS['basico'];
       for (const ext of ['.conf', '.zip', '.rar']) {
@@ -512,7 +555,6 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       }
     }
 
-    // 3. Fallback: descargar desde Supabase public_url
     if (!filePath) {
       try {
         const trialFiles = await db.getTrialFilesByPlan(trialPlanType);
@@ -1327,8 +1369,6 @@ app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
 });
 
 // ==================== POOL DE PRUEBAS POR PLAN ====================
-
-// Subir archivo al pool de un plan específico
 app.post('/api/trial-files/upload', upload.single('file'), async (req, res) => {
   try {
     const { adminId, label, planType } = req.body;
@@ -1372,7 +1412,6 @@ app.post('/api/trial-files/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Obtener archivos del pool de un plan específico
 app.get('/api/trial-files/:planType', async (req, res) => {
   try {
     const planType = PLAN_TYPES.includes(req.params.planType) ? req.params.planType : 'basico';
@@ -1381,7 +1420,6 @@ app.get('/api/trial-files/:planType', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error obteniendo archivos' }); }
 });
 
-// Obtener todos los pools en un solo objeto { basico: [...], avanzado: [...], ... }
 app.get('/api/trial-files', async (req, res) => {
   try {
     const result = {};
@@ -1416,7 +1454,6 @@ app.delete('/api/trial-files/:planType/:id', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
 });
 
-// Legacy: ruta antigua /api/upload-trial-file (mantener por compatibilidad)
 app.post('/api/upload-trial-file', upload.single('file'), async (req, res) => {
   try {
     const { adminId } = req.body;
@@ -1781,6 +1818,49 @@ bot.command('admin', async (ctx) => {
   await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(adminUrl, ctx))]] } });
 });
 
+// ==================== COMANDOS DE BANEO ====================
+bot.command('ban', async (ctx) => {
+    const userId = ctx.from.id.toString();
+    if (!isAdmin(userId)) {
+        return ctx.reply('⛔ No tienes permisos para usar este comando.');
+    }
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        return ctx.reply('Uso: /ban <ID del usuario>');
+    }
+    const targetId = args[1].trim();
+    try {
+        const updated = await banUser(targetId, userId);
+        await ctx.reply(`✅ Usuario ${targetId} ha sido baneado.`);
+        try {
+            await bot.telegram.sendMessage(targetId, '⛔ Has sido baneado de VPN Cuba Bot. No puedes usar el bot.');
+        } catch (e) {}
+    } catch (error) {
+        await ctx.reply(`❌ Error: ${error.message}`);
+    }
+});
+
+bot.command('unban', async (ctx) => {
+    const userId = ctx.from.id.toString();
+    if (!isAdmin(userId)) {
+        return ctx.reply('⛔ No tienes permisos para usar este comando.');
+    }
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        return ctx.reply('Uso: /unban <ID del usuario>');
+    }
+    const targetId = args[1].trim();
+    try {
+        const updated = await unbanUser(targetId);
+        await ctx.reply(`✅ Usuario ${targetId} ha sido desbaneado.`);
+        try {
+            await bot.telegram.sendMessage(targetId, '✅ Has sido desbaneado. Ya puedes usar el bot.');
+        } catch (e) {}
+    } catch (error) {
+        await ctx.reply(`❌ Error: ${error.message}`);
+    }
+});
+
 bot.on('text', async (ctx) => {
   const text = ctx.message.text;
   if (text.startsWith('/')) return;
@@ -1820,7 +1900,9 @@ app.listen(PORT, '0.0.0.0', async () => {
             { command: 'help', description: 'Mostrar ayuda' },
             { command: 'referidos', description: 'Obtener enlace de referidos' },
             { command: 'trialstatus', description: 'Ver estado de prueba gratuita' },
-            { command: 'admin', description: 'Panel de administración (solo admins)' }
+            { command: 'admin', description: 'Panel de administración (solo admins)' },
+            { command: 'ban', description: 'Banear a un usuario (admin)' },
+            { command: 'unban', description: 'Desbanear a un usuario (admin)' }
         ]);
     } catch (error) { console.error('❌ Error configurando comandos:', error); }
     startKeepAlive();
