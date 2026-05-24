@@ -20,7 +20,7 @@ if (!supabaseServiceKey) {
 const dbClient = supabaseAdmin;
 
 const db = {
-  // ========== STORAGE (sin cambios) ==========
+  // ========== STORAGE ==========
   async uploadImage(filePath, telegramId) {
     try {
       const fileBuffer = await fs.readFile(filePath);
@@ -67,7 +67,7 @@ const db = {
     }
   },
 
-  // ========== USUARIOS (con descuento balance) ==========
+  // ========== USUARIOS ==========
   async getUser(telegramId) {
     try {
       const userId = String(telegramId).trim();
@@ -111,8 +111,7 @@ const db = {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           last_activity: new Date().toISOString(),
-          is_active: userData.is_active !== undefined ? userData.is_active : true,
-          discount_balance: userData.discount_balance || 0
+          is_active: userData.is_active !== undefined ? userData.is_active : true
         };
         const { data, error } = await dbClient
           .from('users')
@@ -210,14 +209,29 @@ const db = {
 
   async getAllUsers(limit = 100, offset = 0) {
     try {
-      const safeLimit = Math.min(limit, 1000);
-      const { data, error } = await dbClient
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(offset, offset + safeLimit - 1);
-      if (error) throw error;
-      return data || [];
+      const totalLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 100;
+      const startOffset = Number.isFinite(Number(offset)) && Number(offset) >= 0 ? Number(offset) : 0;
+      const chunkSize = 1000;
+      const results = [];
+      let remaining = totalLimit;
+      let currentOffset = startOffset;
+
+      while (remaining > 0) {
+        const fetchSize = Math.min(chunkSize, remaining);
+        const { data, error } = await dbClient
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(currentOffset, currentOffset + fetchSize - 1);
+        if (error) throw error;
+        const rows = data || [];
+        results.push(...rows);
+        if (rows.length < fetchSize) break;
+        currentOffset += rows.length;
+        remaining -= rows.length;
+      }
+
+      return results;
     } catch (error) {
       console.error('❌ Error en getAllUsers:', error);
       return [];
@@ -256,7 +270,7 @@ const db = {
     }
   },
 
-  // ========== REFERIDOS (sin cambios relevantes) ==========
+  // ========== REFERIDOS ==========
   async createReferral(referrerId, referredId, referredUsername = null, referredName = null) {
     try {
       const referrerIdStr = String(referrerId).trim();
@@ -436,7 +450,7 @@ const db = {
     }
   },
 
-  // ========== PAGOS (sin cambios relevantes) ==========
+  // ========== PAGOS ==========
   async createPayment(paymentData) {
     try {
       const telegramId = String(paymentData.telegram_id).trim();
@@ -576,7 +590,7 @@ const db = {
     }
   },
 
-  // ========== PAGOS USDT (sin cambios) ==========
+  // ========== PAGOS USDT ==========
   async createUsdtPayment(usdtData) {
     try {
       const { data, error } = await dbClient
@@ -627,7 +641,7 @@ const db = {
     }
   },
 
-  // ========== ARCHIVOS DE PLANES (sin cambios) ==========
+  // ========== ARCHIVOS DE PLANES ==========
   async savePlanFile(planFileData) {
     try {
       const { data: existing } = await dbClient
@@ -712,7 +726,7 @@ const db = {
     }
   },
 
-  // ========== ESTADÍSTICAS (sin cambios) ==========
+  // ========== ESTADÍSTICAS ==========
   async getStats() {
     try {
       const [
@@ -836,20 +850,29 @@ const db = {
     }
   },
 
-  // ========== PRUEBAS GRATUITAS (versión mejorada con user_trials) ==========
+  // ========== PRUEBAS GRATUITAS ==========
   async getTrialStats() {
     try {
-      const { data: trials, error } = await dbClient
-        .from('user_trials')
-        .select('status, plan_type, requested_at');
+      const { data, error } = await dbClient
+        .from('users')
+        .select('trial_requested, trial_received, trial_requested_at, trial_sent_at, trial_plan_type')
+        .eq('trial_requested', true);
       if (error) throw error;
-      const totalRequests = trials?.length || 0;
-      const completedTrials = trials?.filter(t => t.status === 'sent')?.length || 0;
-      const pendingTrials = trials?.filter(t => t.status === 'pending')?.length || 0;
+      const totalRequests = data?.length || 0;
+      const completedTrials = data?.filter(u => u.trial_received)?.length || 0;
+      const pendingTrials = totalRequests - completedTrials;
       const today = new Date().toISOString().split('T')[0];
-      const todayRequests = trials?.filter(t => t.requested_at && t.requested_at.startsWith(today))?.length || 0;
-      const trialByType = {};
-      trials?.forEach(t => { trialByType[t.plan_type] = (trialByType[t.plan_type] || 0) + 1; });
+      const todayRequests = data?.filter(u => u.trial_requested_at && u.trial_requested_at.startsWith(today))?.length || 0;
+      const trialByType = {
+        basico: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'basico')?.length || 0,
+        avanzado: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'avanzado')?.length || 0,
+        cuba_vip: data?.filter(u => {
+          const p = (u.trial_plan_type || '').toLowerCase();
+          return p === 'vip' || p === 'cuba_vip';
+        })?.length || 0,
+        premium: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'premium')?.length || 0,
+        anual: data?.filter(u => (u.trial_plan_type || '').toLowerCase() === 'anual')?.length || 0
+      };
       return { total_requests: totalRequests, completed: completedTrials, pending: pendingTrials, today_requests: todayRequests, by_type: trialByType };
     } catch (error) {
       console.error('❌ Error en getTrialStats:', error);
@@ -859,49 +882,23 @@ const db = {
 
   async getPendingTrials() {
     try {
-      const { data: trials, error } = await dbClient
-        .from('user_trials')
+      const { data, error } = await dbClient
+        .from('users')
         .select('*')
-        .eq('status', 'pending')
-        .order('requested_at', { ascending: true });
+        .eq('trial_requested', true)
+        .eq('trial_received', false)
+        .order('trial_requested_at', { ascending: true });
       if (error) throw error;
-      if (!trials || trials.length === 0) return [];
-      const users = await Promise.all(trials.map(async t => {
-        const user = await this.getUser(t.user_id);
-        return { ...user, ...t, trial_plan_type: t.plan_type, trial_game_server: t.game_server, trial_connection_type: t.connection_type, trial_requested_at: t.requested_at };
-      }));
-      return users.filter(u => u);
+      return data || [];
     } catch (error) {
       console.error('❌ Error en getPendingTrials:', error);
       return [];
     }
   },
 
-  async markTrialAsSent(telegramId, sentBy, planType = null) {
+  async markTrialAsSent(telegramId, sentBy) {
     try {
       const userId = String(telegramId).trim();
-      let updatedUser = null;
-      if (planType) {
-        await dbClient
-          .from('user_trials')
-          .update({ status: 'sent', sent_at: new Date().toISOString(), sent_by: sentBy })
-          .eq('user_id', userId)
-          .eq('plan_type', planType);
-      } else {
-        const pendingTrial = await dbClient
-          .from('user_trials')
-          .select('plan_type')
-          .eq('user_id', userId)
-          .eq('status', 'pending')
-          .maybeSingle();
-        if (pendingTrial.data) {
-          await dbClient
-            .from('user_trials')
-            .update({ status: 'sent', sent_at: new Date().toISOString(), sent_by: sentBy })
-            .eq('user_id', userId)
-            .eq('plan_type', pendingTrial.data.plan_type);
-        }
-      }
       const { data, error } = await dbClient
         .from('users')
         .update({
@@ -921,164 +918,30 @@ const db = {
     }
   },
 
-  async checkTrialEligibility(telegramId) {
+  async checkTrialEligibility(telegramId, requestedPlanType = null) {
     try {
       const user = await this.getUser(telegramId);
-      if (!user) return { eligible: true, reason: 'Nuevo usuario', available_plans: ['basico', 'avanzado', 'vip', 'premium', 'anual'] };
-      const { data: usedTrials, error } = await dbClient
-        .from('user_trials')
-        .select('plan_type, status')
-        .eq('user_id', telegramId);
-      if (error) throw error;
-      const allPlans = ['basico', 'avanzado', 'vip', 'premium', 'anual'];
-      const usedPlans = usedTrials?.map(t => t.plan_type) || [];
-      const availablePlans = allPlans.filter(p => !usedPlans.includes(p));
-      if (availablePlans.length === 0) return { eligible: false, reason: 'Ya usaste tu prueba gratuita para todos los planes disponibles.', available_plans: [] };
-      const pendingTrial = usedTrials?.find(t => t.status === 'pending');
-      if (pendingTrial) return { eligible: false, reason: `Ya tienes una solicitud pendiente para el plan ${pendingTrial.plan_type}.`, available_plans: [] };
-      return { eligible: true, reason: `Puedes probar uno de estos planes: ${availablePlans.join(', ')}`, available_plans: availablePlans };
+      if (!user) return { eligible: true, reason: 'Nuevo usuario' };
+
+      const currentPlan = String(user.trial_plan_type || '').trim().toLowerCase();
+      const requestedPlan = String(requestedPlanType || '').trim().toLowerCase();
+
+      if (user.trial_requested && !user.trial_received) {
+        return { eligible: false, reason: 'Ya tiene una solicitud pendiente' };
+      }
+
+      if (user.trial_received && requestedPlan && currentPlan && requestedPlan === currentPlan) {
+        return { eligible: false, reason: 'Este plan ya fue probado' };
+      }
+
+      return { eligible: true, reason: 'Puede solicitar prueba de otro plan' };
     } catch (error) {
       console.error('❌ Error en checkTrialEligibility:', error);
-      return { eligible: true, reason: 'Error verificando elegibilidad, puedes intentarlo', available_plans: ['basico', 'avanzado', 'vip', 'premium', 'anual'] };
+      return { eligible: false, reason: 'Error verificando elegibilidad' };
     }
   },
 
-  async hasUserUsedTrialForPlan(telegramId, planType) {
-    try {
-      const { data, error } = await dbClient
-        .from('user_trials')
-        .select('id')
-        .eq('user_id', telegramId)
-        .eq('plan_type', planType)
-        .maybeSingle();
-      if (error) throw error;
-      return !!data;
-    } catch (error) {
-      console.error('❌ Error en hasUserUsedTrialForPlan:', error);
-      return false;
-    }
-  },
-
-  async createTrialRequest(telegramId, planType, gameServer, connectionType, additionalInfo = '') {
-    try {
-      const userId = String(telegramId).trim();
-      const { data, error } = await dbClient
-        .from('user_trials')
-        .insert({
-          user_id: userId,
-          plan_type: planType,
-          game_server: gameServer,
-          connection_type: connectionType,
-          additional_info: additionalInfo,
-          status: 'pending',
-          requested_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      await dbClient
-        .from('users')
-        .update({
-          trial_requested: true,
-          trial_requested_at: new Date().toISOString(),
-          trial_plan_type: planType,
-          trial_game_server: gameServer,
-          trial_connection_type: connectionType,
-          updated_at: new Date().toISOString()
-        })
-        .eq('telegram_id', userId);
-      return data;
-    } catch (error) {
-      console.error('❌ Error en createTrialRequest:', error);
-      throw error;
-    }
-  },
-
-  // ========== POOL DE ARCHIVOS DE PRUEBA POR PLAN ==========
-  async getTrialFilesByPlan(planType) {
-    const tableName = `trial_files_${planType}`;
-    try {
-      const { data, error } = await dbClient
-        .from(tableName)
-        .select('*')
-        .order('uploaded_at', { ascending: false });
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error(`❌ Error en getTrialFilesByPlan(${planType}):`, error);
-      return [];
-    }
-  },
-
-  async getTrialFileByPlan(planType, id) {
-    const tableName = `trial_files_${planType}`;
-    try {
-      const { data, error } = await dbClient
-        .from(tableName)
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error(`❌ Error en getTrialFileByPlan(${planType}, ${id}):`, error);
-      return null;
-    }
-  },
-
-  async saveTrialFileByPlan(planType, fileData) {
-    const tableName = `trial_files_${planType}`;
-    try {
-      const { data, error } = await dbClient
-        .from(tableName)
-        .insert([{
-          ...fileData,
-          uploaded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error(`❌ Error en saveTrialFileByPlan(${planType}):`, error);
-      throw error;
-    }
-  },
-
-  async updateTrialFileByPlan(planType, id, updateData) {
-    const tableName = `trial_files_${planType}`;
-    try {
-      const { data, error } = await dbClient
-        .from(tableName)
-        .update({ ...updateData, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error(`❌ Error en updateTrialFileByPlan(${planType}, ${id}):`, error);
-      throw error;
-    }
-  },
-
-  async deleteTrialFileByPlan(planType, id) {
-    const tableName = `trial_files_${planType}`;
-    try {
-      const { error } = await dbClient
-        .from(tableName)
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error(`❌ Error en deleteTrialFileByPlan(${planType}, ${id}):`, error);
-      return false;
-    }
-  },
-
-  // ========== BROADCASTS (ya existentes, se dejan igual) ==========
+  // ========== BROADCASTS ==========
   async createBroadcast(message, targetUsers = 'all', sentBy) {
     try {
       const { data, error } = await dbClient
@@ -1197,46 +1060,7 @@ const db = {
     }
   },
 
-  // ========== DESCUENTO POR REFERIDOS (decreciente) ==========
-  async incrementDiscountBalance(telegramId, points) {
-    try {
-      const user = await this.getUser(telegramId);
-      const currentBalance = user?.discount_balance || 0;
-      const newBalance = currentBalance + points;
-      const { data, error } = await dbClient
-        .from('users')
-        .update({ discount_balance: newBalance, updated_at: new Date().toISOString() })
-        .eq('telegram_id', String(telegramId).trim())
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('❌ Error en incrementDiscountBalance:', error);
-      throw error;
-    }
-  },
-
-  async decrementDiscountBalance(telegramId, points) {
-    try {
-      const user = await this.getUser(telegramId);
-      const currentBalance = user?.discount_balance || 0;
-      const newBalance = Math.max(0, currentBalance - points);
-      const { data, error } = await dbClient
-        .from('users')
-        .update({ discount_balance: newBalance, updated_at: new Date().toISOString() })
-        .eq('telegram_id', String(telegramId).trim())
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('❌ Error en decrementDiscountBalance:', error);
-      throw error;
-    }
-  },
-
-  // ========== CUPONES (sin cambios) ==========
+  // ========== CUPONES ==========
   async createCoupon(couponData) {
     try {
       const { data, error } = await dbClient
@@ -1452,7 +1276,86 @@ const db = {
     }
   },
 
-  // ========== OTRAS UTILIDADES (sin cambios) ==========
+  // ========== POOL DE ARCHIVOS DE PRUEBA ==========
+  async getTrialFiles() {
+    try {
+      const { data, error } = await dbClient
+        .from('trial_files')
+        .select('*')
+        .order('uploaded_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error en getTrialFiles:', error);
+      return [];
+    }
+  },
+
+  async getTrialFile(id) {
+    try {
+      const { data, error } = await dbClient
+        .from('trial_files')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Error en getTrialFile:', error);
+      return null;
+    }
+  },
+
+  async saveTrialFile(fileData) {
+    try {
+      const { data, error } = await dbClient
+        .from('trial_files')
+        .insert([{
+          ...fileData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Error en saveTrialFile:', error);
+      throw error;
+    }
+  },
+
+  async updateTrialFile(id, updateData) {
+    try {
+      const { data, error } = await dbClient
+        .from('trial_files')
+        .update({ ...updateData, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Error en updateTrialFile:', error);
+      throw error;
+    }
+  },
+
+  async deleteTrialFile(id) {
+    try {
+      const { error } = await dbClient
+        .from('trial_files')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('❌ Error en deleteTrialFile:', error);
+      return false;
+    }
+  },
+
+  // ========== OTRAS UTILIDADES ==========
   async searchUsers(searchTerm) {
     try {
       const { data, error } = await dbClient
@@ -1512,19 +1415,19 @@ const db = {
   async getGamesStatistics() {
     try {
       const { data, error } = await dbClient
-        .from('user_trials')
-        .select('game_server, connection_type, requested_at')
-        .eq('status', 'sent');
+        .from('users')
+        .select('trial_game_server, trial_connection_type, trial_requested_at')
+        .eq('trial_requested', true);
       if (error) throw error;
       const gamesMap = new Map();
       const connectionsMap = new Map();
-      data?.forEach(trial => {
-        const game = trial.game_server || 'No especificado';
-        const connection = trial.connection_type || 'No especificado';
-        if (!gamesMap.has(game)) gamesMap.set(game, { game, count: 0, lastRequest: trial.requested_at });
+      data?.forEach(user => {
+        const game = user.trial_game_server || 'No especificado';
+        const connection = user.trial_connection_type || 'No especificado';
+        if (!gamesMap.has(game)) gamesMap.set(game, { game, count: 0, lastRequest: user.trial_requested_at });
         const gameData = gamesMap.get(game);
         gameData.count += 1;
-        if (trial.requested_at && (!gameData.lastRequest || trial.requested_at > gameData.lastRequest)) gameData.lastRequest = trial.requested_at;
+        if (user.trial_requested_at && (!gameData.lastRequest || user.trial_requested_at > gameData.lastRequest)) gameData.lastRequest = user.trial_requested_at;
         if (!connectionsMap.has(connection)) connectionsMap.set(connection, { connection, count: 0 });
         connectionsMap.get(connection).count += 1;
       });
