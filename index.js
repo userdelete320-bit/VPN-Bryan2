@@ -1722,26 +1722,42 @@ bot.start(async (ctx) => {
     }
 
     try {
-        const userData = { telegram_id: userId.toString(), username: ctx.from.username, first_name: firstName, last_name: ctx.from.last_name, created_at: new Date().toISOString(), is_active: true };
-        if (referrerId) { userData.referrer_id = referrerId; userData.referrer_username = referrerUsername; }
-        await db.saveUser(userId.toString(), userData);
-    } catch (error) { console.error('Error guardando usuario:', error); }
-
-    const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
-    const welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
-
-    const gifPath = path.join(__dirname, 'assets', 'vpncuba_premium.gif');
-    try {
-        if (fs.existsSync(gifPath)) {
-            await ctx.replyWithAnimation({ source: fs.createReadStream(gifPath) });
-        } else {
-            console.warn(`⚠️ GIF no encontrado en: ${gifPath}`);
+        const userData = {
+            telegram_id: userId.toString(),
+            username: ctx.from.username,
+            first_name: firstName,
+            last_name: ctx.from.last_name,
+            created_at: new Date().toISOString(),
+            is_active: true
+        };
+        if (referrerId) {
+            userData.referrer_id = referrerId;
+            userData.referrer_username = referrerUsername;
         }
-    } catch (gifError) {
-        console.warn('⚠️ No se pudo enviar el GIF de bienvenida:', gifError.message);
+        await db.saveUser(userId.toString(), userData);
+    } catch (error) {
+        console.error('Error guardando usuario:', error);
     }
 
-    await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
+    const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
+
+    const welcomeCaption = `*¡Hola ${firstName || 'usuario'}!* 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
+
+    try {
+        const gifPath = path.join(__dirname, 'assets', 'vpncuba_premium.gif');
+        if (fs.existsSync(gifPath)) {
+            await bot.telegram.sendAnimation(
+                ctx.chat.id,
+                { source: fs.createReadStream(gifPath) },
+                { caption: welcomeCaption, parse_mode: 'Markdown', ...keyboard }
+            );
+        } else {
+            await bot.telegram.sendMessage(ctx.chat.id, welcomeCaption, { parse_mode: 'Markdown', ...keyboard });
+        }
+    } catch (error) {
+        console.error('Error enviando GIF de bienvenida:', error);
+        await bot.telegram.sendMessage(ctx.chat.id, welcomeCaption, { parse_mode: 'Markdown', ...keyboard });
+    }
 });
 
 bot.command('help', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id, ctx.from.first_name, isAdmin(ctx.from.id)); await ctx.reply('🆘 *Ayuda de VPN Cuba*\n\nUsa los botones para navegar.', { parse_mode: 'Markdown', ...keyboard }); });
