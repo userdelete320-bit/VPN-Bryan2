@@ -554,9 +554,10 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
                      `<tg-emoji emoji-id="6021744990252702234">🎮</tg-emoji> <b>Juego/Servidor:</b> ${gameServer}\n` +
                      `<tg-emoji emoji-id="6021744990252702234">📡</tg-emoji> <b>Conexión:</b> ${connectionType}\n\n` +
                      `<b>Instrucciones de instalación:</b>\n` +
-                     `1. Descarga el archivo.\n` +
-                     `2. Importa la configuración en WireGuard.\n` +
-                     `3. Activa la conexión.\n\n` +
+                     `1. Descarga este archivo\n` +
+                     `2. Importa el archivo .conf en tu cliente WireGuard\n` +
+                     `3. Activa la conexión\n` +
+                     `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
                      `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
                      `<b>Importante:</b> Esta configuración expirará en 1 hora.`,
             parse_mode: 'HTML'
@@ -714,6 +715,7 @@ app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
       status: 'pending', created_at: new Date().toISOString(),
       coupon_used: couponUsed, coupon_code: couponUsed ? couponCode?.toUpperCase() : null, coupon_discount: couponDiscount
     });
+
     if (!payment) throw new Error('No se pudo crear el pago en la base de datos');
 
     try {
@@ -884,7 +886,7 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
                    `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${req.file.originalname}\n` +
                    `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n` +
                    `${payment.coupon_used ? `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}%)\n` : ''}` +
-                   `\n<b>Instrucciones:</b>\n1. Descarga el archivo.\n2. Si viene comprimido, descomprímelo.\n3. Importa la configuración en WireGuard.\n4. Activa la conexión.`,
+                   `\n<b>Instrucciones:</b>\n1. Descarga este archivo\n2. ${fileName.endsWith('.conf') ? 'Importa el archivo .conf directamente' : 'Descomprime y luego importa el .conf'}\n3. Importa en WireGuard\n4. Activa la conexión\n5. ¡Disfruta! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
           parse_mode: 'HTML'
         });
         sent = true; break;
@@ -1071,7 +1073,7 @@ app.get('/api/image/:filename', (req, res) => {
 app.get('/api/storage-status', async (req, res) => {
   try {
     const buckets = [];
-    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-vip', 'trial-files-premium', 'trial-files-anual']) {
+    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual']) {
       try { const { data } = await supabaseAdmin.storage.from(name).list(); buckets.push({ name, status: '✅ Existe', fileCount: data?.length || 0 }); }
       catch (e) { buckets.push({ name, status: '❌ Error: ' + e.message }); }
     }
@@ -1082,7 +1084,7 @@ app.get('/api/storage-status', async (req, res) => {
 app.post('/api/broadcast/send', upload.single('media'), async (req, res) => {
   try {
     const { message, target, adminId } = req.body;
-    const mediaFile = req.file ? { path: req.file.path, mimetype: req.file.mimetype, originalname: req.file.originalname } : null;
+    const mediaFile = req.file || null;
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
     if (!message?.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
     const validTargets = ['all', 'vip', 'non_vip', 'trial_pending', 'trial_received', 'active', 'with_referrals', 'usdt_payers'];
@@ -1115,13 +1117,12 @@ ${message}
 
 _Soporte: @L0quen2_`;
         if (mediaFile?.path) {
-          const source = { source: fs.createReadStream(mediaFile.path) };
           if ((mediaFile.mimetype || '').startsWith('image/')) {
-            await bot.telegram.sendPhoto(user.telegram_id, source, { caption, parse_mode: 'Markdown' });
+            await bot.telegram.sendPhoto(user.telegram_id, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
           } else if ((mediaFile.mimetype || '').startsWith('video/')) {
-            await bot.telegram.sendVideo(user.telegram_id, source, { caption, parse_mode: 'Markdown' });
+            await bot.telegram.sendVideo(user.telegram_id, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
           } else {
-            await bot.telegram.sendDocument(user.telegram_id, source, { caption, parse_mode: 'Markdown' });
+            await bot.telegram.sendDocument(user.telegram_id, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
           }
         } else {
           await bot.telegram.sendMessage(user.telegram_id, caption, { parse_mode: 'Markdown' });
@@ -1138,7 +1139,7 @@ _Soporte: @L0quen2_`;
       if ((i + 1) % 25 === 0 || i === users.length - 1) {
         try { await db.updateBroadcastStatus(broadcastId, 'sending', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length }); } catch (e) {}
       }
-      await new Promise(resolve => setTimeout(resolve, 40));
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
     await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length });
     if (mediaFile?.path) fs.unlink(mediaFile.path, () => {});
@@ -1147,7 +1148,6 @@ _Soporte: @L0quen2_`;
     try { await db.updateBroadcastStatus(broadcastId, 'failed', { sent_count: 0, failed_count: users?.length || 0, unavailable_count: 0, total_users: users?.length || 0 }); } catch (e) {}
   }
 }
-
 
 app.get('/api/broadcasts', async (req, res) => { try { res.json(await db.getBroadcasts()); } catch (e) { res.status(500).json({ error: 'Error obteniendo broadcasts' }); } });
 app.get('/api/broadcast/status/:id', async (req, res) => { try { const b = await db.getBroadcast(req.params.id); if (!b) return res.status(404).json({ error: 'No encontrado' }); res.json(b); } catch (e) { res.status(500).json({ error: 'Error' }); } });
@@ -1641,28 +1641,6 @@ bot.command('trialstatus', async (ctx) => {
   const eligibility = await db.checkTrialEligibility(ctx.from.id);
   await ctx.reply(eligibility.eligible ? `✅ *Puedes solicitar una prueba*\n\n${eligibility.reason}. Usa el botón VER PLANES.` : `❌ *No puedes solicitar prueba*\n\n${eligibility.reason}`, { parse_mode: 'Markdown' });
 });
-
-bot.command('ban', async (ctx) => {
-  try {
-    if (!isAdmin(ctx.from.id)) { await ctx.reply('⛔ No tienes permisos.'); return; }
-    const parts = ctx.message.text.split(/\s+/).slice(1);
-    const targetId = parts[0] || ctx.message.reply_to_message?.from?.id?.toString();
-    const reason = parts.slice(1).join(' ').trim() || 'Baneado por administrador';
-    if (!targetId) {
-      await ctx.reply('Uso: /ban <telegram_id> [motivo]');
-      return;
-    }
-    await db.updateUser(targetId.toString(), { is_active: false, last_error: reason, updated_at: new Date().toISOString() });
-    try { await bot.telegram.sendMessage(targetId.toString(), `⛔ <b>Has sido baneado</b>
-
-<b>Motivo:</b> ${reason}`, { parse_mode: 'HTML' }); } catch (e) {}
-    await ctx.reply(`✅ Usuario ${targetId} baneado.`);
-  } catch (error) {
-    console.error('❌ Error en comando /ban:', error);
-    await ctx.reply('❌ No se pudo banear al usuario.');
-  }
-});
-
 bot.command('admin', async (ctx) => {
   if (!isAdmin(ctx.from.id)) { await ctx.reply('⛔ No tienes permisos.'); return; }
   const adminUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}/admin.html?userId=${ctx.from.id}&admin=true`;
