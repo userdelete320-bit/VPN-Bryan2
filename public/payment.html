@@ -42,7 +42,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Grain */
 body::after {
   content:'';
   position:fixed; inset:0;
@@ -50,7 +49,6 @@ body::after {
   pointer-events:none; z-index:999; opacity:0.35;
 }
 
-/* Ambient */
 .ambient {
   position:fixed; inset:0; pointer-events:none; z-index:0;
   background:
@@ -58,7 +56,6 @@ body::after {
     radial-gradient(ellipse 40% 30% at 10% 80%, rgba(91,240,255,0.03) 0%, transparent 100%);
 }
 
-/* ===== LAYOUT ===== */
 .app {
   position:relative; z-index:1;
   max-width:430px; margin:0 auto;
@@ -66,7 +63,6 @@ body::after {
   display:flex; flex-direction:column;
 }
 
-/* ===== TOP BAR ===== */
 .topbar {
   display:flex; align-items:center; justify-content:space-between;
   padding: 16px 20px 12px;
@@ -108,7 +104,6 @@ body::after {
   color:var(--text-muted); cursor:pointer;
 }
 
-/* ===== STEP PROGRESS ===== */
 .progress-wrap {
   padding: 16px 20px;
   animation: fadeUp 0.4s ease both;
@@ -161,12 +156,10 @@ body::after {
 .step.active .step-lbl { color:var(--neon); }
 .step.done .step-lbl { color:var(--text-muted); }
 
-/* ===== PAGES ===== */
 .page { display:none; animation:fadeUp 0.35s ease both; }
 .page.active { display:block; }
 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-/* ===== SHARED SECTION ===== */
 .section {
   margin: 0 16px 12px;
   background:var(--surface);
@@ -190,7 +183,6 @@ body::after {
 .section-head .lbl em { color:var(--neon); font-style:normal; }
 .section-body { padding:16px; }
 
-/* ===== PAGE 1: RESUMEN ===== */
 .plan-hero {
   margin:16px 16px 12px;
   border-radius:var(--radius);
@@ -320,7 +312,6 @@ body::after {
   color:var(--text-muted);
 }
 
-/* ===== PAGE 2: PAGO ===== */
 .method-tabs {
   display:flex; gap:6px;
   padding:12px 16px;
@@ -454,7 +445,7 @@ body::after {
 .ps-row.total .ps-val { color:var(--neon); font-size:16px; font-weight:700; }
 .ps-discount { color:var(--neon); }
 
-/* ===== PAGE 3: COMPROBANTE ===== */
+/* Zona de subida y vista previa */
 .upload-zone {
   border:1.5px dashed rgba(57,255,160,0.2);
   border-radius:var(--radius-sm);
@@ -494,7 +485,7 @@ body::after {
   border:1px solid rgba(57,255,160,0.2);
   border-radius:var(--radius-sm);
   padding:14px;
-  margin-bottom:12px;
+  margin: 0 16px 12px;
   align-items:center; gap:12px;
 }
 .upload-preview.show { display:flex; }
@@ -580,7 +571,7 @@ body::after {
   letter-spacing:0.06em; line-height:1.6;
 }
 
-/* ===== PAGE 4: CONFIRMACIÓN ===== */
+/* Página 4 */
 .confirm-hero {
   padding:48px 24px 32px;
   text-align:center;
@@ -710,7 +701,6 @@ body::after {
   letter-spacing:0.05em; line-height:1.8;
 }
 
-/* ===== PLAN SELECTOR DEMO ===== */
 .demo-selector {
   margin:12px 16px 0;
   background:var(--surface2);
@@ -736,12 +726,11 @@ body::after {
   color:var(--neon);
 }
 
-/* Utils */
 .mt8 { margin-top:8px; }
 .mt12 { margin-top:12px; }
 .mono { font-family:'Space Mono',monospace; }
 
-/* Toast notification */
+/* Toast */
 .toast {
   position: fixed;
   bottom: 24px;
@@ -759,15 +748,11 @@ body::after {
   transition: opacity 0.3s;
   pointer-events: none;
 }
-.toast.show {
-  opacity: 1;
-}
+.toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 <div class="ambient"></div>
-
-<!-- Toast para confirmación de envío -->
 <div class="toast" id="toast">✅ Comprobante subido correctamente</div>
 
 <div class="app">
@@ -979,22 +964,33 @@ body::after {
           <div class="om-left">Plan seleccionado<strong id="comp-plan">Plan Anual · 12 meses</strong></div>
           <div class="om-right" id="comp-price">—</div>
         </div>
+
+        <!-- Zona de subida (se oculta al seleccionar archivo) -->
         <div class="upload-zone" id="uploadZone" onclick="triggerUpload()">
           <input type="file" id="fileInput" accept="image/*,video/*" onchange="handleFile(this)">
           <div class="upload-icon">📤</div>
           <div class="upload-title">Arrastra o toca para subir</div>
           <div class="upload-sub">JPG · PNG · GIF · MP4 · WEBM — MÁX. 20 MB</div>
         </div>
-        <div class="upload-preview" id="uploadPreview">
-          <div class="preview-thumb-placeholder" id="previewThumb">🖼️</div>
-          <div class="preview-info"><div class="preview-name" id="previewName">comprobante.jpg</div><div class="preview-size" id="previewSize">— KB</div></div>
-          <div class="preview-check">✓</div>
-          <button class="remove-btn" onclick="removeFile()">✕</button>
+
+        <div class="warning-note" style="margin-top:0">
+          ⚠ Si el envío falla, recorta o reduce el tamaño de la imagen.
         </div>
-        <div class="warning-note" style="margin-top:0">⚠ Si el envío falla, recorta o reduce el tamaño de la imagen.</div>
         <div class="method-info-note mt8"><span class="ni">ℹ</span> Asegúrate de que el número de confirmación sea visible en el comprobante antes de enviar.</div>
       </div>
     </div>
+
+    <!-- Vista previa (aparece aquí, justo encima del botón) -->
+    <div class="upload-preview" id="uploadPreview">
+      <div class="preview-thumb-placeholder" id="previewThumb">🖼️</div>
+      <div class="preview-info">
+        <div class="preview-name" id="previewName">comprobante.jpg</div>
+        <div class="preview-size" id="previewSize">— KB</div>
+      </div>
+      <div class="preview-check">✓</div>
+      <button class="remove-btn" onclick="removeFile()">✕</button>
+    </div>
+
     <div style="padding:0 16px 4px">
       <button class="send-btn" id="sendBtn" onclick="sendOrder()" disabled>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -1002,6 +998,7 @@ body::after {
       </button>
       <div class="send-info">🕐 REVISIÓN MANUAL · 1-12 HORAS<br>RECIBIRÁS CONFIRMACIÓN POR TELEGRAM</div>
     </div>
+
     <button class="next-btn outline" onclick="goToStep(2)" style="margin-top:4px">← Volver a métodos de pago</button>
   </div>
 
@@ -1191,7 +1188,6 @@ function updatePricing() {
   const discRow = document.getElementById('ps-disc-row');
   if (effective > 0) {
     discRow.style.display = 'flex';
-    // Usamos el ID correcto 'ps-disc'
     setText('ps-disc', `-${effective}%`);
   } else {
     discRow.style.display = 'none';
@@ -1363,6 +1359,8 @@ function removeFile() {
   document.getElementById('uploadZone').style.display='block';
   fileUploaded = false;
   document.getElementById('sendBtn').disabled=true;
+  // Restaurar placeholder del thumbnail
+  document.getElementById('previewThumb').outerHTML = '<div class="preview-thumb-placeholder" id="previewThumb">🖼️</div>';
 }
 
 async function sendOrder() {
@@ -1392,18 +1390,15 @@ async function sendOrder() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error enviando comprobante');
 
-    // Actualizar descuento de referido usado
     if (effective > 0 && currentUserId) {
       localStorage.setItem(`vpncuba_referral_spent_${currentUserId}`, String(referralSpent + 20));
       referralSpent += 20;
     }
 
-    // Mostrar toast de confirmación y luego cambiar a página 4
     showToast();
     setTimeout(() => {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById('page4').classList.add('active');
-      // Solo actualizar elementos que existen en página 4
       setText('conf-plan', planData[currentPlan].name);
       updateDiscountBanner();
       updatePricing();
@@ -1428,7 +1423,6 @@ function openTelegram() {
   else { window.open('https://t.me/L0quen2','_blank'); }
 }
 
-// Inicialización inmediata
 (function init() {
   try {
     if (window.Telegram?.WebApp) {
