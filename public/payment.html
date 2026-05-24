@@ -960,7 +960,7 @@ body::after {
       <!-- METROPOLITANA -->
       <div class="method-panel" id="tab-metropolitan">
         <div class="payment-info-box">
-          <div class="pib-label">NÚMERO DE TARJETA METROPOLITANA</div>
+          <div class="pib-label">NÚMERO DE TARJETA METROPOLITANA # A CONFIRMAR</div>
           <div class="pib-val">9238-9598-7118-1386</div>
           <button class="copy-btn" onclick="copyText('9238959871181386',this)">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -1243,7 +1243,7 @@ const planData = {
   },
   gaming: {
     tag:'GAMING · QoS PRIORITARIO', name:'GAMING', sub:'Latencia mínima · MLBB · CoD · Free Fire',
-    price:'1,500 CUP', mobile:'700 CUP', usdt:'2.3 USDT', duration:'1 MES',
+    price:'1,600 CUP', mobile:'700 CUP', usdt:'2.3 USDT', duration:'1 MES',
     sumPlan:'Plan Gaming', sumDuration:'1 mes',
     features:[['🎮','MLBB·CoD·FF'],['⚡','<25ms latencia'],['🎯','QoS traffic'],['📦','~0% loss'],['🔒','AES-256'],['🆘','Soporte']],
     accentColor:'#ff6eb4', tagBg:'rgba(255,110,180,0.08)', tagBorder:'rgba(255,110,180,0.25)',
@@ -1284,7 +1284,7 @@ const PLAN_BASE = {
   basic: { cup: 900, mobile: 400, usdt: 1.5 },
   advanced: { cup: 1800, mobile: 900, usdt: 2.8 },
   vip: { cup: 1200, mobile: 500, usdt: 1.9 },
-  gaming: { cup: 1500, mobile: 700, usdt: 2.3 },
+  gaming: { cup: 1600, mobile: 700, usdt: 2.3 },
   anual: { cup: 15000, mobile: 10000, usdt: 25 },
   trial: { cup: 0, mobile: 0, usdt: 0 }
 };
@@ -1303,12 +1303,12 @@ function formatCUP(value) {
 function normalizePlan(key) {
   const k = (key || 'anual').toLowerCase();
   if (PLAN_KEYS[k]) return k;
-  if (k === 'basico') return 'basic';
-  if (k === 'avanzado') return 'advanced';
-  if (k === 'cuba_vip') return 'vip';
-  if (k === 'premium') return 'gaming';
+  if (k === 'basico' || k === 'basic') return 'basic';
+  if (k === 'avanzado' || k === 'advanced') return 'advanced';
+  if (k === 'cuba_vip' || k === 'vip') return 'vip';
+  if (k === 'premium' || k === 'gaming') return 'gaming';
   if (k === 'anual') return 'anual';
-  if (k === 'trial') return 'trial';
+  if (k === 'trial' || k === 'turbo') return 'trial';
   return 'anual';
 }
 
@@ -1343,13 +1343,30 @@ function updatePricing() {
   const p = PLAN_BASE[currentPlan] || PLAN_BASE.anual;
   const effective = computeEffectiveDiscount();
   const priceCup = Math.max(0, Math.round(p.cup * (100 - effective) / 100));
-  const priceMobile = Math.max(0, Math.round(p.mobile * (100 - effective) / 100));
-  const priceUsdt = (p.usdt * (100 - effective) / 100).toFixed(2).replace(/\.00$/, '');
+  const priceMobile = Math.max(0, Math.round((p.mobile || 0) * (100 - effective) / 100));
+  const priceUsdt = Math.max(0, (p.usdt * (100 - effective) / 100));
 
   document.getElementById('ps-base').textContent = formatCUP(p.cup);
   document.getElementById('ps-total').textContent = formatCUP(priceCup);
-  document.getElementById('movilAmount').textContent = p.mobile ? formatCUP(priceMobile) : '—';
-  document.getElementById('usdtAmount').textContent = priceUsdt + ' USDT';
+
+  const mobileAmountEl = document.getElementById('movilAmount');
+  const mobileRow = document.getElementById('sumMobileRow');
+  if (p.mobile) {
+    mobileRow.style.display = 'flex';
+    mobileAmountEl.textContent = formatCUP(priceMobile);
+  } else {
+    mobileRow.style.display = 'none';
+    mobileAmountEl.textContent = '—';
+  }
+
+  const usdtRow = document.querySelector('#sumUSDT')?.closest('.detail-row');
+  if (p.usdt) {
+    if (usdtRow) usdtRow.style.display = 'flex';
+    document.getElementById('usdtAmount').textContent = priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT';
+  } else {
+    if (usdtRow) usdtRow.style.display = 'none';
+    document.getElementById('usdtAmount').textContent = '—';
+  }
 
   if (effective > 0) {
     document.getElementById('ps-disc-row').style.display = 'flex';
@@ -1361,6 +1378,31 @@ function updatePricing() {
   document.getElementById('comp-plan').textContent = planData[currentPlan].sumPlan + ' · ' + planData[currentPlan].sumDuration;
   document.getElementById('comp-price').textContent = formatCUP(priceCup);
   document.getElementById('comp-price').style.color = planData[currentPlan].accentColor;
+}
+
+
+function updateTrialMode() {
+  const isTrial = currentPlan === 'trial';
+  const methodTabs = document.querySelector('.method-tabs');
+  const uploadZone = document.getElementById('uploadZone');
+  const uploadPreview = document.getElementById('uploadPreview');
+  const sendBtn = document.getElementById('sendBtn');
+  const couponRow = document.querySelector('.coupon-row');
+  const couponBtn = document.querySelector('.coupon-btn');
+  const couponInput = document.getElementById('couponInput');
+  const refBanner = document.getElementById('refBanner');
+
+  if (methodTabs) methodTabs.style.display = isTrial ? 'none' : 'flex';
+  if (uploadZone) uploadZone.style.display = isTrial ? 'none' : 'block';
+  if (uploadPreview && !fileUploaded) uploadPreview.style.display = 'none';
+  if (sendBtn) {
+    sendBtn.style.display = isTrial ? 'none' : 'flex';
+    sendBtn.disabled = isTrial ? true : sendBtn.disabled;
+  }
+  if (couponRow) couponRow.style.display = isTrial ? 'none' : 'flex';
+  if (couponBtn) couponBtn.style.display = isTrial ? 'none' : '';
+  if (couponInput) couponInput.disabled = isTrial;
+  if (refBanner) refBanner.style.display = isTrial ? 'none' : refBanner.style.display;
 }
 
 // ===== SELECT PLAN =====
@@ -1403,6 +1445,7 @@ function selectPlan(key) {
 
   updateDiscountBanner();
   updatePricing();
+  updateTrialMode();
 
   document.getElementById('conf-plan').textContent = p.name;
 }
@@ -1520,6 +1563,10 @@ function removeFile() {
 
 // ===== SEND =====
 async function sendOrder() {
+  if (currentPlan === 'trial') {
+    alert('La prueba se solicita desde la miniapp, no por el checkout.');
+    return;
+  }
   if(!fileUploaded) return;
   const btn = document.getElementById('sendBtn');
   btn.disabled = true;
