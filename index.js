@@ -14,15 +14,15 @@ const db = require('./supabase');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
-const PLAN_TYPES = ['basico', 'avanzado', 'premium', 'anual'];
+const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
 
 // ==================== STUB MÉTODOS TRIAL FILES (uno por plan) ====================
 // Cada función acepta planType para operar sobre la tabla/bucket correcto.
 // Las tablas en Supabase se llaman: trial_files_basico, trial_files_avanzado,
-// trial_files_premium, trial_files_anual
+// trial_files_cuba_vip, trial_files_premium, trial_files_anual
 
 function getTrialTableName(planType) {
-  const valid = ['basico', 'avanzado', 'premium', 'anual'];
+  const valid = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
   return valid.includes(planType) ? `trial_files_${planType}` : 'trial_files_basico';
 }
 
@@ -445,7 +445,7 @@ async function createBucketViaAPI(bucketName, isPublic = true) {
 
 async function verifyStorageBuckets() {
   try {
-    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual'];
+    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-cuba_vip', 'trial-files-premium', 'trial-files-anual'];
     for (const bucketName of buckets) {
       try {
         const { data, error } = await supabaseAdmin.storage.from(bucketName).list();
@@ -464,6 +464,7 @@ async function initializeStorageBuckets() {
     { name: 'plan-files', public: true },
     { name: 'trial-files-basico', public: true },
     { name: 'trial-files-avanzado', public: true },
+    { name: 'trial-files-cuba_vip', public: true },
     { name: 'trial-files-premium', public: true },
     { name: 'trial-files-anual', public: true }
   ];
@@ -1073,7 +1074,7 @@ app.get('/api/image/:filename', (req, res) => {
 app.get('/api/storage-status', async (req, res) => {
   try {
     const buckets = [];
-    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual']) {
+    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-cuba_vip', 'trial-files-premium', 'trial-files-anual']) {
       try { const { data } = await supabaseAdmin.storage.from(name).list(); buckets.push({ name, status: '✅ Existe', fileCount: data?.length || 0 }); }
       catch (e) { buckets.push({ name, status: '❌ Error: ' + e.message }); }
     }
@@ -1081,51 +1082,139 @@ app.get('/api/storage-status', async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
-app.post('/api/broadcast/send', upload.single('media'), async (req, res) => {
+function normalizeBroadcastMedia(req) {
+  const direct = req.file || null;
+  const fromFiles = req.files || {};
+  const picked = direct || fromFiles?.media?.[0] || fromFiles?.mediaFile?.[0] || null;
+
+  if (!picked) return null;
+
+  return {
+    path: picked.path || null,
+    mimetype: picked.mimetype || req.body?.mediaType || '',
+    originalname: picked.originalname || req.body?.mediaName || 'adjunto',
+    filename: picked.filename || null,
+    size: picked.size || null,
+    media_url: req.body?.mediaUrl || req.body?.attachmentUrl || null,
+    attachment_url: req.body?.attachmentUrl || req.body?.mediaUrl || null,
+    message: req.body?.message || ''
+  };
+}
+
+function buildBroadcastCaption(message) {
+  const clean = (message || '').trim();
+  if (!clean) return `📢 *MENSAJE IMPORTANTE - VPN CUBA*
+
+_Soporte: @L0quen2_`;
+  return `📢 *MENSAJE IMPORTANTE - VPN CUBA*
+
+${clean}
+
+_Soporte: @L0quen2_`;
+}
+
+async function sendBroadcastMediaToUser(telegramId, mediaFile, caption) {
+  const mime = (mediaFile?.mimetype || '').toLowerCase();
+  if (mediaFile?.path) {
+    if (mime.startsWith('image/')) {
+      await bot.telegram.sendPhoto(telegramId, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
+      return 'image';
+    }
+    if (mime.startsWith('video/')) {
+      await bot.telegram.sendVideo(telegramId, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
+      return 'video';
+    }
+    await bot.telegram.sendDocument(telegramId, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
+    return 'document';
+  }
+
+  const url = mediaFile?.media_url || mediaFile?.attachment_url;
+  if (url) {
+    if (mime.startsWith('image/')) {
+      await bot.telegram.sendPhoto(telegramId, url, { caption, parse_mode: 'Markdown' });
+      return 'image';
+    }
+    if (mime.startsWith('video/')) {
+      await bot.telegram.sendVideo(telegramId, url, { caption, parse_mode: 'Markdown' });
+      return 'video';
+    }
+    await bot.telegram.sendDocument(telegramId, url, { caption, parse_mode: 'Markdown' });
+    return 'document';
+  }
+
+  await bot.telegram.sendMessage(telegramId, caption, { parse_mode: 'Markdown' });
+  return null;
+}
+
+app.post('/api/broadcast/send', upload.fields([{ name: 'media', maxCount: 1 }, { name: 'mediaFile', maxCount: 1 }]), async (req, res) => {
   try {
     const { message, target, adminId } = req.body;
-    const mediaFile = req.file || null;
+    const mediaFile = normalizeBroadcastMedia(req);
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
-    if (!message?.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
+    if (!message?.trim() && !mediaFile) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
     const validTargets = ['all', 'vip', 'non_vip', 'trial_pending', 'trial_received', 'active', 'with_referrals', 'usdt_payers'];
     if (!validTargets.includes(target)) return res.status(400).json({ error: 'Target de broadcast inválido' });
-    const broadcast = await db.createBroadcast(message, target, adminId);
+
+    const broadcastMeta = {
+      has_media: !!mediaFile,
+      media_type: mediaFile?.mimetype || null,
+      media_name: mediaFile?.originalname || null,
+      media_url: mediaFile?.media_url || null,
+      attachment_url: mediaFile?.attachment_url || null
+    };
+
+    const broadcast = await db.createBroadcast(message || '', target, adminId, broadcastMeta);
     if (!broadcast?.id) throw new Error('No se pudo crear el broadcast');
     const users = await getAllUsersForBroadcast(target);
     await db.updateBroadcastStatus(broadcast.id, 'pending', { total_users: users.length });
-    setImmediate(() => { sendBroadcastToUsers(broadcast.id, message, users, adminId, mediaFile); });
-    res.json({ success: true, message: 'Broadcast creado', broadcast: { id: broadcast.id, target, total_users: users.length, status: 'pending' }, totalUsers: users.length });
+
+    setImmediate(() => {
+      sendBroadcastToUsers(broadcast.id, message || '', users, adminId, mediaFile, broadcastMeta).catch(err =>
+        console.error(`❌ Error en envío diferido broadcast ${broadcast.id}:`, err)
+      );
+    });
+
+    res.json({
+      success: true,
+      message: 'Broadcast creado',
+      broadcast: {
+        id: broadcast.id,
+        target,
+        total_users: users.length,
+        status: 'pending',
+        ...broadcastMeta
+      },
+      totalUsers: users.length
+    });
   } catch (error) { res.status(500).json({ error: 'Error creando broadcast: ' + error.message }); }
 });
 
-async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaFile = null) {
+async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaFile = null, broadcastMeta = null) {
   try {
     if (!users?.length) {
-      await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 });
+      await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0, ...(broadcastMeta || {}) });
       if (mediaFile?.path) fs.unlink(mediaFile.path, () => {});
       return;
     }
-    await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0 });
+    await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0, ...(broadcastMeta || {}) });
     let sentCount = 0, failedCount = 0, unavailableCount = 0;
+    const caption = buildBroadcastCaption(message);
+
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       try {
         if (!user.telegram_id) { failedCount++; continue; }
-        const caption = `📢 *MENSAJE IMPORTANTE - VPN CUBA*
-
-${message}
-
-_Soporte: @L0quen2_`;
-        if (mediaFile?.path) {
-          if ((mediaFile.mimetype || '').startsWith('image/')) {
-            await bot.telegram.sendPhoto(user.telegram_id, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
-          } else if ((mediaFile.mimetype || '').startsWith('video/')) {
-            await bot.telegram.sendVideo(user.telegram_id, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
-          } else {
-            await bot.telegram.sendDocument(user.telegram_id, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
-          }
-        } else {
-          await bot.telegram.sendMessage(user.telegram_id, caption, { parse_mode: 'Markdown' });
+        const mediaKind = await sendBroadcastMediaToUser(user.telegram_id, mediaFile, caption);
+        if (broadcastMeta && typeof db.updateBroadcast === 'function') {
+          try {
+            await db.updateBroadcast(broadcastId, {
+              has_media: !!mediaFile,
+              media_type: mediaKind || broadcastMeta.media_type || null,
+              media_name: broadcastMeta.media_name || null,
+              media_url: broadcastMeta.media_url || null,
+              attachment_url: broadcastMeta.attachment_url || null
+            });
+          } catch (e) {}
         }
         sentCount++;
       } catch (error) {
@@ -1137,15 +1226,15 @@ _Soporte: @L0quen2_`;
         }
       }
       if ((i + 1) % 25 === 0 || i === users.length - 1) {
-        try { await db.updateBroadcastStatus(broadcastId, 'sending', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length }); } catch (e) {}
+        try { await db.updateBroadcastStatus(broadcastId, 'sending', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length, ...(broadcastMeta || {}) }); } catch (e) {}
       }
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length });
+    await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length, ...(broadcastMeta || {}) });
     if (mediaFile?.path) fs.unlink(mediaFile.path, () => {});
   } catch (error) {
     console.error(`❌ Error crítico en broadcast ${broadcastId}:`, error);
-    try { await db.updateBroadcastStatus(broadcastId, 'failed', { sent_count: 0, failed_count: users?.length || 0, unavailable_count: 0, total_users: users?.length || 0 }); } catch (e) {}
+    try { await db.updateBroadcastStatus(broadcastId, 'failed', { sent_count: 0, failed_count: users?.length || 0, unavailable_count: 0, total_users: users?.length || 0, ...(broadcastMeta || {}) }); } catch (e) {}
   }
 }
 
@@ -1160,7 +1249,21 @@ app.post('/api/broadcast/retry/:id', async (req, res) => {
     const broadcast = await db.retryFailedBroadcast(req.params.id);
     if (!broadcast) return res.status(404).json({ error: 'No encontrado' });
     const users = await getAllUsersForBroadcast(broadcast.target_users);
-    setTimeout(() => { sendBroadcastToUsers(broadcast.id, broadcast.message, users, adminId); }, 100);
+    const retryMedia = broadcast?.media_path || broadcast?.media_url || broadcast?.attachment_url ? {
+      path: broadcast.media_path || null,
+      mimetype: broadcast.media_type || '',
+      originalname: broadcast.media_name || 'adjunto',
+      media_url: broadcast.media_url || null,
+      attachment_url: broadcast.attachment_url || null
+    } : null;
+    const retryMeta = {
+      has_media: !!retryMedia,
+      media_type: broadcast?.media_type || null,
+      media_name: broadcast?.media_name || null,
+      media_url: broadcast?.media_url || null,
+      attachment_url: broadcast?.attachment_url || null
+    };
+    setTimeout(() => { sendBroadcastToUsers(broadcast.id, broadcast.message, users, adminId, retryMedia, retryMeta); }, 100);
     res.json({ success: true, message: 'Reintentando broadcast', broadcast });
   } catch (error) { res.status(500).json({ error: 'Error reintentando: ' + error.message }); }
 });
