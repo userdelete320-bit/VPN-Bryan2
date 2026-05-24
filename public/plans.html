@@ -1,1528 +1,1085 @@
 <!DOCTYPE html>
 <html lang="es">
-<head> 
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes"/>
-<title>VPN Cuba — Planes</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VPN CUBA — @L0quen2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Azeret+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-:root {
-  --black:   #000000;
-  --deep:    #030305;
-  --panel:   #080810;
-  --ink:     #0d0d18;
-  --wire:    rgba(255,255,255,.055);
-  --wire-hi: rgba(255,255,255,.12);
-  --txt:     #eeeef5;
-  --txt-2:   #7a7a96;
-  --txt-3:   #3a3a52;
-
-  --f-head: 'Bebas Neue', sans-serif;
-  --f-body: 'Cabinet Grotesk', sans-serif;
-  --f-mono: 'Azeret Mono', monospace;
-
-  --sig-trial:   #f5c542;
-  --sig-basic:   #00d4ff;
-  --sig-adv:     #e8e8ff;
-  --sig-cuba:    #ffb300;
-  --sig-prem:    #ff3d3d;
-  --sig-ann:     #00ff88;
-
-  --glow-trial:  rgba(245,197,66,.18);
-  --glow-basic:  rgba(0,212,255,.18);
-  --glow-adv:    rgba(232,232,255,.12);
-  --glow-cuba:   rgba(255,179,0,.18);
-  --glow-prem:   rgba(255,61,61,.18);
-  --glow-ann:    rgba(0,255,136,.18);
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-
-body {
-  background: var(--black);
-  color: var(--txt);
-  font-family: var(--f-body);
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-  min-height: 100vh;
-  position: relative;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,.08) 2px,
-    rgba(0,0,0,.08) 4px
-  );
-  opacity: .35;
-}
-
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: var(--black); }
-::-webkit-scrollbar-thumb { background: var(--txt-3); border-radius: 0; }
-
-.ticker-bar {
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  background: var(--deep);
-  border-bottom: 1px solid var(--wire-hi);
-  overflow: hidden;
-  height: 32px;
-  display: flex;
-  align-items: center;
-}
-
-.ticker-inner {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  white-space: nowrap;
-  animation: ticker-scroll 28s linear infinite;
-}
-
-.ticker-inner span {
-  font-family: var(--f-mono);
-  font-size: .65rem;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--txt-2);
-  padding: 0 2rem;
-}
-
-.ticker-inner span.hi {
-  color: var(--sig-basic);
-  font-weight: 500;
-}
-
-.ticker-label {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 80px;
-  background: linear-gradient(90deg, var(--deep) 60%, transparent);
-  display: flex;
-  align-items: center;
-  padding-left: 12px;
-  z-index: 2;
-}
-
-.ticker-label span {
-  font-family: var(--f-mono);
-  font-size: .58rem;
-  letter-spacing: .15em;
-  color: var(--sig-ann);
-  font-weight: 500;
-}
-
-.ticker-fade-r {
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 60px;
-  background: linear-gradient(270deg, var(--deep) 40%, transparent);
-  z-index: 2;
-}
-
-@keyframes ticker-scroll {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-
-.wrap {
-  width: min(1020px, 100%);
-  margin: 0 auto;
-  padding: 0 16px 40px;
-  position: relative;
-  z-index: 2;
-}
-
-.hero {
-  text-align: center;
-  padding: 32px 10px 28px;
-}
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .38rem .82rem;
-  background: transparent;
-  border: 1px solid var(--wire-hi);
-  font-family: var(--f-mono);
-  font-size: .62rem;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--txt-2);
-  margin-bottom: 22px;
-  position: relative;
-  clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--sig-ann);
-  box-shadow: 0 0 8px var(--sig-ann), 0 0 16px rgba(0,255,136,.4);
-  animation: blink-dot 1.8s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-@keyframes blink-dot {
-  0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--sig-ann), 0 0 16px rgba(0,255,136,.4); }
-  50%       { opacity: .25; box-shadow: none; }
-}
-
-.hero-title {
-  font-family: var(--f-head);
-  font-size: clamp(3.2rem, 10vw, 6rem);
-  letter-spacing: .08em;
-  line-height: .9;
-  color: var(--txt);
-  margin-bottom: 4px;
-}
-
-.hero-title .sig {
-  display: inline-block;
-  color: var(--sig-basic);
-  text-shadow: 0 0 30px rgba(0,212,255,.5), 0 0 60px rgba(0,212,255,.2);
-  animation: title-pulse 3s ease-in-out infinite;
-}
-
-@keyframes title-pulse {
-  0%, 100% { text-shadow: 0 0 30px rgba(0,212,255,.5), 0 0 60px rgba(0,212,255,.2); }
-  50%       { text-shadow: 0 0 50px rgba(0,212,255,.8), 0 0 90px rgba(0,212,255,.35); }
-}
-
-.hero-sub {
-  font-family: var(--f-mono);
-  font-size: .78rem;
-  color: var(--txt-2);
-  letter-spacing: .08em;
-  margin: 14px auto 0;
-  max-width: 480px;
-  line-height: 1.7;
-}
-
-.hero-sub strong { color: var(--txt); font-weight: 500; }
-
-.signal-meters {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-  margin: 24px auto 0;
-  width: fit-content;
-}
-
-.signal-meter {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.meter-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 24px;
-}
-
-.meter-bars .bar {
-  width: 5px;
-  background: var(--txt-3);
-  border-radius: 1px;
-  transition: background .3s;
-}
-
-.meter-bars .bar:nth-child(1) { height: 6px; }
-.meter-bars .bar:nth-child(2) { height: 11px; }
-.meter-bars .bar:nth-child(3) { height: 16px; }
-.meter-bars .bar:nth-child(4) { height: 21px; }
-.meter-bars .bar:nth-child(5) { height: 24px; }
-
-.signal-meter .meter-bars .bar { background: var(--sig-basic); box-shadow: 0 0 5px rgba(0,212,255,.6); }
-.signal-meter:nth-child(1) .meter-bars .bar:nth-child(n+3) { background: var(--txt-3); box-shadow: none; }
-.signal-meter:nth-child(2) .meter-bars .bar:nth-child(n+2) { background: var(--txt-3); box-shadow: none; }
-.signal-meter:nth-child(3) .meter-bars .bar { background: var(--sig-ann); box-shadow: 0 0 5px rgba(0,255,136,.6); }
-
-.signal-meter .meter-label {
-  font-family: var(--f-mono);
-  font-size: .6rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--txt-3);
-}
-
-.h-line {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--wire-hi) 20%, var(--wire-hi) 80%, transparent);
-  margin: 28px 0;
-  position: relative;
-}
-
-.h-line::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: -2px;
-  transform: translateX(-50%);
-  width: 60px;
-  height: 5px;
-  background: linear-gradient(90deg, transparent, var(--sig-basic), transparent);
-  filter: blur(3px);
-}
-
-.plans {
-  margin: 0 auto;
-  display: grid;
-  gap: 24px;
-  width: min(100%, 340px);
-}
-
-.shell {
-  position: relative;
-  padding-top: 16px;
-  --sig: var(--sig-basic);
-  --glow: var(--glow-basic);
-  opacity: 0;
-  transform: translateY(20px);
-  animation: shell-in .55s cubic-bezier(.22,.8,.36,1) forwards;
-}
-
-.shell:nth-child(1) { animation-delay: .1s; }
-.shell:nth-child(2) { animation-delay: .2s; }
-.shell:nth-child(3) { animation-delay: .3s; }
-.shell:nth-child(4) { animation-delay: .4s; }
-.shell:nth-child(5) { animation-delay: .5s; }
-
-@keyframes shell-in {
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.shell.trial   { --sig: var(--sig-trial);  --glow: var(--glow-trial); }
-.shell.basic   { --sig: var(--sig-basic);  --glow: var(--glow-basic); }
-.shell.advanced{ --sig: var(--sig-adv);    --glow: var(--glow-adv); }
-.shell.cuba_vip{ --sig: var(--sig-cuba);    --glow: var(--glow-cuba); }
-.shell.premium { --sig: var(--sig-prem);   --glow: var(--glow-prem); }
-.shell.annual  { --sig: var(--sig-ann);    --glow: var(--glow-ann); }
-
-.tag {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  padding: .36rem 1rem .36rem .9rem;
-  background: var(--black);
-  border: 1px solid var(--sig);
-  font-family: var(--f-mono);
-  font-size: .62rem;
-  font-weight: 500;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--sig);
-  white-space: nowrap;
-  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-  box-shadow: 0 0 12px var(--glow);
-  transition: box-shadow .3s;
-}
-
-.shell:hover .tag {
-  box-shadow: 0 0 20px var(--glow), 0 0 40px var(--glow);
-}
-
-.plan-video-box {
-  position: relative;
-  width: 100%;
-  max-width: 340px;
-  margin: 0 auto;
-  background: var(--deep);
-  overflow: hidden;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.07);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,.9),
-    0 28px 70px -16px rgba(0,0,0,.98),
-    inset 0 0 0 1px rgba(255,255,255,.03);
-  transform: translateZ(0);
-  transition: transform .4s cubic-bezier(.22,.8,.36,1), box-shadow .4s ease;
-}
-
-.shell:hover .plan-video-box {
-  transform: translateY(-6px);
-  box-shadow:
-    0 0 0 1px var(--sig),
-    0 36px 80px -16px rgba(0,0,0,.99),
-    0 0 40px -8px var(--glow),
-    inset 0 0 0 1px rgba(255,255,255,.04);
-}
-
-.shell.trial    .plan-video-box { height: 650px; }
-.shell.basic    .plan-video-box { height: 580px; }
-.shell.advanced .plan-video-box { height: 590px; }
-.shell.cuba_vip .plan-video-box { height: 620px; }
-.shell.premium  .plan-video-box { height: 675px; }
-.shell.annual   .plan-video-box { height: 610px; }
-
-.plan-video-box::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255,255,255,.04) 48%,
-    transparent 100%
-  );
-  transform: translateX(-110%);
-  transition: transform 0s;
-  pointer-events: none;
-}
-
-.shell:hover .plan-video-box::after {
-  transform: translateX(110%);
-  transition: transform .7s ease;
-}
-
-.plan-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 0;
-  display: block;
-  background: var(--deep);
-  transform: scale(1.01);
-  transition: transform .5s ease, filter .5s ease;
-}
-
-.shell.cuba_vip .plan-video { object-position: center center; }
-.shell.premium .plan-video { object-position: 72% center; }
-.shell:hover .plan-video   { transform: scale(1.04); filter: brightness(1.05) saturate(1.06); }
-
-.plan-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 14px 12px 12px;
-}
-
-.plan-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(0,0,0,.72) 0%,
-    rgba(0,0,0,.14) 36%,
-    rgba(0,0,0,.18) 60%,
-    rgba(0,0,0,.80) 100%
-  );
-}
-
-.top-block  { flex: 0 0 auto; padding-top: 6px; position: relative; z-index: 3; }
-.mid-block  { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 9px; min-height: 0; position: relative; z-index: 3; }
-.bot-block  { flex: 0 0 auto; position: relative; z-index: 3; }
-
-.freq-label {
-  font-family: var(--f-mono);
-  font-size: .58rem;
-  letter-spacing: .2em;
-  color: var(--sig);
-  text-transform: uppercase;
-  opacity: .7;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.freq-label::before {
-  content: '';
-  display: inline-block;
-  width: 14px;
-  height: 1px;
-  background: var(--sig);
-  opacity: .6;
-}
-
-.top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.plan-title {
-  font-family: var(--f-head);
-  font-size: clamp(2rem, 4vw, 2.6rem);
-  letter-spacing: .06em;
-  line-height: .92;
-  color: var(--txt);
-  text-shadow: 0 2px 14px rgba(0,0,0,.95);
-  margin-bottom: 3px;
-}
-
-.shell.trial .plan-title   { font-family: var(--f-body); font-weight: 900; font-size: 1.5rem; letter-spacing: -.02em; }
-.shell.advanced .plan-title { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: .12em; }
-.shell.annual .plan-title   { font-size: clamp(1.8rem, 3.5vw, 2.4rem); }
-
-.plan-sub {
-  font-family: var(--f-mono);
-  font-size: .66rem;
-  color: var(--txt-2);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  text-shadow: 0 2px 10px rgba(0,0,0,.9);
-}
-
-.price-block { text-align: right; flex-shrink: 0; }
-
-.price-main {
-  font-family: var(--f-head);
-  font-size: clamp(1.8rem, 4vw, 2.4rem);
-  letter-spacing: .04em;
-  line-height: 1;
-  color: var(--sig);
-  text-shadow: 0 0 20px var(--glow), 0 2px 12px rgba(0,0,0,.9);
-}
-
-.price-mobile {
-  font-family: var(--f-mono);
-  font-size: .62rem;
-  color: var(--txt-2);
-  margin-top: 6px;
-  border: 1px solid var(--wire);
-  background: rgba(0,0,0,.5);
-  padding: 3px 7px;
-  display: inline-block;
-  letter-spacing: .04em;
-}
-
-.price-usdt {
-  font-family: var(--f-mono);
-  font-size: .65rem;
-  margin-top: 4px;
-  color: var(--sig);
-  opacity: .65;
-}
-
-.sig-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 18px;
-  margin-bottom: 3px;
-  justify-content: flex-end;
-}
-
-.sig-bars .sb {
-  width: 4px;
-  border-radius: 1px;
-  background: var(--sig);
-  opacity: .3;
-}
-
-.sig-bars .sb:nth-child(1) { height: 5px; }
-.sig-bars .sb:nth-child(2) { height: 9px; }
-.sig-bars .sb:nth-child(3) { height: 13px; }
-.sig-bars .sb:nth-child(4) { height: 18px; }
-
-.shell.trial    .sig-bars .sb:nth-child(-n+2) { opacity: 1; box-shadow: 0 0 5px var(--sig); animation: bar-breathe 2s ease-in-out infinite; }
-.shell.basic    .sig-bars .sb:nth-child(-n+3) { opacity: 1; box-shadow: 0 0 5px var(--sig); animation: bar-breathe 2.2s ease-in-out infinite; }
-.shell.advanced .sig-bars .sb:nth-child(-n+3) { opacity: 1; box-shadow: 0 0 5px var(--sig); animation: bar-breathe 1.9s ease-in-out infinite; }
-.shell.premium  .sig-bars .sb              { opacity: 1; box-shadow: 0 0 6px var(--sig); animation: bar-breathe 1.4s ease-in-out infinite; }
-.shell.annual   .sig-bars .sb              { opacity: 1; box-shadow: 0 0 6px var(--sig); animation: bar-breathe 2.5s ease-in-out infinite; }
-
-@keyframes bar-breathe {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: .5; }
-}
-
-.chips { display: flex; flex-wrap: wrap; gap: 5px; }
-
-.chip {
-  padding: .28rem .62rem;
-  border: 1px solid var(--wire);
-  background: rgba(0,0,0,.55);
-  font-family: var(--f-mono);
-  font-size: .62rem;
-  letter-spacing: .08em;
-  color: var(--txt-2);
-  text-transform: uppercase;
-}
-
-.chip::before { content: '// '; color: var(--txt-3); }
-
-.chip.hi {
-  color: var(--sig);
-  border-color: var(--sig);
-  background: rgba(0,0,0,.7);
-  box-shadow: 0 0 8px var(--glow);
-}
-
-.chip.hi::before { color: var(--sig); opacity: .5; }
-
-.savings {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .48rem .75rem;
-  border-left: 2px solid var(--sig);
-  background: rgba(0,0,0,.5);
-  font-family: var(--f-mono);
-  font-size: .68rem;
-  color: var(--sig);
-  letter-spacing: .04em;
-}
-
-.savings i { opacity: .6; font-size: .65rem; }
-
-.features { display: grid; gap: 6px; }
-
-.feature {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: .55rem .75rem;
-  background: rgba(0,0,0,.48);
-  border-left: 1px solid var(--wire);
-  min-height: 36px;
-  transition: border-color .25s, background .25s;
-}
-
-.shell:hover .feature {
-  border-left-color: var(--sig);
-  background: rgba(0,0,0,.58);
-}
-
-.feature i {
-  width: 15px;
-  text-align: center;
-  font-size: .74rem;
-  color: var(--sig);
-  flex-shrink: 0;
-  opacity: .8;
-}
-
-.feature span {
-  font-family: var(--f-mono);
-  font-size: .69rem;
-  color: rgba(238,238,245,.72);
-  letter-spacing: .03em;
-  line-height: 1.4;
-}
-
-.action {
-  width: 100%;
-  padding: .9rem 1rem;
-  border: 1px solid var(--sig);
-  border-radius: 0;
-  background: transparent;
-  font-family: var(--f-mono);
-  font-size: .74rem;
-  font-weight: 500;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--sig);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: .55rem;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: color .28s ease, box-shadow .28s ease;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-
-.action::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--sig);
-  transform: translateX(-100%);
-  transition: transform .35s cubic-bezier(.22,.8,.36,1);
-  z-index: 0;
-}
-
-.action:hover::before  { transform: translateX(0); }
-.action:hover          { color: var(--black); box-shadow: 0 0 24px var(--glow); }
-.action:active         { transform: scale(.98); }
-.action:disabled       { opacity: .55; cursor: not-allowed; }
-
-.action > * { position: relative; z-index: 1; }
-
-.plan-video-box::before {
-  content: '';
-  position: absolute;
-  top: 8px; left: 8px;
-  width: 14px; height: 14px;
-  border-top: 1px solid var(--sig);
-  border-left: 1px solid var(--sig);
-  z-index: 6;
-  opacity: .5;
-  pointer-events: none;
-  transition: opacity .3s;
-}
-
-.shell:hover .plan-video-box::before { opacity: 1; }
-
-.plan-overlay::after {
-  content: '';
-  position: absolute;
-  bottom: 12px; right: 12px;
-  width: 14px; height: 14px;
-  border-bottom: 1px solid var(--sig);
-  border-right: 1px solid var(--sig);
-  z-index: 6;
-  opacity: .4;
-  pointer-events: none;
-  transition: opacity .3s;
-}
-
-.shell:hover .plan-overlay::after { opacity: .9; }
-
-/* ── CUPÓN CHECKER ───────────────────────────── */
-.coupon-checker {
-  margin: 20px auto 0;
-  width: min(100%, 340px);
-  background: var(--ink);
-  border: 1px solid var(--wire-hi);
-  padding: 16px;
-  position: relative;
-}
-
-.coupon-checker::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--sig-basic), var(--sig-ann));
-}
-
-.coupon-checker-title {
-  font-family: var(--f-mono);
-  font-size: .68rem;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--txt-2);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-}
-
-.coupon-checker-title i { color: var(--sig-basic); }
-
-.coupon-input-row {
-  display: flex;
-  gap: 8px;
-}
-
-.coupon-input {
-  flex: 1;
-  padding: .65rem .85rem;
-  background: rgba(255,255,255,.03);
-  border: 1px solid var(--wire-hi);
-  color: var(--txt);
-  font-family: var(--f-mono);
-  font-size: .78rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  outline: none;
-  transition: border-color .2s;
-}
-
-.coupon-input:focus { border-color: var(--sig-basic); box-shadow: 0 0 10px rgba(0,212,255,.1); }
-.coupon-input::placeholder { color: var(--txt-3); letter-spacing: .06em; text-transform: none; }
-
-.coupon-btn {
-  padding: .65rem 1rem;
-  border: 1px solid var(--sig-basic);
-  background: transparent;
-  color: var(--sig-basic);
-  font-family: var(--f-mono);
-  font-size: .72rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: color .25s;
-  white-space: nowrap;
-}
-
-.coupon-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--sig-basic);
-  transform: translateX(-100%);
-  transition: transform .3s cubic-bezier(.22,.8,.36,1);
-  z-index: 0;
-}
-
-.coupon-btn:hover::before { transform: translateX(0); }
-.coupon-btn:hover { color: var(--black); }
-.coupon-btn span { position: relative; z-index: 1; }
-.coupon-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-.coupon-result {
-  margin-top: 10px;
-  padding: .65rem .85rem;
-  font-family: var(--f-mono);
-  font-size: .72rem;
-  letter-spacing: .04em;
-  display: none;
-  line-height: 1.6;
-}
-
-.coupon-result.success {
-  display: block;
-  border-left: 2px solid var(--sig-ann);
-  background: rgba(0,255,136,.05);
-  color: var(--sig-ann);
-}
-
-.coupon-result.error {
-  display: block;
-  border-left: 2px solid var(--sig-prem);
-  background: rgba(255,61,61,.05);
-  color: var(--sig-prem);
-}
-
-.coupon-result .stat-row {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  color: var(--txt-2);
-}
-
-.coupon-result .stat-row span:last-child { color: var(--txt); }
-
-/* ── WHATSAPP ───────────────────────────────── */
-.wa-float {
-  position: fixed;
-  bottom: 20px; right: 20px;
-  width: 50px; height: 50px;
-  border-radius: 0;
-  clip-path: polygon(10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%, 0% 10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #0d2a14;
-  border: 1px solid rgba(37,211,102,.4);
-  color: #25D366;
-  text-decoration: none;
-  z-index: 1000;
-  box-shadow: 0 0 20px rgba(37,211,102,.18);
-  animation: wa-pulse 3s ease-in-out infinite;
-  touch-action: manipulation;
-}
-
-.wa-float i { font-size: 20px; position: relative; z-index: 1; }
-
-.wa-tip {
-  position: absolute;
-  right: 58px; bottom: 10px;
-  background: var(--ink);
-  border: 1px solid var(--wire-hi);
-  color: var(--txt-2);
-  padding: 5px 10px;
-  font-family: var(--f-mono);
-  font-size: .62rem;
-  letter-spacing: .08em;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateX(8px);
-  transition: .22s ease;
-  pointer-events: none;
-  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
-}
-
-.wa-float:hover .wa-tip { opacity: 1; transform: translateX(0); }
-
-@keyframes wa-pulse {
-  0%,100% { box-shadow: 0 0 20px rgba(37,211,102,.18); }
-  50%      { box-shadow: 0 0 30px rgba(37,211,102,.36); }
-}
-
-.footer {
-  margin-top: 32px;
-  padding: 20px 10px 8px;
-  text-align: center;
-  border-top: 1px solid var(--wire);
-}
-
-.footer p {
-  font-family: var(--f-mono);
-  font-size: .68rem;
-  color: var(--txt-3);
-  letter-spacing: .08em;
-}
-
-.footer a { color: #25D366; text-decoration: none; }
-
-#notification {
-  position: fixed;
-  top: 20px; right: 20px;
-  background: var(--ink);
-  border: 1px solid var(--wire-hi);
-  border-left: 3px solid var(--sig-basic);
-  padding: .78rem 1rem;
-  font-family: var(--f-mono);
-  font-size: .75rem;
-  letter-spacing: .04em;
-  color: var(--txt);
-  z-index: 3000;
-  transform: translateX(160%);
-  transition: transform .28s cubic-bezier(.22,.8,.36,1);
-  max-width: min(92vw, 340px);
-  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-}
-
-.modal {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.94);
-  z-index: 2000;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-
-.modal.active { display: flex; }
-
-.modal-content {
-  width: min(480px, 100%);
-  background: var(--ink);
-  border: 1px solid var(--wire-hi);
-  border-top: 2px solid var(--sig-basic);
-  padding: 28px 22px;
-  position: relative;
-  box-shadow: 0 0 60px rgba(0,0,0,.9), 0 0 30px rgba(0,212,255,.06);
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-content h2 {
-  font-family: var(--f-head);
-  font-size: 1.5rem;
-  letter-spacing: .08em;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  color: var(--txt);
-}
-
-.modal-content h2 i { color: var(--sig-basic); font-size: 1rem; }
-
-.modal-content > p {
-  font-family: var(--f-mono);
-  font-size: .74rem;
-  color: var(--txt-2);
-  margin-bottom: 24px;
-  line-height: 1.7;
-  letter-spacing: .03em;
-}
-
-.close-modal {
-  position: absolute;
-  top: 12px; right: 12px;
-  width: 34px; height: 34px;
-  border: 1px solid var(--wire-hi);
-  background: transparent;
-  color: var(--txt-2);
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
-  transition: color .2s, border-color .2s;
-}
-
-.close-modal:hover { color: var(--txt); border-color: var(--sig-basic); }
-
-.form-label {
-  display: block;
-  font-family: var(--f-mono);
-  font-size: .64rem;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--txt-2);
-  margin-bottom: 7px;
-}
-
-.form-label i { color: var(--sig-basic); margin-right: .3rem; }
-
-.form-field {
-  width: 100%;
-  padding: .8rem 1rem;
-  background: rgba(255,255,255,.03);
-  border: 1px solid var(--wire-hi);
-  border-radius: 0;
-  color: var(--txt);
-  font-family: var(--f-mono);
-  font-size: .78rem;
-  outline: none;
-  transition: border-color .2s;
-  margin-bottom: 14px;
-  letter-spacing: .04em;
-}
-
-.form-field:focus { border-color: var(--sig-basic); box-shadow: 0 0 12px rgba(0,212,255,.1); }
-.form-field option { background: var(--ink); }
-
-.form-submit {
-  width: 100%;
-  padding: .9rem 1rem;
-  border: 1px solid var(--sig-basic);
-  border-radius: 0;
-  background: transparent;
-  color: var(--sig-basic);
-  font-family: var(--f-mono);
-  font-size: .76rem;
-  font-weight: 500;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: color .28s;
-}
-
-.form-submit::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--sig-basic);
-  transform: translateX(-100%);
-  transition: transform .32s cubic-bezier(.22,.8,.36,1);
-  z-index: 0;
-}
-
-.form-submit:hover::before { transform: translateX(0); }
-.form-submit:hover { color: var(--black); }
-.form-submit span { position: relative; z-index: 1; }
-.form-submit:disabled { opacity: .55; cursor: not-allowed; }
-
-/* Plan selector en modal trial */
-.plan-selector {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.plan-option {
-  padding: .7rem .5rem;
-  border: 1px solid var(--wire-hi);
-  background: rgba(255,255,255,.02);
-  font-family: var(--f-mono);
-  font-size: .65rem;
-  letter-spacing: .06em;
-  color: var(--txt-2);
-  cursor: pointer;
-  text-align: center;
-  transition: all .2s;
-  line-height: 1.4;
-}
-
-.plan-option:hover { border-color: var(--sig-basic); color: var(--sig-basic); }
-.plan-option.selected { border-color: var(--sig-basic); color: var(--sig-basic); background: rgba(0,212,255,.08); }
-.plan-option .plan-opt-name { font-size: .78rem; font-weight: 700; display: block; margin-bottom: 2px; color: inherit; }
-.plan-option .plan-opt-price { font-size: .6rem; color: var(--txt-3); }
-.plan-option.selected .plan-opt-price { color: var(--txt-2); }
-
-@media (max-width: 480px) {
-  .hero-title { font-size: 3rem; }
-  .top { flex-direction: column; }
-  .price-block { text-align: left; }
-  .signal-meters { gap: 18px; }
-  .wa-float { width: 44px; height: 44px; right: 14px; bottom: 14px; }
-  .plan-selector { grid-template-columns: 1fr; }
-}
+  :root {
+    --bg: #080a0f;
+    --bg2: #0d1018;
+    --surface: #111520;
+    --surface2: #161c2e;
+    --border: rgba(255,255,255,0.06);
+    --border-glow: rgba(168,220,255,0.2);
+
+    --neon-blue: #5bf0ff;
+    --neon-purple: #b16fff;
+    --neon-green: #39ffa0;
+    --neon-pink: #ff6eb4;
+    --neon-yellow: #ffe566;
+
+    --pastel-blue: #a8dcff;
+    --pastel-purple: #d4b8ff;
+    --pastel-mint: #b8ffd9;
+    --pastel-pink: #ffc2e2;
+    --pastel-peach: #ffd4b8;
+
+    --text: #e8edf5;
+    --text-muted: #6b7a99;
+    --text-dim: #3d4a63;
+
+    --radius: 20px;
+    --radius-sm: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  .bg-ambient {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bg-ambient::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(91,240,255,0.04) 0%, transparent 70%);
+    animation: drift1 12s ease-in-out infinite alternate;
+  }
+  .bg-ambient::after {
+    content: '';
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(ellipse, rgba(177,111,255,0.05) 0%, transparent 70%);
+    animation: drift2 15s ease-in-out infinite alternate;
+  }
+  @keyframes drift1 { 0% { transform: translate(0,0); } 100% { transform: translate(5%,8%); } }
+  @keyframes drift2 { 0% { transform: translate(0,0); } 100% { transform: translate(-5%,-8%); } }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 430px;
+    margin: 0 auto;
+    padding: 0 0 40px;
+  }
+
+  .header {
+    padding: 40px 24px 24px;
+    position: relative;
+  }
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(91,240,255,0.08);
+    border: 1px solid rgba(91,240,255,0.2);
+    border-radius: 100px;
+    padding: 4px 12px 4px 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--neon-blue);
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+    animation: fadeSlideDown 0.6s ease both;
+  }
+  .header-badge .dot {
+    width: 6px; height: 6px;
+    background: var(--neon-green);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--neon-green);
+    animation: pulse 2s ease infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.8); } }
+
+  .header-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    animation: fadeSlideDown 0.6s 0.1s ease both;
+  }
+  .header-title span {
+    background: linear-gradient(135deg, var(--pastel-blue) 0%, var(--neon-purple) 50%, var(--pastel-pink) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header-sub {
+    margin-top: 8px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 300;
+    animation: fadeSlideDown 0.6s 0.2s ease both;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 10px;
+    padding: 0 24px;
+    margin-bottom: 32px;
+    animation: fadeSlideDown 0.6s 0.3s ease both;
+  }
+  .stat-pill {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-pill .val {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--pastel-blue);
+  }
+  .stat-pill .lbl {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    padding: 0 24px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  .new-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--neon-green), #00d080);
+    color: #000;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 2px 7px;
+    border-radius: 100px;
+    vertical-align: middle;
+    margin-left: 6px;
+    text-transform: uppercase;
+  }
+
+  /* Tarjeta destacada: Nodo Turbo (Prueba gratuita) */
+  .turbo-card {
+    margin: 0 24px 16px;
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    cursor: pointer;
+    animation: fadeSlideDown 0.6s 0.35s ease both;
+    transform: translateZ(0);
+  }
+  .turbo-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-blue) 50%, var(--neon-purple) 100%);
+    border-radius: 25px;
+    z-index: 0;
+    animation: borderRotate 4s linear infinite;
+  }
+  @keyframes borderRotate {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+  }
+  .turbo-inner {
+    position: relative;
+    z-index: 1;
+    background: #0b1020;
+    border-radius: 23px;
+    padding: 24px;
+    overflow: hidden;
+  }
+  .turbo-inner::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 70%;
+    height: 70%;
+    background: radial-gradient(ellipse, rgba(57,255,160,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .turbo-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(57,255,160,0.1);
+    border: 1px solid rgba(57,255,160,0.3);
+    border-radius: 100px;
+    padding: 3px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--neon-green);
+    letter-spacing: 0.1em;
+    margin-bottom: 14px;
+  }
+  .turbo-tag svg { width:10px; height:10px; }
+  .turbo-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .turbo-name em {
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-style: normal;
+  }
+  .turbo-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .turbo-price-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .turbo-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+  }
+  .turbo-price sup {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--neon-green);
+    vertical-align: super;
+  }
+  .turbo-price sub {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-muted);
+    vertical-align: baseline;
+  }
+  .turbo-cta {
+    background: linear-gradient(135deg, var(--neon-green), #00c070);
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 12px 20px;
+    border-radius: 100px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 20px rgba(57,255,160,0.3);
+  }
+  .turbo-cta:active { transform: scale(0.96); }
+  .turbo-specs {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .turbo-spec {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .turbo-spec span { color: var(--neon-green); }
+
+  /* Plan cards con video (estilo original adaptado) */
+  .plan-card {
+    margin: 0 16px 16px;
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: transform 0.2s, border-color 0.2s;
+    animation: fadeSlideDown 0.5s ease both;
+  }
+  .plan-card:active { transform: scale(0.98); }
+
+  /* Contenedor del video similar al original */
+  .plan-video-box {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
+  .plan-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    transition: transform 0.5s ease, filter 0.5s ease;
+  }
+  .plan-card:hover .plan-video {
+    transform: scale(1.04);
+    filter: brightness(1.05) saturate(1.06);
+  }
+  .plan-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.8) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .plan-overlay {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+    min-height: 460px;
+  }
+
+  .freq-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--accent, var(--neon-blue));
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .freq-label::before {
+    content: '';
+    width: 20px;
+    height: 1px;
+    background: var(--accent, var(--neon-blue));
+    opacity: 0.6;
+  }
+
+  .plan-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  .plan-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .plan-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .price-block {
+    text-align: right;
+  }
+  .price-main {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent, var(--neon-blue));
+    line-height: 1;
+  }
+  .price-mobile {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .price-usdt {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--accent, var(--neon-blue));
+    opacity: 0.7;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .chip {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .chip.hi {
+    border-color: var(--accent, var(--neon-blue));
+    color: var(--accent, var(--neon-blue));
+  }
+
+  .features {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    background: rgba(0,0,0,0.3);
+    padding: 8px 12px;
+    border-left: 1px solid rgba(255,255,255,0.1);
+  }
+  .feature i {
+    width: 14px;
+    color: var(--accent, var(--neon-blue));
+  }
+
+  .action {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--accent, var(--neon-blue));
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent, var(--neon-blue));
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+    border-radius: 100px;
+  }
+  .action:active { transform: scale(0.96); }
+
+  /* Colores por plan (se asignan via JS o inline) */
+  .plan-card.basic { --accent: var(--pastel-blue); }
+  .plan-card.advanced { --accent: var(--pastel-purple); }
+  .plan-card.vip { --accent: var(--neon-yellow); }
+  .plan-card.gaming { --accent: var(--neon-pink); }
+  .plan-card.anual { --accent: var(--pastel-peach); }
+
+  /* Coupon checker */
+  .coupon-checker {
+    margin: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+  }
+  .coupon-checker-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .coupon-checker-title i { color: var(--neon-green); }
+  .coupon-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .coupon-input {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    outline: none;
+  }
+  .coupon-input:focus { border-color: var(--neon-green); }
+  .coupon-btn {
+    padding: 10px 16px;
+    background: rgba(57,255,160,0.08);
+    border: 1px solid rgba(57,255,160,0.3);
+    border-radius: var(--radius-xs);
+    color: var(--neon-green);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .coupon-btn:active { background: rgba(57,255,160,0.15); }
+  .coupon-result {
+    margin-top: 10px;
+    padding: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    border-radius: var(--radius-xs);
+    display: none;
+  }
+  .coupon-result.success {
+    display: block;
+    background: rgba(57,255,160,0.05);
+    border-left: 2px solid var(--neon-green);
+    color: var(--neon-green);
+  }
+  .coupon-result.error {
+    display: block;
+    background: rgba(255,77,77,0.05);
+    border-left: 2px solid #ff4d4d;
+    color: #ff8888;
+  }
+
+  /* Trust strip */
+  .trust-strip {
+    margin: 0 24px 28px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .trust-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .trust-item .icon { font-size: 22px; margin-bottom: 6px; }
+  .trust-item .label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  /* FAQ */
+  .faq-section {
+    margin: 0 24px 32px;
+  }
+  .faq-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .faq-q {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text);
+    user-select: none;
+  }
+  .faq-q .arr {
+    color: var(--text-dim);
+    transition: transform 0.25s;
+    font-size: 16px;
+  }
+  .faq-item.open .faq-q .arr { transform: rotate(45deg); color: var(--pastel-blue); }
+  .faq-a {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    padding: 0 16px;
+  }
+  .faq-item.open .faq-a {
+    max-height: 200px;
+    padding: 0 16px 14px;
+  }
+
+  /* Modal de prueba */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 500;
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal-sheet {
+    background: #0f1420;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 28px 28px 0 0;
+    padding: 0 24px 40px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  }
+  .modal-overlay.open .modal-sheet {
+    transform: translateY(0);
+  }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 100px;
+    margin: 14px auto 24px;
+  }
+  .plan-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .plan-option {
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    border-radius: var(--radius-xs);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .plan-option.selected {
+    border-color: var(--neon-green);
+    background: rgba(57,255,160,0.08);
+    color: var(--neon-green);
+  }
+  .plan-opt-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    display: block;
+  }
+  .plan-opt-price {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+  .modal-cta {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: linear-gradient(135deg, var(--neon-green), #00c070);
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Ticker */
+  .ticker-wrap {
+    background: rgba(91,240,255,0.05);
+    border-top: 1px solid rgba(91,240,255,0.1);
+    border-bottom: 1px solid rgba(91,240,255,0.1);
+    padding: 8px 0;
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+  .ticker {
+    display: flex;
+    gap: 40px;
+    white-space: nowrap;
+    animation: ticker 20s linear infinite;
+    width: max-content;
+  }
+  .ticker-item {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ticker-item span { color: var(--neon-blue); }
+  @keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  #notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--surface);
+    border-left: 4px solid var(--neon-green);
+    padding: 12px 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    z-index: 10000;
+    transform: translateX(160%);
+    transition: transform 0.3s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    max-width: 320px;
+  }
+
+  @keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 </style>
 </head>
-
 <body>
 
-<!-- TICKER -->
-<div class="ticker-bar">
-  <div class="ticker-label"><span>LIVE</span></div>
-  <div class="ticker-inner">
-    <span>VPN CUBA · Sistema activo</span>
-    <span class="hi">Conexión estable garantizada</span>
-    <span>Pago en CUP · Saldo Móvil · USDT</span>
-    <span class="hi">Soporte directo · Respuesta inmediata</span>
-    <span>Latencia mínima · Servidores optimizados</span>
-    <span class="hi">6 planes disponibles · Desde 0 CUP</span>
-    <span>WireGuard protocol · Máxima seguridad</span>
-    <span class="hi">Trial gratuito disponible ahora</span>
-    <span>VPN CUBA · Sistema activo</span>
-    <span class="hi">Conexión estable garantizada</span>
-    <span>Pago en CUP · Saldo Móvil · USDT</span>
-    <span class="hi">Soporte directo · Respuesta inmediata</span>
-    <span>Latencia mínima · Servidores optimizados</span>
-    <span class="hi">6 planes disponibles · Desde 0 CUP</span>
-    <span>WireGuard protocol · Máxima seguridad</span>
-    <span class="hi">Trial gratuito disponible ahora</span>
+<div class="bg-ambient"></div>
+
+<div class="app">
+
+  <div class="header">
+    <div class="header-badge">
+      <span class="dot"></span>
+      15,000+ USUARIOS ACTIVOS
+    </div>
+    <h1 class="header-title">Elige tu<br><span>conexión.</span></h1>
+    <p class="header-sub">Planes diseñados para Cuba. Sin límites reales.</p>
   </div>
-  <div class="ticker-fade-r"></div>
+
+  <div class="stats-row">
+    <div class="stat-pill"><div class="val">99.8%</div><div class="lbl">UPTIME</div></div>
+    <div class="stat-pill"><div class="val">&lt;25ms</div><div class="lbl">LATENCIA</div></div>
+    <div class="stat-pill"><div class="val">WG</div><div class="lbl">PROTOCOL</div></div>
+  </div>
+
+  <div class="ticker-wrap">
+    <div class="ticker">
+      <div class="ticker-item">🟢 NODO TURBO <span>ONLINE</span></div>
+      <div class="ticker-item">⚡ WireGuard UDP:80</div>
+      <div class="ticker-item">🔒 AES-256 CIFRADO</div>
+      <div class="ticker-item">🇨🇺 IP RESIDENCIAL CU</div>
+      <div class="ticker-item">🎮 GAMING PRIORITY</div>
+      <div class="ticker-item">📡 MTU 1280 OPTIMIZADO</div>
+      <div class="ticker-item">🟢 NODO TURBO <span>ONLINE</span></div>
+      <div class="ticker-item">⚡ WireGuard UDP:80</div>
+      <div class="ticker-item">🔒 AES-256 CIFRADO</div>
+      <div class="ticker-item">🇨🇺 IP RESIDENCIAL CU</div>
+      <div class="ticker-item">🎮 GAMING PRIORITY</div>
+      <div class="ticker-item">📡 MTU 1280 OPTIMIZADO</div>
+    </div>
+  </div>
+
+  <!-- Tarjeta Nodo Turbo (Prueba gratuita) -->
+  <div class="section-label">// PRUEBA GRATUITA</div>
+  <div class="turbo-card" onclick="openTrialModal()">
+    <div class="turbo-inner">
+      <div class="turbo-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> NODO TURBO · 1 HORA GRATIS</div>
+      <div class="turbo-name"><em>Prueba Gratis</em> Nodo Turbo</div>
+      <div class="turbo-desc">Acceso completo por 1 hora. Sin costo, sin tarjeta. Elige el plan que quieres probar.</div>
+      <div class="turbo-price-row">
+        <div><div class="turbo-price"><sup>$</sup>0<sub>/1h</sub></div></div>
+        <button class="turbo-cta">Solicitar prueba <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+      </div>
+      <div class="turbo-specs">
+        <div class="turbo-spec">⚡ <span>1 HORA</span> ILIMITADA</div>
+        <div class="turbo-spec">🎮 <span>PRUEBA</span> CUALQUIER PLAN</div>
+        <div class="turbo-spec">🔒 <span>MISMA</span> SEGURIDAD</div>
+        <div class="turbo-spec">🆘 <span>SOPORTE</span> INMEDIATO</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Planes regulares con video (estructura similar al original) -->
+  <div class="section-label" style="margin-top:24px">// PLANES DISPONIBLES</div>
+
+  <!-- TRIAL (gratuito 1h, pero aquí es el plan de prueba, ya tenemos el Nodo Turbo arriba, pero lo dejamos por coherencia con el flujo original? No, mejor ocultamos el trial de pago y solo mostramos el nodo turbo como prueba. En el original hay un plan Trial de 1h que no es necesario. Lo omitimos. -->
+
+  <!-- BÁSICO -->
+  <div class="plan-card basic" data-plan-key="basico" onclick="selectPlanHandler('basico', 900, 1.5)">
+    <div class="plan-video-box" style="height: 480px;">
+      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
+        <source src="videos/basic.mp4" type="video/mp4">
+      </video>
+      <div class="plan-scrim"></div>
+      <div class="plan-overlay">
+        <div class="freq-label">freq·01 · 1 mes</div>
+        <div class="plan-top">
+          <div>
+            <div class="plan-title">Básico</div>
+            <div class="plan-sub">navegación · streaming</div>
+          </div>
+          <div class="price-block">
+            <div class="price-main" id="price-basico">900 CUP</div>
+            <div class="price-mobile">📱 400 CUP móvil</div>
+            <div class="price-usdt">≈ 1.5 USDT</div>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip hi">entrada</span>
+          <span class="chip">estable</span>
+          <span class="chip">saldo móvil</span>
+        </div>
+        <div class="features">
+          <div class="feature"><i class="fas fa-bolt"></i><span>Baja latencia para streaming</span></div>
+          <div class="feature"><i class="fas fa-infinity"></i><span>Ancho de banda ilimitado</span></div>
+          <div class="feature"><i class="fas fa-headset"></i><span>Soporte prioritario</span></div>
+          <div class="feature"><i class="fas fa-server"></i><span>4 servidores disponibles</span></div>
+        </div>
+        <button class="action"><i class="fas fa-arrow-right"></i> Activar señal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AVANZADO -->
+  <div class="plan-card advanced" data-plan-key="avanzado" onclick="selectPlanHandler('avanzado', 1800, 2.8)">
+    <div class="plan-video-box" style="height: 480px;">
+      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
+        <source src="videos/advanced.mp4" type="video/mp4">
+      </video>
+      <div class="plan-scrim"></div>
+      <div class="plan-overlay">
+        <div class="freq-label">freq·02 · 2 meses</div>
+        <div class="plan-top">
+          <div>
+            <div class="plan-title">Avanzado</div>
+            <div class="plan-sub">equilibrio · precisión</div>
+          </div>
+          <div class="price-block">
+            <div class="price-main" id="price-avanzado">1800 CUP</div>
+            <div class="price-mobile">📱 900 CUP móvil</div>
+            <div class="price-usdt">≈ 2.8 USDT</div>
+          </div>
+        </div>
+        <div class="chips"><span class="chip hi">mejor equilibrio</span><span class="chip">ahorro real</span><span class="chip">saldo móvil</span></div>
+        <div class="features">
+          <div class="feature"><i class="fas fa-check-circle"></i><span>Todo lo del plan básico</span></div>
+          <div class="feature"><i class="fas fa-clock"></i><span>2 meses de servicio</span></div>
+          <div class="feature"><i class="fas fa-life-ring"></i><span>Soporte 24/7</span></div>
+          <div class="feature"><i class="fas fa-shield-alt"></i><span>Protección avanzada</span></div>
+        </div>
+        <button class="action"><i class="fas fa-arrow-right"></i> Activar señal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIP CUBA -->
+  <div class="plan-card vip" data-plan-key="cuba_vip" onclick="selectPlanHandler('cuba_vip', 1200, 1.9)">
+    <div class="plan-video-box" style="height: 480px;">
+      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
+        <source src="videos/cuba_vip.mp4" type="video/mp4">
+      </video>
+      <div class="plan-scrim"></div>
+      <div class="plan-overlay">
+        <div class="freq-label">freq·cu · ip residencial</div>
+        <div class="plan-top">
+          <div>
+            <div class="plan-title">VIP Cuba</div>
+            <div class="plan-sub">ip residencial cubana · acceso local</div>
+          </div>
+          <div class="price-block">
+            <div class="price-main" id="price-vip">1200 CUP</div>
+            <div class="price-mobile">📱 500 CUP móvil</div>
+            <div class="price-usdt">≈ 1.9 USDT</div>
+          </div>
+        </div>
+        <div class="chips"><span class="chip hi">cubano real</span><span class="chip">sin bloqueos</span><span class="chip">trámites .cu</span></div>
+        <div class="features">
+          <div class="feature"><i class="fas fa-map-marker-alt"></i><span>Acceso a Enzona, Transfermóvil y Banca Remota</span></div>
+          <div class="feature"><i class="fas fa-shield-alt"></i><span>Evita bloqueos geográficos y alertas sospechosas</span></div>
+          <div class="feature"><i class="fas fa-globe"></i><span>Gestiona sitios .cu como usuario local</span></div>
+          <div class="feature"><i class="fas fa-lock"></i><span>Seguridad bancaria reforzada</span></div>
+        </div>
+        <button class="action"><i class="fas fa-star"></i> Activar acceso VIP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAMING -->
+  <div class="plan-card gaming" data-plan-key="premium" onclick="selectPlanHandler('premium', 1500, 2.3)">
+    <div class="plan-video-box" style="height: 480px;">
+      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
+        <source src="videos/gaming.mp4" type="video/mp4">
+      </video>
+      <div class="plan-scrim"></div>
+      <div class="plan-overlay">
+        <div class="freq-label">freq·max · gaming</div>
+        <div class="plan-top">
+          <div>
+            <div class="plan-title">Gaming</div>
+            <div class="plan-sub">latencia mínima · 1 mes</div>
+          </div>
+          <div class="price-block">
+            <div class="price-main" id="price-premium">1500 CUP</div>
+            <div class="price-mobile">📱 700 CUP móvil</div>
+            <div class="price-usdt">≈ 2.3 USDT</div>
+          </div>
+        </div>
+        <div class="chips"><span class="chip hi">baja latencia</span><span class="chip">servidor privado</span><span class="chip">saldo móvil</span></div>
+        <div class="features">
+          <div class="feature"><i class="fas fa-check-double"></i><span>Todo lo del plan avanzado</span></div>
+          <div class="feature"><i class="fas fa-tachometer-alt"></i><span>Menor latencia para juegos</span></div>
+          <div class="feature"><i class="fas fa-bolt"></i><span>Mayor velocidad de respuesta</span></div>
+          <div class="feature"><i class="fas fa-server"></i><span>Servidor privado optimizado</span></div>
+        </div>
+        <button class="action"><i class="fas fa-crosshairs"></i> Activar señal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANUAL -->
+  <div class="plan-card anual" data-plan-key="anual" onclick="selectPlanHandler('anual', 15000, 25)">
+    <div class="plan-video-box" style="height: 480px;">
+      <video class="plan-video" autoplay muted loop playsinline preload="metadata">
+        <source src="videos/annual.mp4" type="video/mp4">
+      </video>
+      <div class="plan-scrim"></div>
+      <div class="plan-overlay">
+        <div class="freq-label">freq·full · anual</div>
+        <div class="plan-top">
+          <div>
+            <div class="plan-title">Anual</div>
+            <div class="plan-sub">exclusivo · 12 meses</div>
+          </div>
+          <div class="price-block">
+            <div class="price-main" id="price-anual">15000 CUP</div>
+            <div class="price-mobile">📱 10000 CUP móvil</div>
+            <div class="price-usdt">≈ 25 USDT</div>
+          </div>
+        </div>
+        <div class="chips"><span class="chip hi">máximo valor</span><span class="chip">exclusivo</span><span class="chip">saldo móvil</span></div>
+        <div class="features">
+          <div class="feature"><i class="fas fa-crown"></i><span>Servidor privado exclusivo</span></div>
+          <div class="feature"><i class="fas fa-headset"></i><span>Atención prioritaria 24/7</span></div>
+          <div class="feature"><i class="fas fa-shield-alt"></i><span>Máxima seguridad</span></div>
+          <div class="feature"><i class="fas fa-calendar-alt"></i><span>12 meses completos</span></div>
+        </div>
+        <button class="action"><i class="fas fa-lock-open"></i> Activar acceso total</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cupón checker -->
+  <div class="coupon-checker">
+    <div class="coupon-checker-title"><i class="fas fa-tag"></i> Consultar usos de un cupón</div>
+    <div class="coupon-input-row">
+      <input type="text" id="couponCheckInput" class="coupon-input" placeholder="Escribe el código..." maxlength="20">
+      <button class="coupon-btn" id="couponCheckBtn" onclick="checkCouponUsage()"><span><i class="fas fa-search"></i> Consultar</span></button>
+    </div>
+    <div id="couponResult" class="coupon-result"></div>
+  </div>
+
+  <div class="trust-strip">
+    <div class="trust-item"><div class="icon">🔒</div><div class="label">AES-256<br>Cifrado</div></div>
+    <div class="trust-item"><div class="icon">⚡</div><div class="label">WireGuard<br>Protocol</div></div>
+    <div class="trust-item"><div class="icon">🛡️</div><div class="label">Sin logs<br>No tracking</div></div>
+  </div>
+
+  <div class="faq-section">
+    <div class="section-label" style="padding:0;margin-bottom:14px">// FAQ</div>
+    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿Funciona tras apagones? <span class="arr">+</span></div><div class="faq-a">Sí. Recomendamos desactivar Fast Startup en Windows y limpiar caché DNS tras un apagón. Nuestro soporte tiene guías paso a paso para reconectar en segundos.</div></div>
+    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿Qué puerto usa? <span class="arr">+</span></div><div class="faq-a">Puerto 80 UDP con WireGuard. MTU 1280 y PersistentKeepalive 25, configurados automáticamente para Cuba.</div></div>
+    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿Cómo activo el plan VIP? <span class="arr">+</span></div><div class="faq-a">Contáctanos en el canal oficial @L0quen2. IP residencial cubana activada en menos de 1 hora. Compatible con Enzona y Transfermóvil.</div></div>
+    <div class="faq-item" onclick="toggleFaq(this)"><div class="faq-q">¿El Gaming plan reduce lag? <span class="arr">+</span></div><div class="faq-a">Usamos QoS (Quality of Service) en MikroTik para priorizar paquetes de juego. Latencia optimizada para MLBB, CoD Mobile y Free Fire.</div></div>
+  </div>
+
 </div>
 
-<!-- WhatsApp link actualizado -->
-<a href="https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t" target="_blank" class="wa-float" aria-label="WhatsApp">
-  <i class="fab fa-whatsapp"></i>
-  <span class="wa-tip">Soporte directo</span>
-</a>
-
-<!-- TRIAL MODAL -->
-<div id="trialModal" class="modal">
-  <div class="modal-content">
-    <button class="close-modal" onclick="closeTrialModal()">×</button>
-    <h2><i class="fas fa-signal"></i> SOLICITAR PRUEBA</h2>
-    <p>Elige el plan que quieres probar, tu juego y tipo de conexión.</p>
+<!-- Modal de prueba -->
+<div class="modal-overlay" id="trialModal" onclick="closeModalOutside(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-plan-icon" style="font-size:36px; text-align:center">⚡</div>
+    <div class="modal-plan-name" style="text-align:center">Solicitar Prueba <span style="font-size:14px;color:var(--neon-green);">Nodo Turbo</span></div>
+    <div class="modal-plan-desc" style="text-align:center">Elige el plan que quieres probar, tu juego y tipo de conexión.</div>
     <form id="trialForm">
-
-      <label class="form-label"><i class="fas fa-layer-group"></i>Plan a probar</label>
       <div class="plan-selector" id="planSelector">
-        <div class="plan-option selected" data-plan="basico" onclick="selectTrialPlan(this)">
-          <span class="plan-opt-name">Básico</span>
-          <span class="plan-opt-price">1 mes · 900 CUP</span>
-        </div>
-        <div class="plan-option" data-plan="avanzado" onclick="selectTrialPlan(this)">
-          <span class="plan-opt-name">Avanzado</span>
-          <span class="plan-opt-price">2 meses · 1800 CUP</span>
-        </div>
-        <div class="plan-option" data-plan="cuba_vip" onclick="selectTrialPlan(this)">
-          <span class="plan-opt-name">Cuba VIP</span>
-          <span class="plan-opt-price">1 mes · 1200 CUP</span>
-        </div>
-        <div class="plan-option" data-plan="premium" onclick="selectTrialPlan(this)">
-          <span class="plan-opt-name">Gaming</span>
-          <span class="plan-opt-price">1 mes · 1500 CUP</span>
-        </div>
-        <div class="plan-option" data-plan="anual" onclick="selectTrialPlan(this)">
-          <span class="plan-opt-name">Anual</span>
-          <span class="plan-opt-price">12 meses · 15,000 CUP</span>
-        </div>
+        <div class="plan-option selected" data-plan="basico" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Básico</span><span class="plan-opt-price">1 mes · 900 CUP</span></div>
+        <div class="plan-option" data-plan="avanzado" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Avanzado</span><span class="plan-opt-price">2 meses · 1800 CUP</span></div>
+        <div class="plan-option" data-plan="cuba_vip" onclick="selectTrialPlan(this)"><span class="plan-opt-name">VIP Cuba</span><span class="plan-opt-price">1 mes · 1200 CUP</span></div>
+        <div class="plan-option" data-plan="premium" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Gaming</span><span class="plan-opt-price">1 mes · 1500 CUP</span></div>
+        <div class="plan-option" data-plan="anual" onclick="selectTrialPlan(this)"><span class="plan-opt-name">Anual</span><span class="plan-opt-price">12 meses · 15000 CUP</span></div>
       </div>
-
-      <label class="form-label"><i class="fas fa-gamepad"></i>Juego / Servidor</label>
-      <input type="text" id="gameServer" class="form-field" required placeholder="Ej: Free Fire — EE.UU.">
-
-      <label class="form-label"><i class="fas fa-wifi"></i>Tipo de conexión</label>
-      <select id="connectionType" class="form-field" required>
-        <option value="">Selecciona...</option>
+      <input type="text" id="gameServer" class="coupon-input" placeholder="Juego / Servidor (ej: Free Fire — EE.UU.)" required style="width:100%; margin-bottom:16px">
+      <select id="connectionType" class="coupon-input" required style="width:100%; margin-bottom:16px">
+        <option value="">Tipo de conexión</option>
         <option value="WiFi">WiFi</option>
         <option value="Cable Ethernet">Cable Ethernet</option>
         <option value="Datos Móviles">Datos Móviles</option>
       </select>
-
-      <label class="form-label"><i class="fas fa-info-circle"></i>Info adicional <span style="color:var(--txt-3)">(opcional)</span></label>
-      <textarea id="additionalInfo" class="form-field" rows="2" style="resize:none;"></textarea>
-
-      <button type="submit" class="form-submit"><span><i class="fas fa-paper-plane"></i> Enviar solicitud</span></button>
+      <textarea id="additionalInfo" class="coupon-input" rows="2" placeholder="Info adicional (opcional)" style="resize:none; width:100%; margin-bottom:20px"></textarea>
+      <button type="submit" class="modal-cta"><i class="fas fa-paper-plane"></i> Enviar solicitud</button>
     </form>
   </div>
 </div>
 
 <div id="notification"></div>
 
-<div class="wrap">
-
-  <!-- HEADER -->
-  <header class="hero">
-    <div class="status-pill">
-      <span class="status-dot"></span>
-      Sistema activo · señal óptima
-    </div>
-
-    <div class="hero-title">VPN&nbsp;<span class="sig">CUBA</span></div>
-
-    <p class="hero-sub">
-      Elige tu frecuencia. Conexión estable, baja latencia, soporte real.<br>
-      <strong>CUP · Saldo Móvil · USDT</strong>
-    </p>
-
-    <div class="signal-meters">
-      <div class="signal-meter">
-        <div class="meter-bars">
-          <div class="bar"></div><div class="bar"></div>
-          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-        </div>
-        <div class="meter-label">Estable</div>
-      </div>
-      <div class="signal-meter">
-        <div class="meter-bars">
-          <div class="bar"></div><div class="bar"></div>
-          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-        </div>
-        <div class="meter-label">Velocidad</div>
-      </div>
-      <div class="signal-meter">
-        <div class="meter-bars">
-          <div class="bar"></div><div class="bar"></div>
-          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-        </div>
-        <div class="meter-label">Soporte</div>
-      </div>
-    </div>
-  </header>
-
-  <div class="h-line"></div>
-
-  <!-- PLANS -->
-  <section class="plans">
-
-    <!-- ── TRIAL ── -->
-    <div class="shell trial individual">
-      <div class="tag">⚡ FREQ·LIBRE · 1H</div>
-      <div class="plan-video-box">
-        <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-          <source src="videos/trial.mp4" type="video/mp4">
-        </video>
-        <div class="plan-scrim"></div>
-        <div class="plan-overlay">
-          <div class="top-block">
-            <div class="freq-label">freq · libre · sin costo</div>
-            <div class="top">
-              <div>
-                <div class="plan-title">Prueba</div>
-                <div class="plan-sub">acceso · 1 hora</div>
-              </div>
-              <div class="price-block">
-                <div class="sig-bars">
-                  <div class="sb"></div><div class="sb"></div>
-                  <div class="sb"></div><div class="sb"></div>
-                </div>
-                <div class="price-main">0 CUP</div>
-              </div>
-            </div>
-          </div>
-          <div class="mid-block">
-            <div class="chips">
-              <span class="chip hi">sin costo</span>
-              <span class="chip">config rápida</span>
-            </div>
-            <div class="features">
-              <div class="feature"><i class="fas fa-bolt"></i><span>Conexión completa durante 1 hora</span></div>
-              <div class="feature"><i class="fas fa-infinity"></i><span>Ancho de banda ilimitado</span></div>
-              <div class="feature"><i class="fas fa-shield-alt"></i><span>Misma seguridad que planes pagos</span></div>
-              <div class="feature"><i class="fas fa-clock"></i><span>Elige el plan que quieres probar</span></div>
-            </div>
-          </div>
-          <div class="bot-block">
-            <button class="action" onclick="openTrialModal()">
-              <i class="fas fa-signal"></i> Solicitar señal
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── BASIC ── -->
-    <div class="shell basic individual" data-plan-key="basico">
-      <div class="tag">🌐 FREQ·01 · NAVEGACIÓN</div>
-      <div class="plan-video-box">
-        <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-          <source src="videos/basic.mp4" type="video/mp4">
-        </video>
-        <div class="plan-scrim"></div>
-        <div class="plan-overlay">
-          <div class="top-block">
-            <div class="freq-label">freq·01 · 1 mes</div>
-            <div class="top">
-              <div>
-                <div class="plan-title">Básico</div>
-                <div class="plan-sub">navegación · streaming</div>
-              </div>
-              <div class="price-block">
-                <div class="sig-bars">
-                  <div class="sb"></div><div class="sb"></div>
-                  <div class="sb"></div><div class="sb"></div>
-                </div>
-                <div class="price-main">900 CUP</div>
-                <div class="price-mobile">📱 400 CUP móvil</div>
-                <div class="price-usdt">≈ 1.5 USDT</div>
-              </div>
-            </div>
-          </div>
-          <div class="mid-block">
-            <div class="chips">
-              <span class="chip hi">entrada</span>
-              <span class="chip">estable</span>
-              <span class="chip">saldo móvil</span>
-            </div>
-            <div class="features">
-              <div class="feature"><i class="fas fa-bolt"></i><span>Baja latencia para streaming</span></div>
-              <div class="feature"><i class="fas fa-infinity"></i><span>Ancho de banda ilimitado</span></div>
-              <div class="feature"><i class="fas fa-headset"></i><span>Soporte prioritario</span></div>
-              <div class="feature"><i class="fas fa-server"></i><span>4 servidores disponibles</span></div>
-            </div>
-          </div>
-          <div class="bot-block">
-            <button class="action" onclick="selectPlan('basico', 900, 1.5, this)">
-              <i class="fas fa-arrow-right"></i> Activar señal
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ADVANCED ── -->
-    <div class="shell advanced individual" data-plan-key="avanzado">
-      <div class="tag">🌟 FREQ·02 · RECOMENDADO</div>
-      <div class="plan-video-box">
-        <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-          <source src="videos/advanced.mp4" type="video/mp4">
-        </video>
-        <div class="plan-scrim"></div>
-        <div class="plan-overlay">
-          <div class="top-block">
-            <div class="freq-label">freq·02 · 2 meses</div>
-            <div class="top">
-              <div>
-                <div class="plan-title">Avanzado</div>
-                <div class="plan-sub">equilibrio · precisión</div>
-              </div>
-              <div class="price-block">
-                <div class="sig-bars">
-                  <div class="sb"></div><div class="sb"></div>
-                  <div class="sb"></div><div class="sb"></div>
-                </div>
-                <div class="price-main">1800 CUP</div>
-                <div class="price-mobile">📱 900 CUP móvil</div>
-                <div class="price-usdt">≈ 2.8 USDT</div>
-              </div>
-            </div>
-          </div>
-          <div class="mid-block">
-            <div class="chips">
-              <span class="chip hi">mejor equilibrio</span>
-              <span class="chip">ahorro real</span>
-              <span class="chip">saldo móvil</span>
-            </div>
-            <div class="savings"><i class="fas fa-tag"></i> Ahorras 670 CUP vs. dos meses básico</div>
-            <div class="features">
-              <div class="feature"><i class="fas fa-check-circle"></i><span>Todo lo del plan básico</span></div>
-              <div class="feature"><i class="fas fa-clock"></i><span>2 meses de servicio</span></div>
-              <div class="feature"><i class="fas fa-life-ring"></i><span>Soporte 24/7</span></div>
-              <div class="feature"><i class="fas fa-shield-alt"></i><span>Protección avanzada</span></div>
-            </div>
-          </div>
-          <div class="bot-block">
-            <button class="action" onclick="selectPlan('avanzado', 1800, 2.8, this)">
-              <i class="fas fa-arrow-right"></i> Activar señal
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── CUBA VIP ── -->
-    <div class="shell cuba_vip individual" data-plan-key="cuba_vip">
-      <div class="tag">🇨🇺 FREQ·CU · IP RESIDENCIAL</div>
-      <div class="plan-video-box">
-        <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-          <source src="videos/cuba_vip.mp4" type="video/mp4">
-        </video>
-        <div class="plan-scrim"></div>
-        <div class="plan-overlay">
-          <div class="top-block">
-            <div class="freq-label">freq·cu · 1 mes</div>
-            <div class="top">
-              <div>
-                <div class="plan-title">CUBA VIP</div>
-                <div class="plan-sub">ip residencial cubana · acceso local</div>
-              </div>
-              <div class="price-block">
-                <div class="sig-bars">
-                  <div class="sb"></div><div class="sb"></div>
-                  <div class="sb"></div><div class="sb"></div>
-                </div>
-                <div class="price-main">1,200 CUP</div>
-                <div class="price-mobile">📱 500 CUP móvil</div>
-                <div class="price-usdt">≈ 1.9 USDT</div>
-              </div>
-            </div>
-          </div>
-          <div class="mid-block">
-            <div class="chips">
-              <span class="chip hi">cubano real</span>
-              <span class="chip">sin bloqueos</span>
-              <span class="chip">trámites .cu</span>
-            </div>
-            <div class="savings"><i class="fas fa-passport"></i> IP residencial cubana para acceso local auténtico</div>
-            <div class="features">
-              <div class="feature"><i class="fas fa-map-marker-alt"></i><span>Acceso a Enzona, Transfermóvil y Banca Remota</span></div>
-              <div class="feature"><i class="fas fa-shield-alt"></i><span>Evita bloqueos geográficos y alertas sospechosas</span></div>
-              <div class="feature"><i class="fas fa-globe"></i><span>Gestiona sitios .cu como usuario local</span></div>
-              <div class="feature"><i class="fas fa-lock"></i><span>Seguridad bancaria reforzada</span></div>
-            </div>
-          </div>
-          <div class="bot-block">
-            <button class="action" onclick="selectPlan('cuba_vip', 1200, 1.9, this)">
-              <i class="fas fa-star"></i> Activar acceso VIP
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── PREMIUM / GAMING ── -->
-    <div class="shell premium individual" data-plan-key="premium">
-      <div class="tag">🎮 FREQ·MAX · GAMING</div>
-      <div class="plan-video-box">
-        <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-          <source src="videos/gaming.mp4" type="video/mp4">
-        </video>
-        <div class="plan-scrim"></div>
-        <div class="plan-overlay">
-          <div class="top-block">
-            <div class="freq-label">freq·max · servidor privado</div>
-            <div class="top">
-              <div>
-                <div class="plan-title">Gaming</div>
-                <div class="plan-sub">latencia mínima · 1 mes</div>
-              </div>
-              <div class="price-block">
-                <div class="sig-bars">
-                  <div class="sb"></div><div class="sb"></div>
-                  <div class="sb"></div><div class="sb"></div>
-                </div>
-                <div class="price-main">1500 CUP</div>
-                <div class="price-mobile">📱 700 CUP móvil</div>
-                <div class="price-usdt">≈ 2.3 USDT</div>
-              </div>
-            </div>
-          </div>
-          <div class="mid-block">
-            <div class="chips">
-              <span class="chip hi">baja latencia</span>
-              <span class="chip">servidor privado</span>
-              <span class="chip">saldo móvil</span>
-            </div>
-            <div class="savings"><i class="fas fa-tachometer-alt"></i> Máxima velocidad + prioridad de tráfico</div>
-            <div class="features">
-              <div class="feature"><i class="fas fa-check-double"></i><span>Todo lo del plan avanzado</span></div>
-              <div class="feature"><i class="fas fa-tachometer-alt"></i><span>Menor latencia para juegos</span></div>
-              <div class="feature"><i class="fas fa-bolt"></i><span>Mayor velocidad de respuesta</span></div>
-              <div class="feature"><i class="fas fa-server"></i><span>Servidor privado optimizado</span></div>
-            </div>
-          </div>
-          <div class="bot-block">
-            <button class="action" onclick="selectPlan('premium', 1500, 2.3, this)">
-              <i class="fas fa-crosshairs"></i> Activar señal
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ANNUAL ── -->
-    <div class="shell annual individual" data-plan-key="anual">
-      <div class="tag">📅 FREQ·FULL · ANUAL</div>
-      <div class="plan-video-box">
-        <video class="plan-video" autoplay muted loop playsinline preload="metadata">
-          <source src="videos/annual.mp4" type="video/mp4">
-        </video>
-        <div class="plan-scrim"></div>
-        <div class="plan-overlay">
-          <div class="top-block">
-            <div class="freq-label">freq·full · acceso total</div>
-            <div class="top">
-              <div>
-                <div class="plan-title">Anual</div>
-                <div class="plan-sub">exclusivo · 12 meses</div>
-              </div>
-              <div class="price-block">
-                <div class="sig-bars">
-                  <div class="sb"></div><div class="sb"></div>
-                  <div class="sb"></div><div class="sb"></div>
-                </div>
-                <div class="price-main">15,000 CUP</div>
-                <div class="price-mobile">📱 10,000 CUP móvil</div>
-                <div class="price-usdt">≈ 25 USDT</div>
-              </div>
-            </div>
-          </div>
-          <div class="mid-block">
-            <div class="chips">
-              <span class="chip hi">máximo valor</span>
-              <span class="chip">exclusivo</span>
-              <span class="chip">saldo móvil</span>
-            </div>
-            <div class="savings"><i class="fas fa-star"></i> Ahorro superior al 40% vs. mensual</div>
-            <div class="features">
-              <div class="feature"><i class="fas fa-crown"></i><span>Servidor privado exclusivo</span></div>
-              <div class="feature"><i class="fas fa-headset"></i><span>Atención prioritaria 24/7</span></div>
-              <div class="feature"><i class="fas fa-shield-alt"></i><span>Máxima seguridad</span></div>
-              <div class="feature"><i class="fas fa-calendar-alt"></i><span>12 meses completos</span></div>
-            </div>
-          </div>
-          <div class="bot-block">
-            <button class="action" onclick="selectPlan('anual', 15000, 25, this)">
-              <i class="fas fa-lock-open"></i> Activar acceso total
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </section>
-
-  <!-- ── CUPÓN CHECKER ── -->
-  <div class="coupon-checker">
-    <div class="coupon-checker-title">
-      <i class="fas fa-tag"></i> Consultar usos de un cupón
-    </div>
-    <div class="coupon-input-row">
-      <input type="text" id="couponCheckInput" class="coupon-input" placeholder="Escribe el código..." maxlength="20">
-      <button class="coupon-btn" id="couponCheckBtn" onclick="checkCouponUsage()">
-        <span><i class="fas fa-search"></i> Consultar</span>
-      </button>
-    </div>
-    <div id="couponResult" class="coupon-result"></div>
-  </div>
-
-  <footer class="footer">
-    <p>© 2025 VPN Cuba — protocolo WireGuard · tecnología de punta</p>
-    <p style="margin-top:.5rem;">
-      ¿Preguntas? <a href="https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t" target="_blank">WhatsApp directo →</a>
-    </p>
-  </footer>
-</div>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 <script>
 const tg = window.Telegram?.WebApp ?? { expand(){}, MainButton:{ hide(){} }, initDataUnsafe:{} };
 tg.expand?.();
@@ -1530,12 +1087,10 @@ tg.MainButton?.hide?.();
 
 const urlParams = new URLSearchParams(window.location.search);
 const userId = urlParams.get('userId');
-// Wallet USDT actualizada
 const USDT_ADDRESS = '0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2';
 
 let userReferralDiscount = 0;
 
-// Precios base de todos los planes
 const BASE_PRICES = {
   basico:   { cup: 900,   mobile: 400,  usdt: 1.5 },
   avanzado: { cup: 1800,   mobile: 900,  usdt: 2.8 },
@@ -1544,44 +1099,15 @@ const BASE_PRICES = {
   anual:    { cup: 15000, mobile: 10000, usdt: 25 }
 };
 
-// Mapeo: clase CSS del shell → clave de plan
-const SHELL_CLASS_TO_KEY = {
-  basic:    'basico',
-  advanced: 'avanzado',
-  cuba_vip: 'cuba_vip',
-  premium:  'premium',
-  annual:   'anual'
-};
-
-/* ── SIGNAL BARS ANIMATION ─── */
-const meters = document.querySelectorAll('.signal-meter');
-meters.forEach((m, mi) => {
-  const bars = m.querySelectorAll('.bar');
-  bars.forEach((bar, bi) => {
-    const maxH = [6,11,16,21,24][bi];
-    const minH = Math.max(2, maxH * 0.3);
-    const colors = ['var(--sig-basic)','var(--sig-ann)','var(--sig-trial)'];
-    bar.style.background = colors[mi % colors.length];
-    bar.style.boxShadow = `0 0 5px ${colors[mi % colors.length]}`;
-    setInterval(() => {
-      const h = minH + Math.random() * (maxH - minH);
-      bar.style.height = h + 'px';
-      bar.style.opacity = 0.4 + Math.random() * 0.6;
-    }, 300 + bi * 80 + mi * 120);
-  });
-});
-
-/* ── NOTIFICATION ─── */
 function showNotification(msg, type = 'info') {
   const n = document.getElementById('notification');
   n.textContent = msg;
-  n.style.borderLeftColor = type === 'success' ? 'var(--sig-ann)' : type === 'error' ? 'var(--sig-prem)' : 'var(--sig-basic)';
+  n.style.borderLeftColor = type === 'success' ? 'var(--neon-green)' : type === 'error' ? '#ff4d4d' : 'var(--neon-blue)';
   n.style.transform = 'translateX(0)';
   clearTimeout(window.__nTimer);
   window.__nTimer = setTimeout(() => { n.style.transform = 'translateX(160%)'; }, 3800);
 }
 
-/* ── DESCUENTO REFERIDOS (aplica a TODOS los planes) ── */
 async function loadReferralDiscount() {
   if (!userId) return 0;
   try {
@@ -1594,59 +1120,39 @@ async function loadReferralDiscount() {
       showNotification(`✅ Descuento por referidos del ${userReferralDiscount}% aplicado`, 'success');
     }
     return userReferralDiscount;
-  } catch (e) {
-    console.warn('Error al obtener descuento por referidos', e);
-    return 0;
-  }
+  } catch (e) { return 0; }
 }
 
 function applyDiscountToAllPlans(discountPercent) {
   if (discountPercent <= 0) return;
   const factor = (100 - discountPercent) / 100;
-
-  document.querySelectorAll('.shell[data-plan-key]').forEach(shell => {
-    const planKey = shell.dataset.planKey;
-    const base = BASE_PRICES[planKey];
-    if (!base) return;
-
-    const newCup    = Math.round(base.cup    * factor);
-    const newMobile = Math.round(base.mobile * factor);
-    const newUsdt   = (base.usdt * factor).toFixed(2);
-
-    const priceMain   = shell.querySelector('.price-main');
-    const priceMobile = shell.querySelector('.price-mobile');
-    const priceUsdt   = shell.querySelector('.price-usdt');
-
-    if (priceMain)   priceMain.textContent   = newCup.toLocaleString() + ' CUP';
-    if (priceMobile) priceMobile.innerHTML   = `📱 ${newMobile.toLocaleString()} CUP móvil`;
-    if (priceUsdt)   priceUsdt.textContent   = `≈ ${newUsdt} USDT`;
-
-    // Guardar para pasar a payment.html
-    shell.dataset.discount        = discountPercent;
-    shell.dataset.discountedCup   = newCup;
-    shell.dataset.discountedUsdt  = newUsdt;
-  });
+  const priceMap = {
+    basico: document.getElementById('price-basico'),
+    avanzado: document.getElementById('price-avanzado'),
+    vip: document.getElementById('price-vip'),
+    premium: document.getElementById('price-premium'),
+    anual: document.getElementById('price-anual')
+  };
+  for (const [planKey, priceEl] of Object.entries(priceMap)) {
+    if (priceEl) {
+      const base = BASE_PRICES[planKey === 'vip' ? 'cuba_vip' : planKey];
+      if (base) {
+        const newCup = Math.round(base.cup * factor);
+        priceEl.textContent = newCup.toLocaleString() + ' CUP';
+      }
+    }
+  }
 }
 
-/* ── SELECT PLAN (con descuento) ── */
-function selectPlan(planType, originalPrice, usdtAmount, button) {
+function selectPlanHandler(planType, originalPrice, usdtAmount) {
   if (!userId) { alert('Error: no se pudo identificar el usuario.'); return; }
-
   let finalPrice = originalPrice;
-  let finalUsdt  = usdtAmount;
-  let discountApplied = 0;
-
-  const shell = button.closest('.shell');
-  if (shell && shell.dataset.discount) {
-    discountApplied = parseInt(shell.dataset.discount);
-    finalPrice      = parseInt(shell.dataset.discountedCup);
-    finalUsdt       = parseFloat(shell.dataset.discountedUsdt);
+  let finalUsdt = usdtAmount;
+  let discountApplied = userReferralDiscount;
+  if (discountApplied > 0) {
+    finalPrice = Math.round(originalPrice * (100 - discountApplied) / 100);
+    finalUsdt = (usdtAmount * (100 - discountApplied) / 100).toFixed(2);
   }
-
-  const orig = button.innerHTML;
-  button.disabled = true;
-  button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-
   localStorage.setItem('selectedPlan', JSON.stringify({
     type: planType,
     originalPrice,
@@ -1657,15 +1163,13 @@ function selectPlan(planType, originalPrice, usdtAmount, button) {
     userId,
     timestamp: new Date().toISOString()
   }));
-
   showNotification('Redirigiendo al pago...', 'info');
   setTimeout(() => {
     window.location.href = `/payment.html?userId=${encodeURIComponent(userId)}&plan=${encodeURIComponent(planType)}&price=${encodeURIComponent(finalPrice)}&usdtAmount=${encodeURIComponent(finalUsdt)}&usdtAddress=${encodeURIComponent(USDT_ADDRESS)}&discount=${encodeURIComponent(discountApplied)}`;
   }, 700);
-  setTimeout(() => { button.innerHTML = orig; button.disabled = false; }, 1200);
 }
 
-/* ── TRIAL PLAN SELECTOR ── */
+// ── Prueba (Nodo Turbo) ──
 let selectedTrialPlan = 'basico';
 
 function selectTrialPlan(el) {
@@ -1674,12 +1178,8 @@ function selectTrialPlan(el) {
   selectedTrialPlan = el.dataset.plan;
 }
 
-/* ── TRIAL MODAL ── */
 async function openTrialModal() {
-  if (!userId) {
-    alert('Error: no se pudo identificar el usuario.');
-    return;
-  }
+  if (!userId) { alert('Error: no se pudo identificar el usuario.'); return; }
   try {
     const res = await fetch(`/api/check-trial-eligibility/${userId}`);
     if (res.ok) {
@@ -1689,36 +1189,37 @@ async function openTrialModal() {
         return;
       }
     }
-  } catch (e) {
-    console.warn('No se pudo verificar elegibilidad, continuando:', e.message);
-  }
-  document.getElementById('trialModal').classList.add('active');
+  } catch (e) { console.warn(e); }
+  document.getElementById('trialModal').classList.add('open');
 }
 
-function closeTrialModal() { document.getElementById('trialModal').classList.remove('active'); }
+function closeModal() {
+  document.getElementById('trialModal').classList.remove('open');
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('trialModal')) closeModal();
+}
 
 document.getElementById('trialForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const gameServer     = document.getElementById('gameServer').value.trim();
+  const gameServer = document.getElementById('gameServer').value.trim();
   const connectionType = document.getElementById('connectionType').value;
   const additionalInfo = document.getElementById('additionalInfo').value.trim();
   if (!gameServer || !connectionType) return;
-
-  const btn  = e.target.querySelector('button[type="submit"]');
-  const span = btn.querySelector('span');
-  const orig = span.innerHTML;
-  span.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+  const btn = e.target.querySelector('button[type="submit"]');
+  const orig = btn.innerHTML;
   btn.disabled = true;
-
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
   try {
     const res = await fetch(`${window.location.origin}/api/request-trial`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        telegramId:    userId,
-        username:      tg.initDataUnsafe?.user?.username   || '',
-        firstName:     tg.initDataUnsafe?.user?.first_name || 'Usuario',
-        trialType:     '1h',
+        telegramId: userId,
+        username: tg.initDataUnsafe?.user?.username || '',
+        firstName: tg.initDataUnsafe?.user?.first_name || 'Usuario',
+        trialType: '1h',
         trialPlanType: selectedTrialPlan,
         gameServer,
         connectionType,
@@ -1727,57 +1228,43 @@ document.getElementById('trialForm').addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (res.ok && data.success) {
-      showNotification('✅ Solicitud enviada. Recibirás la config en minutos.', 'success');
-      closeTrialModal();
-    } else { throw new Error(data.error || 'Error inesperado'); }
+      showNotification('✅ Solicitud enviada. Recibirás la configuración en minutos.', 'success');
+      closeModal();
+    } else {
+      throw new Error(data.error || 'Error inesperado');
+    }
   } catch (err) {
     showNotification('❌ ' + err.message, 'error');
   } finally {
-    span.innerHTML = orig;
+    btn.innerHTML = orig;
     btn.disabled = false;
   }
 });
 
-/* ── CUPÓN: VER USOS (público) ── */
+// ── Cupón checker ──
 async function checkCouponUsage() {
-  const input  = document.getElementById('couponCheckInput');
-  const btn    = document.getElementById('couponCheckBtn');
+  const input = document.getElementById('couponCheckInput');
+  const btn = document.getElementById('couponCheckBtn');
   const result = document.getElementById('couponResult');
-  const code   = input.value.trim().toUpperCase();
-
+  const code = input.value.trim().toUpperCase();
   if (!code) {
     result.className = 'coupon-result error';
     result.innerHTML = '⚠️ Ingresa un código de cupón';
     return;
   }
-
   btn.disabled = true;
   result.className = 'coupon-result';
   result.innerHTML = '';
-
   try {
-    const res  = await fetch(`/api/coupons/public/${encodeURIComponent(code)}/usage`);
+    const res = await fetch(`/api/coupons/public/${encodeURIComponent(code)}/usage`);
     const data = await res.json();
-
     if (!res.ok) {
       result.className = 'coupon-result error';
       result.innerHTML = `❌ ${data.error || 'Cupón no encontrado'}`;
     } else {
-      const statusLabel = {
-        active:   '✅ Activo',
-        inactive: '⏸ Inactivo',
-        expired:  '❌ Expirado'
-      }[data.status] || data.status;
-
+      const statusLabel = { active: '✅ Activo', inactive: '⏸ Inactivo', expired: '❌ Expirado' }[data.status] || data.status;
       result.className = 'coupon-result success';
-      result.innerHTML = `
-        <strong>// ${data.code}</strong>
-        <div class="stat-row"><span>Estado</span><span>${statusLabel}</span></div>
-        <div class="stat-row"><span>Descuento</span><span>${data.discount}%</span></div>
-        <div class="stat-row"><span>Veces usado</span><span>${data.used}</span></div>
-        <div class="stat-row"><span>Stock restante</span><span>${data.stock_remaining}</span></div>
-        ${data.description ? `<div class="stat-row"><span>Descripción</span><span>${data.description}</span></div>` : ''}
-      `;
+      result.innerHTML = `<strong>// ${data.code}</strong><div style="display:flex;justify-content:space-between;margin-top:4px"><span>Estado</span><span>${statusLabel}</span></div><div style="display:flex;justify-content:space-between"><span>Descuento</span><span>${data.discount}%</span></div><div style="display:flex;justify-content:space-between"><span>Veces usado</span><span>${data.used}</span></div><div style="display:flex;justify-content:space-between"><span>Stock restante</span><span>${data.stock_remaining}</span></div>`;
     }
   } catch (err) {
     result.className = 'coupon-result error';
@@ -1787,22 +1274,25 @@ async function checkCouponUsage() {
   }
 }
 
-// Enter en el input también dispara la búsqueda
 document.getElementById('couponCheckInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') checkCouponUsage();
 });
 
-/* ── TERMS CHECK ── */
+function toggleFaq(el) {
+  const wasOpen = el.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+  if (!wasOpen) el.classList.add('open');
+}
+
+// Verificar términos
 function checkTermsAccepted(uid) {
   if (!uid) return false;
   return localStorage.getItem(`termsAccepted_${uid}`) === 'true';
 }
-
 if (userId && !checkTermsAccepted(userId)) {
   window.location.href = `/index.html?userId=${encodeURIComponent(userId)}`;
 }
 
-// Inicializar descuento al cargar
 loadReferralDiscount();
 </script>
 </body>
