@@ -1714,18 +1714,33 @@ bot.start(async (ctx) => {
     const chatType = ctx.chat.type;
     const isGroup = chatType === 'group' || chatType === 'supergroup';
     let referrerId = null, referrerUsername = null;
+
     if (startPayload && startPayload.startsWith('ref') && !isGroup) {
         referrerId = startPayload.replace('ref', '');
         try { const referrer = await db.getUser(referrerId); if (referrer) referrerUsername = referrer.username; } catch (e) {}
         if (referrerId) { try { await db.createReferral(referrerId, userId.toString(), ctx.from.username, firstName); } catch (e) {} }
     }
+
     try {
         const userData = { telegram_id: userId.toString(), username: ctx.from.username, first_name: firstName, last_name: ctx.from.last_name, created_at: new Date().toISOString(), is_active: true };
         if (referrerId) { userData.referrer_id = referrerId; userData.referrer_username = referrerUsername; }
         await db.saveUser(userId.toString(), userData);
     } catch (error) { console.error('Error guardando usuario:', error); }
+
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
-    let welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
+    const welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
+
+    const gifPath = path.join(__dirname, 'assets', 'vpncuba_premium.gif');
+    try {
+        if (fs.existsSync(gifPath)) {
+            await ctx.replyWithAnimation({ source: fs.createReadStream(gifPath) });
+        } else {
+            console.warn(`⚠️ GIF no encontrado en: ${gifPath}`);
+        }
+    } catch (gifError) {
+        console.warn('⚠️ No se pudo enviar el GIF de bienvenida:', gifError.message);
+    }
+
     await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
 });
 
