@@ -435,7 +435,11 @@ select option{background:var(--ink)}
         </div></div>
         <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-history"></i> Historial</div></div>
         <div class="card-body"><div class="loading" id="broadcastLoading"><div class="spinner"></div> Cargando...</div><div class="no-data" id="broadcastNoData" style="display:none"><i class="fas fa-bullhorn"></i>Sin broadcasts</div>
-        <div class="table-wrap" id="broadcastTableWrap" style="display:none"><table><thead><tr><th>ID</th><th>Mensaje</th><th>Adjunto</th><th>Target</th><th>Progreso</th><th>Estado</th><th>Fecha</th></tr></thead><tbody id="broadcastTableBody"></tbody></table></div></div></div>
+        <div class="table-wrap" id="broadcastTableWrap" style="display:none"><table><thead><tr><th>ID</th><th>Mensaje</th><th>Adjunto</th><th>Target</th><th>Progreso</th><th>Estado</th><th>Fecha</th></tr></thead><tbody id="broadcastTableBody"></tbody></table></div>
+        <div id="broadcastProgressBar" style="display:none; height:6px; background:var(--wire); margin-top:10px; border-radius:3px; overflow:hidden;">
+          <div id="broadcastProgressFill" style="height:100%; width:0%; background:var(--sig); transition: width 0.3s;"></div>
+        </div>
+        </div></div>
       </div>
 
       <!-- ── JUEGOS ── -->
@@ -516,13 +520,14 @@ select option{background:var(--ink)}
 <div id="notification"></div>
 
 <script>
-// ==================== SIGNAL ADMIN v3.0 ====================
+// ==================== SIGNAL ADMIN v3.0 (CORREGIDO) ====================
 const tg = window.Telegram?.WebApp ?? { initDataUnsafe: {} };
 let currentUserId = null, isAdminUser = false, currentTab = 'stats';
 let currentPaymentId = null, currentUserDetailsId = null, currentCouponCode = null;
 let allUsers = [], filteredUsers = [], currentUsersPage = 1, usersPerPage = 50, totalUsersPages = 1;
 let allReferrals = [], filteredReferrals = [], currentReferralsPage = 1, referralsPerPage = 30;
 let allCoupons = [];
+let broadcastPollingInterval = null; // Para el polling de broadcasts
 
 const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
 const PLAN_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', anual: '📅 Anual' };
@@ -735,7 +740,7 @@ async function deleteTrialRequest(telegramId, userName) {
   } catch(e) { showNotification('Error', 'error'); }
 }
 
-// ── POOL DE PRUEBAS POR PLAN ──────────────────────────
+// ── POOL DE PRUEBAS POR PLAN (CORREGIDO) ──────────
 function buildPoolCards() {
   const grid = document.getElementById('planPoolsGrid');
   grid.innerHTML = '';
@@ -748,16 +753,25 @@ function buildPoolCards() {
           <span class="pool-count" id="poolCount_${pt}">0 archivos</span>
         </div>
         <div class="pool-upload-area">
-          <div class="pool-upload-zone" onclick="document.getElementById('poolInput_${pt}').click()">
+          <div class="pool-upload-zone" id="poolUploadZone_${pt}">
             <i class="fas fa-plus-circle"></i>
             <span>Subir archivo(s) al pool ${label}</span>
           </div>
-          <input type="file" id="poolInput_${pt}" accept=".conf,.zip,.rar" hidden multiple onchange="uploadToPool('${pt}', this)">
+          <input type="file" id="poolInput_${pt}" accept=".conf,.zip,.rar" hidden multiple>
         </div>
         <div class="pool-files-list" id="poolList_${pt}">
           <div class="pool-loading"><div class="spinner"></div> Cargando...</div>
         </div>
       </div>`;
+  });
+  // Asignar eventos después de que el DOM esté listo
+  PLAN_TYPES.forEach(pt => {
+    const zone = document.getElementById(`poolUploadZone_${pt}`);
+    const input = document.getElementById(`poolInput_${pt}`);
+    if (zone && input) {
+      zone.addEventListener('click', () => input.click());
+      input.addEventListener('change', function() { uploadToPool(pt, this); });
+    }
   });
 }
 
@@ -765,7 +779,6 @@ async function loadAllTrialPools() {
   try {
     const res = await fetch('/api/trial-files');
     const data = await res.json();
-    // data es { basico: [...], avanzado: [...], cuba_vip: [...], premium: [...], anual: [...] }
     for (const pt of PLAN_TYPES) {
       const files = data[pt] || [];
       renderPoolList(pt, files);
@@ -827,14 +840,23 @@ async function uploadToPool(pt, input) {
     fd.append('label', file.name);
     try {
       const res = await fetch('/api/trial-files/upload', { method: 'POST', body: fd });
-      if (res.ok) { ok++; }
-      else { const err = await res.json(); throw new Error(err.error || 'Error desconocido'); }
-    } catch(e) { fail++; showNotification(`❌ Error en ${file.name}: ${e.message}`, 'error'); }
+      const data = await res.json();
+      if (res.ok) {
+        ok++;
+        // Recargar inmediatamente el pool para esta plan
+        loadPoolForPlan(pt);
+      } else {
+        fail++;
+        showNotification(`❌ Error en ${file.name}: ${data.error || 'Error desconocido'}`, 'error');
+      }
+    } catch(e) {
+      fail++;
+      showNotification(`❌ Error de red en ${file.name}: ${e.message}`, 'error');
+    }
   }
   isUploading[pt] = false;
   input.value = '';
   showNotification(`✅ Pool ${getPlanLabel(pt)}: ${ok} subido(s), ${fail} fallo(s)`, ok > 0 ? 'success' : 'error');
-  if (ok > 0) loadPoolForPlan(pt);
 }
 
 async function togglePoolFile(pt, id, currentlyActive) {
@@ -1153,7 +1175,7 @@ async function deleteCoupon(code) {
   } catch(e) { showNotification('❌ Error de red', 'error'); }
 }
 
-// ── BROADCAST ────────────────────────────────────────
+// ── BROADCAST (CORREGIDO CON POLLING) ────────────────
 let broadcastAttachment = null;
 let broadcastAttachmentUrl = '';
 
@@ -1247,15 +1269,36 @@ async function sendBroadcast() {
     }
     const data = await res.json();
     if (res.ok && data.success) {
-      showNotification(`✅ Enviado a ${data.totalUsers||0} usuarios`, 'success');
+      showNotification(`✅ Broadcast creado. Enviando a ${data.totalUsers||0} usuarios...`, 'success');
       document.getElementById('broadcastMessage').value = '';
       clearBroadcastAttachment();
       loadBroadcasts();
+      startBroadcastPolling(); // iniciar polling
     } else {
-      showNotification(`❌ ${data.error||'Error al enviar broadcast'}`, 'error');
+      showNotification(`❌ ${data.error||'Error al crear broadcast'}`, 'error');
     }
-  } catch(e) { showNotification('Error', 'error'); }
+  } catch(e) { showNotification('Error de red', 'error'); }
   btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> <span>Enviar broadcast</span>';
+}
+
+function startBroadcastPolling() {
+  if (broadcastPollingInterval) clearInterval(broadcastPollingInterval);
+  broadcastPollingInterval = setInterval(async () => {
+    const res = await fetch('/api/broadcasts');
+    const broadcasts = await res.json();
+    const pendingOrSending = broadcasts?.some(b => b.status === 'pending' || b.status === 'sending');
+    if (!pendingOrSending) {
+      stopBroadcastPolling();
+    }
+    loadBroadcasts(); // actualizar la tabla y barra de progreso
+  }, 5000);
+}
+
+function stopBroadcastPolling() {
+  if (broadcastPollingInterval) {
+    clearInterval(broadcastPollingInterval);
+    broadcastPollingInterval = null;
+  }
 }
 
 async function loadBroadcasts() {
@@ -1269,7 +1312,7 @@ async function loadBroadcasts() {
     const targetNames = { all:'👥 Todos', vip:'👑 VIP', non_vip:'👤 No VIP', trial_pending:'⏳ Pruebas', trial_received:'✅ Recibidas', active:'📱 Activos', with_referrals:'🤝 Referidos', usdt_payers:'💰 USDT' };
     const tb = document.getElementById('broadcastTableBody'); tb.innerHTML = '';
     broadcasts.forEach(b => {
-      const statusBadge = b.status === 'completed' ? '<span class="badge active">Completado</span>' : b.status === 'sending' ? '<span class="badge pending">Enviando</span>' : '<span class="badge expired">Fallido</span>';
+      const statusBadge = b.status === 'completed' ? '<span class="badge active">Completado</span>' : b.status === 'sending' ? '<span class="badge pending">Enviando</span>' : b.status === 'pending' ? '<span class="badge bpa">Pendiente</span>' : '<span class="badge expired">Fallido</span>';
       const mediaType = String(b.media_type || b.mediaType || b.attachment_type || '').toLowerCase();
       const mediaLabel = mediaType.startsWith('video/')
         ? '<span class="badge purple">Video</span>'
@@ -1277,9 +1320,22 @@ async function loadBroadcasts() {
           ? '<span class="badge default">Imagen</span>'
           : (b.media_url || b.attachment_url || b.has_media ? '<span class="badge bpa">Media</span>' : '—');
       const safeMsg = (b.message || '—').substring(0, 50);
-      tb.innerHTML += `<tr><td style="color:var(--sig)">${b.id}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${(b.message||'').replace(/"/g, '&quot;')}">${safeMsg}</td><td>${mediaLabel}</td><td>${targetNames[b.target_users]||b.target_users||'—'}</td><td>${b.sent_count||0}/${b.total_users||0}</td><td>${statusBadge}</td><td>${b.created_at?new Date(b.created_at).toLocaleDateString('es-ES'):'—'}</td></tr>`;
+      const sent = b.sent_count || 0;
+      const total = b.total_users || 0;
+      tb.innerHTML += `<tr><td style="color:var(--sig)">${b.id}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${(b.message||'').replace(/"/g, '&quot;')}">${safeMsg}</td><td>${mediaLabel}</td><td>${targetNames[b.target_users]||b.target_users||'—'}</td><td>${sent}/${total}</td><td>${statusBadge}</td><td>${b.created_at?new Date(b.created_at).toLocaleDateString('es-ES'):'—'}</td></tr>`;
     });
     document.getElementById('broadcastTableWrap').style.display = 'block';
+    // Actualizar barra de progreso con el primer broadcast activo
+    const activeBroadcast = broadcasts.find(b => b.status === 'sending' || b.status === 'pending');
+    const progressBar = document.getElementById('broadcastProgressBar');
+    const progressFill = document.getElementById('broadcastProgressFill');
+    if (activeBroadcast) {
+      const percent = activeBroadcast.total_users > 0 ? Math.round((activeBroadcast.sent_count / activeBroadcast.total_users) * 100) : 0;
+      progressBar.style.display = 'block';
+      progressFill.style.width = percent + '%';
+    } else {
+      progressBar.style.display = 'none';
+    }
   } catch(e) { document.getElementById('broadcastLoading').style.display = 'none'; showNotification('Error', 'error'); }
 }
 
@@ -1301,6 +1357,7 @@ async function loadGamesStats() {
 const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos' };
 
 function switchTab(name) {
+  stopBroadcastPolling(); // detener polling al cambiar de pestaña
   currentTab = name;
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1319,7 +1376,16 @@ function switchTab(name) {
     referrals: loadReferrals,
     'plan-files': loadPlanFiles,
     coupons: loadCoupons,
-    broadcast: loadBroadcasts,
+    broadcast: () => {
+      loadBroadcasts().then(() => {
+        // Verificar si hay envíos en curso para iniciar polling
+        fetch('/api/broadcasts').then(r => r.json()).then(b => {
+          if (b?.some(bc => bc.status === 'sending' || bc.status === 'pending')) {
+            startBroadcastPolling();
+          }
+        });
+      });
+    },
     games: loadGamesStats
   };
   if (loaders[name]) loaders[name]();
