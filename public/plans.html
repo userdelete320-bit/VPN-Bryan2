@@ -1283,11 +1283,29 @@ function handleCTA(key) {
   window.location.href = `payment.html?${params.toString()}`;
 }
 
+// ==================== FUNCIÓN CORREGIDA requestTrial ====================
 async function requestTrial(planKey) {
+  // Si no hay userId, mostrar mensaje en el modal en lugar de alert
   if (!currentUserId) {
-    alert('No pude identificar tu usuario.');
+    const modalContent = document.getElementById('modalContent');
+    if (modalContent) {
+      modalContent.innerHTML = `
+        <div style="text-align:center; padding:20px;">
+          <div style="font-size:48px; margin-bottom:16px;">🔐</div>
+          <div class="modal-plan-name">Acceso requerido</div>
+          <div class="modal-plan-desc">
+            Para solicitar una prueba necesitas abrir esta Web App desde el bot de Telegram.<br><br>
+            <b>1.</b> Ve a <a href="https://t.me/vpncubaw_bot" target="_blank">@vpncubaw_bot</a><br>
+            <b>2.</b> Toca "VER PLANES"<br><br>
+            También puedes pedirle a un administrador que te envíe un enlace directo con tu ID.
+          </div>
+          <button class="modal-cta" style="background:#5bf0ff;color:#000;" onclick="closeModal()">Cerrar</button>
+        </div>
+      `;
+    }
     return;
   }
+
   try {
     const res = await fetch('/api/request-trial', {
       method: 'POST',
