@@ -192,6 +192,12 @@ async function requireNotBanned(req, res, next) {
     next();
 }
 
+// Aplicamos el middleware a las rutas críticas
+app.post('/api/payment', requireNotBanned);
+app.post('/api/request-trial', requireNotBanned);
+app.post('/api/accept-terms', requireNotBanned);
+app.post('/api/coupons/verify/:code', requireNotBanned);
+
 async function canSendMessageToUser(telegramId) {
     try {
         await bot.telegram.sendChatAction(telegramId, 'typing');
