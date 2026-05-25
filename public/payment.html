@@ -749,6 +749,7 @@ body::after {
 <div class="ambient"></div>
 <div class="toast" id="toast">✅ Comprobante subido correctamente</div>
 
+<!-- Pantalla de baneo -->
 <div class="ban-screen" id="banScreen">
   <div style="font-size:48px; margin-bottom:16px;">🚫</div>
   <div style="font-family:'Syne',sans-serif; font-size:24px; font-weight:800; color:#fff; margin-bottom:12px;">Acceso bloqueado</div>
@@ -830,9 +831,9 @@ body::after {
       </div>
     </div>
 
-    <div class="referral-banner" id="refBanner">
+    <div class="referral-banner" id="refBanner" style="display:none">
       <span class="icon">👥</span>
-      <p>Tienes un <strong>20% de descuento</strong> por referidos activo — se aplicará automáticamente al confirmar tu pago.</p>
+      <p>Tienes un <strong>0% de descuento</strong> por referidos activo — se aplicará automáticamente al confirmar tu pago.</p>
     </div>
 
     <div class="section">
@@ -1116,11 +1117,11 @@ const PLAN_BASE = {
   trial: { cup: 0, mobile: 0, usdt: 0 }
 };
 
+// Descuento de referido (viene del backend, ya neto)
 let referralDiscount = 0;
-let referralSpent = Number(localStorage.getItem(`vpncuba_referral_spent_${currentUserId || 'guest'}`) || 0);
+// Descuento por cupón (validado con backend)
 let appliedCouponPercent = 0;
 let appliedCouponCode = '';
-let couponValid = false;
 
 function safeText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
 function formatCUP(value) { return Number(value || 0).toLocaleString('es-ES') + ' CUP'; }
@@ -1138,20 +1139,8 @@ function normalizePlan(key) {
 }
 
 function computeEffectiveDiscount() {
-  const ref = Math.max(0, Number(referralDiscount || 0) - Number(referralSpent || 0));
-  return Math.min(100, ref + appliedCouponPercent);
-}
-
-async function loadReferralDiscount() {
-  if (!currentUserId) return;
-  try {
-    const res = await fetch(`/api/user-info/${encodeURIComponent(currentUserId)}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    referralDiscount = Number(data.referral_discount || 0);
-    updateDiscountBanner();
-    updatePricing();
-  } catch (e) {}
+  // Solo suma descuento de referido + cupón (backend ya aplica el usado)
+  return Math.min(100, (referralDiscount || 0) + (appliedCouponPercent || 0));
 }
 
 function updateDiscountBanner() {
@@ -1343,7 +1332,6 @@ async function applyCoupon() {
     if (response.ok && data.success) {
       appliedCouponCode = code.toUpperCase();
       appliedCouponPercent = Number(data.coupon.discount) || 0;
-      couponValid = true;
       document.getElementById('couponInput').style.borderColor = 'rgba(57,255,160,0.4)';
     } else {
       resetCoupon();
@@ -1361,7 +1349,7 @@ async function applyCoupon() {
 }
 
 function resetCoupon() {
-  appliedCouponCode = ''; appliedCouponPercent = 0; couponValid = false;
+  appliedCouponCode = ''; appliedCouponPercent = 0;
   const inp = document.getElementById('couponInput');
   if (inp) inp.style.borderColor = 'rgba(255,255,255,0.1)';
 }
@@ -1439,11 +1427,6 @@ async function sendOrder() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error enviando comprobante');
 
-    if (effective > 0 && currentUserId) {
-      localStorage.setItem(`vpncuba_referral_spent_${currentUserId}`, String(referralSpent + 20));
-      referralSpent += 20;
-    }
-
     showToast();
     setTimeout(() => {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1500,20 +1483,21 @@ function openTelegram() {
         .then(data => {
           if (data.banned) {
             document.getElementById('banScreen')?.classList.add('active');
-            const mainApp = document.getElementById('mainApp');
-            if (mainApp) mainApp.style.display = 'none';
+            document.getElementById('mainApp').style.display = 'none';
             return;
           }
+          // Inicializar descuento de referido
+          referralDiscount = Number(data.referral_discount || 0);
+          // Ahora sí seleccionar plan y pintar
           selectPlan(planParam);
-          loadReferralDiscount();
+          updateDiscountBanner();
+          updatePricing();
         })
         .catch(() => {
           selectPlan(planParam);
-          loadReferralDiscount();
         });
     } else {
       selectPlan(planParam);
-      loadReferralDiscount();
     }
   } catch (e) {
     console.error('Error inicializando checkout:', e);
