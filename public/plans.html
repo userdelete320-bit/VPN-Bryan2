@@ -1336,16 +1336,12 @@ window.addEventListener('load', () => {
       .then(res => res.json())
       .then(data => {
         if (data.banned) {
-          document.getElementById('banScreen').classList.add('active');
-          document.getElementById('mainApp').style.display = 'none';
-          return;
+          document.getElementById('banScreen')?.classList.add('active');
+          const mainApp = document.getElementById('mainApp');
+          if (mainApp) mainApp.style.display = 'none';
         }
-        // Si no está baneado, no es necesario hacer nada extra; la página ya está visible.
       })
-      .catch(() => {
-        // Si falla la verificación, permitimos el acceso normal
-        console.log('No se pudo verificar el estado de baneo, acceso permitido.');
-      });
+      .catch(() => {});
   }
 });
 </script>
