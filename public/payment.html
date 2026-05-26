@@ -1394,11 +1394,19 @@ function removeFile() {
 
 async function sendOrder() {
   if (currentPlan === 'trial') { alert('La prueba se solicita desde la miniapp.'); return; }
-  if(!fileUploaded) return;
+  if (!fileUploaded) return;
+  if (!currentUserId) {
+    alert('No se pudo identificar tu usuario. Abre esta página desde el bot de Telegram.');
+    return;
+  }
   const btn = document.getElementById('sendBtn');
   if (!btn) return;
   btn.disabled = true;
   btn.innerHTML = '<span style="animation:spin 0.8s linear infinite">⋯</span> ENVIANDO...';
+
+  // Timeout con AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
 
   try {
     const p = PLAN_BASE[currentPlan] || PLAN_BASE.anual;
@@ -1423,7 +1431,13 @@ async function sendOrder() {
     if (!fileInput.files[0]) throw new Error('Archivo no encontrado. Vuelve a seleccionar la imagen.');
     form.append('screenshot', fileInput.files[0]);
 
-    const res = await fetch('/api/payment', { method: 'POST', body: form });
+    const res = await fetch('/api/payment', { 
+      method: 'POST', 
+      body: form,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error enviando comprobante');
 
@@ -1439,8 +1453,12 @@ async function sendOrder() {
     }, 800);
 
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error('Error enviando comprobante:', err);
-    const message = err.message || 'No se pudo enviar el comprobante. Revisa tu conexión.';
+    let message = err.message || 'No se pudo enviar el comprobante. Revisa tu conexión.';
+    if (err.name === 'AbortError') {
+      message = 'El servidor tardó demasiado en responder. Intenta de nuevo.';
+    }
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.showAlert(message, () => {});
     } else {
