@@ -308,46 +308,55 @@ const db = {
     }
   },
 
+  // ========== FUNCIÓN CORREGIDA ==========
   async getReferralStats(telegramId) {
     try {
       const userId = String(telegramId).trim();
-      const user = await this.getUser(userId);
       const { data: level1, error: error1 } = await dbClient
         .from('referrals')
         .select('*')
         .eq('referrer_id', userId)
-        .eq('level', 1);
+        .eq('level', 1)
+        .eq('has_paid', true);
       const { data: level2, error: error2 } = await dbClient
         .from('referrals')
         .select('*')
         .eq('referrer_id', userId)
-        .eq('level', 2);
+        .eq('level', 2)
+        .eq('has_paid', true);
+
       const level1Paid = level1?.filter(r => r.has_paid).length || 0;
       const level2Paid = level2?.filter(r => r.has_paid).length || 0;
-      const totalReferrals = (level1?.length || 0) + (level2?.length || 0);
-      const totalPaid = level1Paid + level2Paid;
+      // Cada referido nivel 1 da 20%, nivel 2 da 10%, acumulable hasta 100%
       const discount = (level1Paid * 20) + (level2Paid * 10);
-      const discountPercentage = discount > 100 ? 100 : discount;
-      let usedDiscount = 0;
-      try {
-        const payments = await this.getUserPayments(userId);
-        const countedPayments = (payments || []).filter(p => p.status && p.status !== 'rejected').length;
-        usedDiscount = Math.min(discountPercentage, countedPayments * 20);
-      } catch (e) {}
-      const finalDiscount = Math.max(0, discountPercentage - usedDiscount);
+      const discountPercentage = Math.min(discount, 100);
+
       return {
         level1: { total: level1?.length || 0, paid: level1Paid },
         level2: { total: level2?.length || 0, paid: level2Paid },
-        total_referrals: totalReferrals,
-        total_paid: totalPaid,
-        discount_percentage: finalDiscount,
-        discount_base: discountPercentage,
-        discount_used: usedDiscount,
-        paid_referrals: totalPaid
+        total_referrals: (level1?.length || 0) + (level2?.length || 0),
+        total_paid: level1Paid + level2Paid,
+        discount_percentage: discountPercentage,
+        paid_referrals: level1Paid + level2Paid
       };
     } catch (error) {
       console.error('❌ Error en getReferralStats:', error);
       return { level1: { total: 0, paid: 0 }, level2: { total: 0, paid: 0 }, total_referrals: 0, total_paid: 0, discount_percentage: 0, paid_referrals: 0 };
+    }
+  },
+
+  // Método para marcar referidos como utilizados (cuando se aprueba un pago)
+  async markReferralDiscountAsUsed(referralIds) {
+    try {
+      const { error } = await dbClient
+        .from('referrals')
+        .update({ discount_used_at: new Date().toISOString() })
+        .in('id', referralIds);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('❌ Error en markReferralDiscountAsUsed:', error);
+      return false;
     }
   },
 
@@ -463,6 +472,7 @@ const db = {
           coupon_used: paymentData.coupon_used || false,
           coupon_code: paymentData.coupon_code || null,
           coupon_discount: paymentData.coupon_discount || 0,
+          referral_discount: paymentData.referral_discount || 0,
           created_at: paymentData.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
