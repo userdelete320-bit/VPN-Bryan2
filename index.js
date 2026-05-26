@@ -182,7 +182,7 @@ bot.use(async (ctx, next) => {
 
 // Middleware de API para rutas protegidas (bloquea a baneados)
 async function requireNotBanned(req, res, next) {
-    const telegramId = req.body.telegramId || req.params.telegramId || req.query.telegramId;
+    const telegramId = (req.body && req.body.telegramId) || req.params.telegramId || req.query.telegramId;
     if (!telegramId) {
         return next();
     }
