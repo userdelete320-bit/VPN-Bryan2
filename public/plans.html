@@ -95,7 +95,6 @@
     padding: 0 0 100px;
   }
 
-  /* Pantalla de baneo */
   .ban-screen {
     position: fixed;
     inset: 0;
@@ -1219,9 +1218,9 @@ function openModal(key) {
       <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
       <div class="modal-plan-name">${p.name}</div>
       <div class="modal-plan-desc">${p.desc}</div>
-      <div class="modal-features-grid">
+      <div class="modal-features-grid" id="trialButtonsContainer">
         ${TRIAL_OPTIONS.map(opt => `
-          <button class="trial-choice" onclick="requestTrial('${opt.key}')">
+          <button class="trial-choice" data-plan-key="${opt.key}">
             <div class="mf-icon">${opt.key === 'basic' ? '🌐' : opt.key === 'advanced' ? '🚀' : opt.key === 'vip' ? '🏦' : opt.key === 'gaming' ? '🎮' : '♾️'}</div>
             <div class="mf-label">${opt.label}</div>
             <div class="mf-val">Pedir prueba</div>
@@ -1232,6 +1231,18 @@ function openModal(key) {
         Cerrar
       </button>
     `;
+
+    // Delegación de eventos para los botones de prueba
+    const container = document.getElementById('trialButtonsContainer');
+    if (container) {
+      container.addEventListener('click', (e) => {
+        const btn = e.target.closest('.trial-choice');
+        if (btn) {
+          const planKey = btn.dataset.planKey;
+          if (planKey) requestTrial(planKey);
+        }
+      });
+    }
   } else {
     content.innerHTML = `
       <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
@@ -1283,9 +1294,7 @@ function handleCTA(key) {
   window.location.href = `payment.html?${params.toString()}`;
 }
 
-// ==================== FUNCIÓN CORREGIDA requestTrial ====================
 async function requestTrial(planKey) {
-  // Si no hay userId, mostrar mensaje en el modal en lugar de alert
   if (!currentUserId) {
     const modalContent = document.getElementById('modalContent');
     if (modalContent) {
@@ -1339,7 +1348,6 @@ function scrollTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ===== INICIALIZACIÓN (con verificación de baneo) =====
 window.addEventListener('load', () => {
   const tg = window.Telegram?.WebApp;
   if (tg) {
