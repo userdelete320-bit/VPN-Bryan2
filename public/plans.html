@@ -756,18 +756,27 @@
     font-weight: 500;
     color: var(--text);
   }
+
+  /* Estilo mejorado para los botones de prueba */
   .trial-choice {
     width:100%;
     text-align:left;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
     color: var(--text);
     border-radius: 16px;
     padding: 14px;
     display:flex;
     flex-direction:column;
     gap:4px;
-    cursor:pointer;
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(57,255,160,0.2);
+    user-select: none;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .trial-choice:active {
+    background: rgba(57,255,160,0.08);
+    border-color: rgba(57,255,160,0.3);
   }
   .trial-choice .mf-icon { font-size: 20px; }
   .trial-choice .mf-label { font-size: 12px; font-weight: 700; }
@@ -1218,9 +1227,9 @@ function openModal(key) {
       <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
       <div class="modal-plan-name">${p.name}</div>
       <div class="modal-plan-desc">${p.desc}</div>
-      <div class="modal-features-grid" id="trialButtonsContainer">
+      <div class="modal-features-grid">
         ${TRIAL_OPTIONS.map(opt => `
-          <button class="trial-choice" data-plan-key="${opt.key}">
+          <button class="trial-choice" onclick="requestTrial('${opt.key}')">
             <div class="mf-icon">${opt.key === 'basic' ? '🌐' : opt.key === 'advanced' ? '🚀' : opt.key === 'vip' ? '🏦' : opt.key === 'gaming' ? '🎮' : '♾️'}</div>
             <div class="mf-label">${opt.label}</div>
             <div class="mf-val">Pedir prueba</div>
@@ -1231,18 +1240,6 @@ function openModal(key) {
         Cerrar
       </button>
     `;
-
-    // Delegación de eventos para los botones de prueba
-    const container = document.getElementById('trialButtonsContainer');
-    if (container) {
-      container.addEventListener('click', (e) => {
-        const btn = e.target.closest('.trial-choice');
-        if (btn) {
-          const planKey = btn.dataset.planKey;
-          if (planKey) requestTrial(planKey);
-        }
-      });
-    }
   } else {
     content.innerHTML = `
       <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
