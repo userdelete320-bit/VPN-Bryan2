@@ -846,48 +846,87 @@ app.post('/api/payments/:id/approve', async (req, res) => {
     }
 
     if (payment.referral_discount && payment.referral_discount > 0) {
-      const userId = payment.telegram_id;
-      const { data: level1 } = await supabaseAdmin
-        .from('referrals')
-        .select('id')
-        .eq('referrer_id', userId)
-        .eq('level', 1)
-        .eq('has_paid', true)
-        .is('discount_used_at', null);
-      const { data: level2 } = await supabaseAdmin
-        .from('referrals')
-        .select('id')
-        .eq('referrer_id', userId)
-        .eq('level', 2)
-        .eq('has_paid', true)
-        .is('discount_used_at', null);
+  const userId = payment.telegram_id;
+  
+  // Obtener el descuento actual del usuario
+  const referralStats = await db.getReferralStats(userId);
+  const currentDiscount = referralStats?.discount_percentage || 0;
+  
+  // Calcular nuevo descuento después de usar este
+  let newDiscount = currentDiscount;
+  if (currentDiscount >= 40) {
+    newDiscount = 20;
+  } else if (currentDiscount >= 20) {
+    newDiscount = 0;
+  }
+  
+  // Obtener referidos no usados
+  const { data: level1 } = await supabaseAdmin
+    .from('referrals')
+    .select('id')
+    .eq('referrer_id', userId)
+    .eq('level', 1)
+    .eq('has_paid', true)
+    .is('discount_used_at', null);
+  const { data: level2 } = await supabaseAdmin
+    .from('referrals')
+    .select('id')
+    .eq('referrer_id', userId)
+    .eq('level', 2)
+    .eq('has_paid', true)
+    .is('discount_used_at', null);
 
-      let remainingDiscount = payment.referral_discount;
-      const referralsToMark = [];
-      for (const ref of (level1 || [])) {
-        if (remainingDiscount >= 20) {
-          referralsToMark.push(ref.id);
-          remainingDiscount -= 20;
-        } else break;
-      }
-      for (const ref of (level2 || [])) {
-        if (remainingDiscount >= 10) {
-          referralsToMark.push(ref.id);
-          remainingDiscount -= 10;
-        } else break;
-      }
-      if (referralsToMark.length > 0) {
-        await db.markReferralDiscountAsUsed(referralsToMark);
-      }
-    }
+  let remainingDiscount = payment.referral_discount;
+  const referralsToMark = [];
+  for (const ref of (level1 || [])) {
+    if (remainingDiscount >= 20) {
+      referralsToMark.push(ref.id);
+      remainingDiscount -= 20;
+    } else break;
+  }
+  for (const ref of (level2 || [])) {
+    if (remainingDiscount >= 10) {
+      referralsToMark.push(ref.id);
+      remainingDiscount -= 10;
+    } else break;
+  }
+  if (referralsToMark.length > 0) {
+    await db.markReferralDiscountAsUsed(referralsToMark);
+  }
+  
+  // Actualizar el descuento del usuario si cambió
+  if (newDiscount !== currentDiscount) {
+    await supabaseAdmin
+      .from('users')
+      .update({ 
+        referral_discount: newDiscount,
+        last_discount_used_at: new Date().toISOString()
+      })
+      .eq('telegram_id', userId);
+    
+    console.log(`✅ Descuento de referido actualizado: ${currentDiscount}% → ${newDiscount}% para usuario ${userId}`);
+  }
+}
 
     try {
-      let userMessage = '<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Tu pago ha sido aprobado!</b>\n\nAhora eres usuario VIP de VPN Cuba.\nEl administrador te enviará el archivo de configuración en breve.\n\n';
-      if (payment.coupon_used && payment.coupon_discount) userMessage += `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}% descuento)\n`;
-      userMessage += '<b>Nota:</b> Sistema de envío automático desactivado.';
-      await bot.telegram.sendMessage(payment.telegram_id, userMessage, { parse_mode: 'HTML' });
-    } catch (botError) { console.log('❌ No se pudo notificar al usuario:', botError.message); }
-
+  let userMessage = '<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Tu pago ha sido aprobado!</b>\n\nAhora eres usuario VIP de VPN Cuba.\nEl administrador te enviará el archivo de configuración en breve.\n\n';
+  if (payment.coupon_used && payment.coupon_discount) userMessage += `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}% descuento)\n`;
+  if (payment.referral_discount && payment.referral_discount > 0) {
+    userMessage += `<tg-emoji emoji-id="5258362837411045098">🤝</tg-emoji> <b>Descuento por referidos:</b> ${payment.referral_discount}% aplicado\n`;
+    
+    // Mostrar el nuevo descuento acumulado
+    const newStats = await db.getReferralStats(payment.telegram_id);
+    if (newStats && newStats.discount_percentage > 0) {
+      userMessage += `\n💰 <b>Tu nuevo descuento acumulado:</b> ${newStats.discount_percentage}% para tu próxima compra.`;
+    } else {
+      userMessage += `\n💰 <b>Has agotado tu descuento por referidos.</b> Invita más amigos para obtener nuevos descuentos.`;
+    }
+    userMessage += `\n\n<i>Nota: Cada vez que usas tu descuento, este se reduce (40% → 20% → 0%).</i>`;
+  }
+  userMessage += '\n\n<b>Nota:</b> Sistema de envío automático desactivado.';
+  await bot.telegram.sendMessage(payment.telegram_id, userMessage, { parse_mode: 'HTML' });
+} catch (botError) { console.log('❌ No se pudo notificar al usuario:', botError.message); }
+    
     const user = await db.getUser(payment.telegram_id);
     if (!user.vip) await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
 
