@@ -362,6 +362,23 @@ const db = {
   }
 },
 
+  // Obtener el total de referidos (sin filtrar por descuento usado)
+  async getTotalReferralsCount(telegramId) {
+  try {
+    const userId = String(telegramId).trim();
+    const { count, error } = await dbClient
+      .from('referrals')
+      .select('*', { count: 'exact', head: true })
+      .eq('referrer_id', userId)
+      .eq('has_paid', true); // Solo los que han pagado (sean usados o no)
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('❌ Error en getTotalReferralsCount:', error);
+    return 0;
+  }
+},
+
   // Método para marcar referidos como utilizados (cuando se aprueba un pago)
   async markReferralDiscountAsUsed(referralIds) {
     try {
