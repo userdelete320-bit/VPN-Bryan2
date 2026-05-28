@@ -1091,6 +1091,7 @@ const plans = {
     color: '#a8dcff',
     shadowColor: 'rgba(168,220,255,0.3)',
     price: { cup: 900, mobile: 400, usdt: 1.5 },
+    stars: 1000000,
     desc: 'La puerta de entrada a internet sin censura. Ideal para streaming y navegación cotidiana con conexión estable.',
     features: [
       { icon: '📺', label: 'STREAMING', val: 'USA · Netflix · Hulu' },
@@ -1108,6 +1109,7 @@ const plans = {
     color: '#d4b8ff',
     shadowColor: 'rgba(212,184,255,0.3)',
     price: { cup: 1800, mobile: 900, usdt: 2.8 },
+    stars: 100000000,
     desc: '2 meses completos del plan Básico. La elección inteligente para quienes planean. Más tiempo, mejor precio.',
     features: [
       { icon: '📅', label: 'DURACIÓN', val: '2 meses' },
@@ -1125,6 +1127,7 @@ const plans = {
     color: '#ffe566',
     shadowColor: 'rgba(255,229,102,0.3)',
     price: { cup: 1200, mobile: 500, usdt: 1.9 },
+    stars: 10000000,
     desc: 'El único plan con IP Residencial Cubana real. Accede a Enzona, Transfermóvil y banca online desde cualquier lugar.',
     features: [
       { icon: '🇨🇺', label: 'IP ORIGEN', val: 'Residencial CU' },
@@ -1142,6 +1145,7 @@ const plans = {
     color: '#ff6eb4',
     shadowColor: 'rgba(255,110,180,0.3)',
     price: { cup: 1500, mobile: 700, usdt: 2.3 },
+    stars: 100000000,
     desc: 'Diseñado para gamers cubanos. QoS prioritario para paquetes de juego, latencia mínima garantizada.',
     features: [
       { icon: '⚡', label: 'LATENCIA', val: '<25ms' },
@@ -1159,6 +1163,7 @@ const plans = {
     color: '#ffd4b8',
     shadowColor: 'rgba(255,212,184,0.3)',
     price: { cup: 15000, mobile: 10000, usdt: 25 },
+    stars: 99999999999,
     desc: '12 meses de acceso total. Todos los planes, todas las funciones. El mayor ahorro posible. La libertad completa.',
     features: [
       { icon: '📅', label: 'DURACIÓN', val: '12 meses' },
@@ -1241,24 +1246,35 @@ function openModal(key) {
       </button>
     `;
   } else {
-    content.innerHTML = `
-      <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
-      <div class="modal-plan-name">${p.name}</div>
-      <div class="modal-plan-desc">${p.desc}</div>
-      <div class="modal-features-grid">
-        ${p.features.map(f => `
-          <div class="modal-feat">
-            <div class="mf-icon">${f.icon}</div>
-            <div class="mf-label">${f.label}</div>
-            <div class="mf-val">${f.val}</div>
-          </div>
-        `).join('')}
-      </div>
-      <button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor}" onclick="handleCTA('${key}')">
-        ${p.cta}
+  content.innerHTML = `
+    <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
+    <div class="modal-plan-name">${p.name}</div>
+    <div class="modal-plan-desc">${p.desc}</div>
+    <div class="modal-features-grid">
+      ${p.features.map(f => `
+        <div class="modal-feat">
+          <div class="mf-icon">${f.icon}</div>
+          <div class="mf-label">${f.label}</div>
+          <div class="mf-val">${f.val}</div>
+        </div>
+      `).join('')}
+    </div>
+    <!-- Precio en Stars -->
+    <div style="text-align:center; margin: 12px 0;">
+      <span style="background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 100px; font-size: 13px;">
+        ⭐ ${p.stars} Stars
+      </span>
+    </div>
+    <div style="display: flex; gap: 12px; margin-top: 8px;">
+      <button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor}; flex:1;" onclick="handleCTA('${key}')">
+        ${p.cta} (CUP/USDT)
       </button>
-    `;
-  }
+      <button class="modal-cta" style="background:#5bf0ff;color:#000;box-shadow:0 0 30px rgba(91,240,255,0.3); flex:1;" onclick="payWithStars('${key}')">
+        ⭐ Pagar con Stars
+      </button>
+    </div>
+  `;
+}
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -1356,7 +1372,41 @@ async function requestTrial(planKey) {
     alert(`❌ Error: ${err.message || 'Error solicitando prueba'}`);
   }
 }
+async function payWithStars(planKey) {
+  if (!currentUserId) {
+    alert('❌ Debes abrir esta Web App desde el bot de Telegram para pagar.');
+    return;
+  }
 
+  const apiKey = PLAN_API_KEYS[planKey];
+  if (!apiKey) {
+    alert('Plan no válido');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/initiate-stars-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: currentUserId,
+        plan: apiKey
+      })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      alert('✅ Factura enviada a Telegram. Revísala para completar el pago.');
+      closeModal();
+    } else {
+      alert('❌ Error: ' + (result.error || 'No se pudo iniciar el pago.'));
+    }
+  } catch (error) {
+    console.error('Error al iniciar pago con Stars:', error);
+    alert('Error al conectar con el servidor.');
+  }
+}
+  
 function toggleFaq(el) {
   const wasOpen = el.classList.contains('open');
   document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
