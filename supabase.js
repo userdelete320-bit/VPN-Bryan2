@@ -917,26 +917,34 @@ const db = {
     }
   },
 
-  async checkTrialEligibility(telegramId) {
-    try {
-      const user = await this.getUser(telegramId);
-      if (!user) return { eligible: true, reason: 'Nuevo usuario' };
-      if (!user.trial_requested) return { eligible: true, reason: 'Primera solicitud' };
-      if (user.trial_requested && !user.trial_received) return { eligible: false, reason: 'Ya tiene una solicitud pendiente' };
+  async checkTrialEligibility(telegramId, planType = null) {
+  try {
+    const user = await this.getUser(telegramId);
+    if (!user) return { eligible: true, reason: 'Nuevo usuario' };
+    
+    const targetPlan = planType || 'basico';
+    
+    // Verificar si ya solicitó ESTE plan específico
+    if (user.trial_requested && user.trial_plan_type === targetPlan) {
+      if (!user.trial_received) {
+        return { eligible: false, reason: `Ya tienes una solicitud PENDIENTE del plan ${targetPlan.toUpperCase()}` };
+      }
       if (user.trial_received && user.trial_sent_at) {
         const lastTrialDate = new Date(user.trial_sent_at);
         const now = new Date();
         const daysSinceLastTrial = Math.floor((now - lastTrialDate) / (1000 * 60 * 60 * 24));
         if (daysSinceLastTrial < 30) {
-          return { eligible: false, reason: `Debe esperar ${30 - daysSinceLastTrial} días para solicitar otra prueba`, days_remaining: 30 - daysSinceLastTrial };
+          return { eligible: false, reason: `Ya solicitaste el plan ${targetPlan.toUpperCase()}. Debes esperar ${30 - daysSinceLastTrial} días para volver a solicitar ESTE mismo plan.` };
         }
       }
-      return { eligible: true, reason: 'Puede solicitar nueva prueba' };
-    } catch (error) {
-      console.error('❌ Error en checkTrialEligibility:', error);
-      return { eligible: false, reason: 'Error verificando elegibilidad' };
     }
-  },
+    
+    return { eligible: true, reason: `Puedes solicitar tu prueba del plan ${targetPlan.toUpperCase()}` };
+  } catch (error) {
+    console.error('❌ Error en checkTrialEligibility:', error);
+    return { eligible: false, reason: 'Error verificando elegibilidad' };
+  }
+},
 
   // ========== BROADCASTS ==========
   async createBroadcast(message, targetUsers = 'all', sentBy) {
