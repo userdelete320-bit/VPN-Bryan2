@@ -1056,7 +1056,6 @@ app.post('/api/request-trial', requireNotBanned, async (req, res) => {
         updated_at: new Date().toISOString()
       })
       .eq('telegram_id', telegramId)
-      .eq('trial_requested', false)
       .select()
       .single();
 
