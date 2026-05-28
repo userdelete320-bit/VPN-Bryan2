@@ -1312,6 +1312,16 @@ async function requestTrial(planKey) {
     return;
   }
 
+  const planNames = {
+    'basico': 'Básico',
+    'avanzado': 'Avanzado',
+    'cuba_vip': 'Cuba VIP',
+    'premium': 'Premium',
+    'anual': 'Anual'
+  };
+  
+  const selectedPlanName = planNames[PLAN_API_KEYS[planKey]] || PLAN_API_KEYS[planKey];
+
   try {
     const res = await fetch('/api/request-trial', {
       method: 'POST',
@@ -1327,11 +1337,23 @@ async function requestTrial(planKey) {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'No se pudo solicitar la prueba');
-    alert(data.message || 'Prueba solicitada con éxito');
+    
+    if (!res.ok) {
+      // Manejar errores específicos
+      if (data.error && data.error.includes('pendiente del plan')) {
+        alert(`⚠️ Ya tienes una solicitud PENDIENTE para el plan ${selectedPlanName}.\n\nEspera a que un administrador te envíe la configuración.`);
+      } else if (data.error && (data.error.includes('Ya solicitaste') || data.error.includes('esperar'))) {
+        alert(`⚠️ ${data.error}\n\nSolo puedes solicitar el plan ${selectedPlanName} una vez cada 30 días.`);
+      } else {
+        alert(`❌ Error: ${data.error || 'No se pudo solicitar la prueba'}`);
+      }
+      return;
+    }
+    
+    alert(`✅ ¡Prueba del plan ${selectedPlanName} solicitada con éxito!\n\nRevisa tu chat de Telegram, la configuración ya ha sido enviada.`);
     closeModal();
   } catch (err) {
-    alert(err.message || 'Error solicitando prueba');
+    alert(`❌ Error: ${err.message || 'Error solicitando prueba'}`);
   }
 }
 
