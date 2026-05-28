@@ -928,8 +928,9 @@ app.post('/api/payments/:id/approve', async (req, res) => {
 } catch (botError) { console.log('❌ No se pudo notificar al usuario:', botError.message); }
     
     const user = await db.getUser(payment.telegram_id);
-    if (!user.vip) await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
-
+   
+    // Siempre actualizar la fecha, incluso en renovaciones
+  await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
     if (user.referrer_id) {
       try {
         await db.markReferralAsPaid(payment.telegram_id);
