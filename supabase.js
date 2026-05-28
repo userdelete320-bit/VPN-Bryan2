@@ -310,40 +310,46 @@ const db = {
 
   // ========== FUNCIÓN CORREGIDA ==========
   async getReferralStats(telegramId) {
-    try {
-      const userId = String(telegramId).trim();
-      const { data: level1, error: error1 } = await dbClient
-        .from('referrals')
-        .select('*')
-        .eq('referrer_id', userId)
-        .eq('level', 1)
-        .eq('has_paid', true);
-      const { data: level2, error: error2 } = await dbClient
-        .from('referrals')
-        .select('*')
-        .eq('referrer_id', userId)
-        .eq('level', 2)
-        .eq('has_paid', true);
+  try {
+    const userId = String(telegramId).trim();
+    
+    // Obtener referidos que NO han sido usados para descuento
+    const { data: level1, error: error1 } = await dbClient
+      .from('referrals')
+      .select('*')
+      .eq('referrer_id', userId)
+      .eq('level', 1)
+      .eq('has_paid', true)
+      .is('discount_used_at', null);  // Solo los no usados
+    
+    const { data: level2, error: error2 } = await dbClient
+      .from('referrals')
+      .select('*')
+      .eq('referrer_id', userId)
+      .eq('level', 2)
+      .eq('has_paid', true)
+      .is('discount_used_at', null);  // Solo los no usados
 
-      const level1Paid = level1?.filter(r => r.has_paid).length || 0;
-      const level2Paid = level2?.filter(r => r.has_paid).length || 0;
-      // Cada referido nivel 1 da 20%, nivel 2 da 10%, acumulable hasta 100%
-      const discount = (level1Paid * 20) + (level2Paid * 10);
-      const discountPercentage = Math.min(discount, 100);
+    const level1Paid = level1?.length || 0;
+    const level2Paid = level2?.length || 0;
+    
+    // Calcular descuento SOLO con referidos no usados
+    const discount = (level1Paid * 20) + (level2Paid * 10);
+    const discountPercentage = Math.min(discount, 100);
 
-      return {
-        level1: { total: level1?.length || 0, paid: level1Paid },
-        level2: { total: level2?.length || 0, paid: level2Paid },
-        total_referrals: (level1?.length || 0) + (level2?.length || 0),
-        total_paid: level1Paid + level2Paid,
-        discount_percentage: discountPercentage,
-        paid_referrals: level1Paid + level2Paid
-      };
-    } catch (error) {
-      console.error('❌ Error en getReferralStats:', error);
-      return { level1: { total: 0, paid: 0 }, level2: { total: 0, paid: 0 }, total_referrals: 0, total_paid: 0, discount_percentage: 0, paid_referrals: 0 };
-    }
-  },
+    return {
+      level1: { total: level1?.length || 0, paid: level1Paid },
+      level2: { total: level2?.length || 0, paid: level2Paid },
+      total_referrals: (level1?.length || 0) + (level2?.length || 0),
+      total_paid: level1Paid + level2Paid,
+      discount_percentage: discountPercentage,
+      paid_referrals: level1Paid + level2Paid
+    };
+  } catch (error) {
+    console.error('❌ Error en getReferralStats:', error);
+    return { level1: { total: 0, paid: 0 }, level2: { total: 0, paid: 0 }, total_referrals: 0, total_paid: 0, discount_percentage: 0, paid_referrals: 0 };
+  }
+},
 
   // Método para marcar referidos como utilizados (cuando se aprueba un pago)
   async markReferralDiscountAsUsed(referralIds) {
@@ -422,6 +428,28 @@ const db = {
     }
   },
 
+  // Agregar esta función después de getReferralStats
+async updateUserReferralDiscount(telegramId, newDiscount) {
+  try {
+    const userId = String(telegramId).trim();
+    const { data, error } = await dbClient
+      .from('users')
+      .update({ 
+        referral_discount: newDiscount,
+        last_discount_used_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('telegram_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('❌ Error en updateUserReferralDiscount:', error);
+    return null;
+  }
+},
+
   async markReferralAsPaid(referredId, level = 1) {
     try {
       const userId = String(referredId).trim();
@@ -454,6 +482,7 @@ const db = {
     }
   },
 
+  
   // ========== PAGOS ==========
   async createPayment(paymentData) {
     try {
