@@ -1793,10 +1793,37 @@ bot.action('referral_info', async (ctx) => {
   try {
     const user = await db.getUser(userId);
     let referralStats = null;
-    if (user) try { referralStats = await db.getReferralStats(userId); } catch (e) {}
+    let totalReferrals = 0;
+    if (user) {
+      try {
+        referralStats = await db.getReferralStats(userId);
+        totalReferrals = await db.getTotalReferralsCount(userId);
+      } catch (e) {}
+    }
+    const activeDiscount = referralStats?.discount_percentage || 0;
+    
+    // Construcción del mensaje con el formato que deseas
+    let message = `<tg-emoji emoji-id="5258362837411045098">🤝</tg-emoji> <b>SISTEMA DE REFERIDOS</b>\n\n`;
+    message += `🔗 <b>Tu enlace único:</b>\n<code>${referralLink}</code>\n\n`;
+    message += `📊 <b>Total referidos:</b> ${totalReferrals}\n`;
+    message += `💰 <b>Descuentos por Referidos sin usar:</b> ${activeDiscount}%\n\n`;
+    message += `<i>Detalle: Bajo</i>\n\n`;
+    message += `💡 Cada referido que paga te da 20% (nivel 1) o 10% (nivel 2). El descuento se reduce al usarlo (40%→20%→0%).`;
+    
     await ctx.answerCbQuery();
-    await ctx.reply(getReferralInfoHtml(userId, referralStats), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
-  } catch (error) { await ctx.answerCbQuery(); await ctx.reply(`🤝 Tu enlace: \`https://t.me/vpncubaw_bot?start=ref${userId}\``, { parse_mode: 'Markdown' }); }
+    await ctx.reply(message, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })],
+          [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
+        ]
+      }
+    });
+  } catch (error) {
+    await ctx.answerCbQuery();
+    await ctx.reply(`🤝 Tu enlace: \`https://t.me/vpncubaw_bot?start=ref${userId}\``, { parse_mode: 'Markdown' });
+  }
 });
 
 bot.action('how_it_works', async (ctx) => {
