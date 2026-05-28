@@ -155,27 +155,38 @@ const db = {
   },
 
   async makeUserVIP(telegramId, vipData = {}) {
-    try {
-      const userId = String(telegramId).trim();
-      const { data, error } = await dbClient
-        .from('users')
-        .update({
-          vip: true,
-          plan: vipData.plan || 'vip',
-          plan_price: vipData.plan_price || 0,
-          vip_since: vipData.vip_since || new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('telegram_id', userId)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('❌ Error en makeUserVIP:', error);
-      throw error;
-    }
-  },
+  try {
+    const userId = String(telegramId).trim();
+    
+    // Obtener usuario actual para saber si ya era VIP
+    const currentUser = await this.getUser(userId);
+    const wasVip = currentUser?.vip === true;
+    
+    // SIEMPRE actualizar vip_since cuando se aprueba un pago (renovación)
+    // Esto reinicia el contador de días
+    const newVipSince = vipData.vip_since || new Date().toISOString();
+    
+    const { data, error } = await dbClient
+      .from('users')
+      .update({
+        vip: true,
+        plan: vipData.plan || 'vip',
+        plan_price: vipData.plan_price || 0,
+        vip_since: newVipSince,
+        updated_at: new Date().toISOString()
+      })
+      .eq('telegram_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    
+    console.log(`✅ Usuario ${userId} actualizado a VIP. Plan: ${vipData.plan}. Fecha inicio: ${newVipSince} (${wasVip ? 'Renovación' : 'Nuevo VIP'})`);
+    return data;
+  } catch (error) {
+    console.error('❌ Error en makeUserVIP:', error);
+    throw error;
+  }
+},
 
   async removeVIP(telegramId) {
     try {
