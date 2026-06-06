@@ -765,7 +765,7 @@ body::after {
     </div>
     <div class="topbar-logo">
       <span class="dot"></span>
-      @L0QUE N2
+      @ROV3R777
     </div>
     <div class="topbar-help">?</div>
   </div>
@@ -931,7 +931,7 @@ body::after {
         <div class="payment-info-box">
           <div class="pib-label"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/></svg> NÚMERO PARA RECARGAR</div>
           <div class="pib-val">+53 51732958</div>
-          <button class="copy-btn" onclick="copyText('+5363806513',this)">COPIAR</button>
+          <button class="copy-btn" onclick="copyText('+5351732958',this)">COPIAR</button>
         </div>
         <div class="payment-info-box mt8">
           <div class="pib-label">MONTO SALDO MÓVIL</div>
@@ -1025,10 +1025,10 @@ body::after {
       <div class="tl-item"><div class="tl-dot-wrap"><div class="tl-dot"></div></div><div class="tl-content"><div class="tl-label">¡Conectado!</div><div class="tl-sub">Importa el .conf en WireGuard y listo.</div><div class="tl-time">MTU 1280 · UDP:80</div></div></div>
     </div>
     <div class="confirm-btns">
-      <button class="cb-primary" onclick="openTelegram()">Ir al canal @L0quen2</button>
+      <button class="cb-primary" onclick="openTelegram()">Ir al canal @rov3r777</button>
       <button class="cb-secondary" onclick="goToStep(1)">↺ HACER OTRO PEDIDO</button>
     </div>
-    <div class="footer-note">© 2025 VPN CUBA · @L0quen2 · PAGO SEGURO<br>Los archivos de configuración se envían manualmente tras la verificación.</div>
+    <div class="footer-note">© 2025 VPN CUBA · @rov3r777 · PAGO SEGURO<br>Los archivos de configuración se envían manualmente tras la verificación.</div>
   </div>
 
 </div><!-- /app -->
@@ -1300,7 +1300,7 @@ function goBack() { if(currentStep > 1) goToStep(currentStep - 1); }
 
 function switchTab(id) {
   document.querySelectorAll('.method-tab').forEach((t,i)=>{
-    const ids=['bpa','metropolitan','movil','usdt'];
+    const ids=['bpa','movil','usdt'];
     t.classList.toggle('active', ids[i]===id);
   });
   document.querySelectorAll('.method-panel').forEach(p=>p.classList.remove('active'));
@@ -1422,8 +1422,7 @@ async function sendOrder() {
     form.append('notes', document.getElementById('couponInput')?.value?.trim() || '');
     const activeTab = document.querySelector('.method-tab.active');
     const method = activeTab?.textContent?.includes('USDT') ? 'usdt' :
-                   activeTab?.textContent?.includes('Saldo Móvil') ? 'mobile' :
-                   activeTab?.textContent?.includes('Metropolitana') ? 'metropolitan' : 'transfer';
+                   activeTab?.textContent?.includes('Saldo Móvil') ? 'mobile' : 'transfer';
     form.append('method', method);
     form.append('couponCode', appliedCouponCode || '');
     form.append('referralDiscount', String(effective));
@@ -1481,7 +1480,7 @@ function showToast() {
 
 function openTelegram() {
   if (window.Telegram?.WebApp) { window.Telegram.WebApp.close(); }
-  else { window.open('https://t.me/L0quen2','_blank'); }
+  else { window.open('https://t.me/rov3r777','_blank'); }
 }
 
 // ===== INICIALIZACIÓN =====
