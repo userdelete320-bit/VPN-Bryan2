@@ -268,7 +268,6 @@ function getSupportHtml() {
     return `<tg-emoji emoji-id="5886412370347036129">🆘</tg-emoji> <b>SOPORTE TÉCNICO</b>\n\n` +
            `Para cualquier duda o problema, contacta con nuestro soporte:\n\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (CEO)\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @L0quen2 (ADMIN)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Mod)\n\n` +
            `Responde rápido y te ayudaremos.`;
 }
@@ -784,7 +783,7 @@ app.post('/api/payment', requireNotBanned, upload.single('screenshot'), async (r
     const username = user?.username ? `@${user.username}` : 'Sin usuario';
     const firstName = user?.first_name || 'Usuario';
 
-    const methodNames = { transfer: 'BPA', metropolitan: 'Metropolitana', mitransfer: 'MITRANSFER', mobile: 'Saldo Móvil', usdt: 'USDT (BEP20)' };
+    const methodNames = { transfer: 'BPA', mitransfer: 'MITRANSFER', mobile: 'Saldo Móvil', usdt: 'USDT (BEP20)' };
     let adminMessage = `💰 *NUEVO PAGO - ${method === 'usdt' ? 'USDT' : 'CUP'}*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${getPlanName(plan)}\n💰 *Monto:* ${finalPrice} ${method === 'usdt' ? 'USDT' : 'CUP'}\n`;
     if (couponUsed) adminMessage += `🎫 *Cupón:* ${couponCode} (${couponDiscount}%)\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
     else if (referralDiscountApplied > 0) adminMessage += `👥 *Descuento:* ${referralDiscountApplied}%\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
@@ -1233,12 +1232,12 @@ function buildBroadcastCaption(message) {
   const clean = (message || '').trim();
   if (!clean) return `📢 *MENSAJE IMPORTANTE - VPN CUBA*
 
-_Soporte: @L0quen2_`;
+_Soporte: @rov3r777_`;
   return `📢 *MENSAJE IMPORTANTE - VPN CUBA*
 
 ${clean}
 
-_Soporte: @L0quen2_`;
+_Soporte: @rov3r777_`;
 }
 
 async function sendBroadcastMediaToUser(telegramId, mediaFile, caption) {
@@ -1750,7 +1749,7 @@ bot.action('show_support', async (ctx) => {
       parse_mode: 'HTML', 
       reply_markup: { 
         inline_keyboard: [
-          [createButton("CEO", { url: 'https://t.me/rov3r777' }), createButton("ADMIN", { url: 'https://t.me/L0quen2' })], 
+          [createButton("CEO", { url: 'https://t.me/rov3r777' })], 
           [createButton("MOD", { url: 'https://t.me/ErenJeager129182' })], 
           [createButton("WHATSAPP", { url: WHATSAPP_GROUP_LINK })], 
           [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
