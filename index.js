@@ -269,8 +269,6 @@ function getSupportHtml() {
            `Para cualquier duda o problema, contacta con nuestro soporte:\n\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (CEO)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Mod)\n\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> Admin 2 (WhatsApp)\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> Admin 1 (WhatsApp)\n` +
            `Responde rápido y te ayudaremos.`;
 }
 
@@ -1438,6 +1436,128 @@ app.get('/api/usdt/verify-transaction/:hash', (req, res) => { res.json({ success
 app.post('/api/usdt/force-check', (req, res) => { if (!isAdmin(req.body.adminId)) return res.status(403).json({ error: 'No autorizado' }); res.json({ success: true, message: 'Verificación automática desactivada.', result: { transactions: 0, mode: 'manual' } }); });
 app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
 
+// ==================== PAGO CON STARS ====================
+
+const STARS_PRICES = {
+  basico:   500,
+  avanzado: 1000,
+  cuba_vip: 1200,
+  premium:  1500,
+  anual:    50000
+};
+
+const STARS_PLAN_LABELS = {
+  basico:   'Plan Básico (1 mes)',
+  avanzado: 'Plan Avanzado (2 meses)',
+  cuba_vip: 'Plan VIP Cuba (1 mes)',
+  premium:  'Plan Gaming (1 mes)',
+  anual:    'Plan Anual (12 meses)'
+};
+
+app.post('/api/initiate-stars-payment', async (req, res) => {
+  try {
+    const { telegramId, plan } = req.body;
+    if (!telegramId) return res.status(400).json({ error: 'ID de usuario requerido' });
+    const stars = STARS_PRICES[plan];
+    if (!stars) return res.status(400).json({ error: 'Plan inválido' });
+
+    const label = STARS_PLAN_LABELS[plan] || plan;
+
+    await bot.telegram.sendInvoice(telegramId, {
+      title: `VPN Cuba — ${label}`,
+      description: `Activa tu ${label} de VPN Cuba. Recibirás el archivo de configuración WireGuard por este chat tras la verificación.`,
+      payload: JSON.stringify({ plan, telegramId: String(telegramId) }),
+      currency: 'XTR',
+      prices: [{ label, amount: stars }],
+      provider_token: ''
+    });
+
+    res.json({ success: true, message: 'Factura enviada por Telegram' });
+  } catch (error) {
+    console.error('❌ Error iniciando pago Stars:', error);
+    res.status(500).json({ error: 'Error enviando factura: ' + (error.description || error.message) });
+  }
+});
+
+// Pre-checkout: Telegram pide confirmación antes de cobrar
+bot.on('pre_checkout_query', async (ctx) => {
+  try {
+    await ctx.answerPreCheckoutQuery(true);
+  } catch (error) {
+    console.error('❌ Error en pre_checkout_query:', error);
+    try { await ctx.answerPreCheckoutQuery(false, 'Error procesando el pago. Inténtalo de nuevo.'); } catch (e) {}
+  }
+});
+
+// Pago completado: Telegram confirma el cobro
+bot.on('message', async (ctx, next) => {
+  if (!ctx.message?.successful_payment) return next();
+  try {
+    const payment = ctx.message.successful_payment;
+    const payload = JSON.parse(payment.invoice_payload);
+    const { plan, telegramId } = payload;
+    const label = STARS_PLAN_LABELS[plan] || plan;
+    const stars = payment.total_amount;
+
+    // Registrar el pago en la BD
+    await db.createPayment({
+      telegram_id: String(telegramId),
+      plan,
+      price: stars,
+      original_price: stars,
+      method: 'stars',
+      screenshot_url: '',
+      notes: `Pago Stars · charge_id: ${payment.telegram_payment_charge_id}`,
+      status: 'approved',
+      created_at: new Date().toISOString(),
+      coupon_used: false,
+      coupon_code: null,
+      coupon_discount: 0,
+      referral_discount: 0
+    });
+
+    // Hacer VIP al usuario
+    await db.makeUserVIP(String(telegramId), {
+      plan,
+      plan_price: stars,
+      vip_since: new Date().toISOString()
+    });
+
+    // Notificar al usuario
+    await ctx.reply(
+      `<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Pago con Stars confirmado!</b>\n\n` +
+      `<b>Plan:</b> ${label}\n` +
+      `<b>Stars pagadas:</b> ⭐ ${stars}\n\n` +
+      `Un administrador te enviará el archivo de configuración WireGuard en breve.\n\n` +
+      `<b>Tiempo estimado:</b> 1-12 horas`,
+      { parse_mode: 'HTML' }
+    );
+
+    // Notificar a los admins
+    const user = await db.getUser(String(telegramId)).catch(() => null);
+    const username = user?.username ? `@${user.username}` : 'Sin usuario';
+    const firstName = user?.first_name || 'Usuario';
+    const adminMsg = `⭐ *NUEVO PAGO STARS*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${label}\n⭐ *Stars:* ${stars}\n🔖 *Charge ID:* \`${payment.telegram_payment_charge_id}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch (e) {}
+    }
+
+    // Marcar referido como pagado si aplica
+    if (user?.referrer_id) {
+      try {
+        await db.markReferralAsPaid(String(telegramId));
+        const referrerUser = await db.getUser(user.referrer_id);
+        if (referrerUser?.referrer_id) await db.markReferralAsPaid(user.referrer_id, 2);
+      } catch (e) {}
+    }
+  } catch (error) {
+    console.error('❌ Error procesando successful_payment:', error);
+    try {
+      await ctx.reply('⚠️ Tu pago fue procesado pero hubo un error activando tu plan. Contacta con soporte indicando tu ID de usuario.');
+    } catch (e) {}
+  }
+});
+
 // ==================== ARCHIVOS DE PLANES ====================
 app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
   try {
@@ -1751,9 +1871,8 @@ bot.action('show_support', async (ctx) => {
       parse_mode: 'HTML', 
       reply_markup: { 
         inline_keyboard: [
-          [createButton("CEO", { url: 'https://t.me/rov3r777' })],
-          [createButton("SAYKO", { url: 'https://wa.me/50793992' }), createButton("ROVER", { url: 'https://wa.me/56557646' })],
-          [createButton("MOD", { url: 'https://t.me/ErenJeager129182' })],
+          [createButton("CEO", { url: 'https://t.me/rov3r777' })], 
+          [createButton("MOD", { url: 'https://t.me/ErenJeager129182' })], 
           [createButton("WHATSAPP", { url: WHATSAPP_GROUP_LINK })], 
           [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
         ] 
