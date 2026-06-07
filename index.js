@@ -228,7 +228,14 @@ const BUTTON_ICONS = {
     'TÉRMINOS DE SERVICIO': '6021744990252702234',
     'POLÍTICA DE REEMBOLSO': '6021435576513730578',
     'POLÍTICA DE PRIVACIDAD': '6021745995275048956',
-    'VER PREGUNTAS FRECUENTES': '5873121512445187130'
+    'VER PREGUNTAS FRECUENTES': '5873121512445187130',
+    'MENÚ PRINCIPAL': '5984794970263018051',
+    'RENOVAR AHORA': '6019175208240289774',
+    'ABRIR PANEL WEB': '5839116473951328489',
+    'SAYKO': '5884179047482659474',
+    'ROVER': '5884179047482659474',
+    'CEO': '6021659919835469581',
+    'MOD': '6021401276904905698'
 };
 
 function createButton(text, options) {
@@ -1441,11 +1448,11 @@ app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
 // ==================== PAGO CON STARS ====================
 
 const STARS_PRICES = {
-  basico:   500,
-  avanzado: 1000,
-  cuba_vip: 1200,
-  premium:  1500,
-  anual:    50000
+  basico:   150,
+  avanzado: 270,
+  cuba_vip: 180,
+  premium:  210,
+  anual:    2100
 };
 
 const STARS_PLAN_LABELS = {
