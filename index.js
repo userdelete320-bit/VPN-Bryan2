@@ -269,6 +269,8 @@ function getSupportHtml() {
            `Para cualquier duda o problema, contacta con nuestro soporte:\n\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (CEO)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Mod)\n\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> Admin 2 (WhatsApp)\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> Admin 1 (WhatsApp)\n` +
            `Responde rápido y te ayudaremos.`;
 }
 
@@ -1872,7 +1874,8 @@ bot.action('show_support', async (ctx) => {
       reply_markup: { 
         inline_keyboard: [
           [createButton("CEO", { url: 'https://t.me/rov3r777' })], 
-          [createButton("MOD", { url: 'https://t.me/ErenJeager129182' })], 
+          [createButton("SAYKO", { url: 'https://wa.me/50793992' }), createButton("ROVER", { url: 'https://wa.me/56557646' })],
+          [createButton("MOD", { url: 'https://t.me/ErenJeager129182' })],
           [createButton("WHATSAPP", { url: WHATSAPP_GROUP_LINK })], 
           [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
         ] 
