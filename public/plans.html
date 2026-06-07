@@ -1092,6 +1092,7 @@ const plans = {
     shadowColor: 'rgba(168,220,255,0.3)',
     price: { cup: 900, mobile: 400, usdt: 1.5 },
     stars: 150,
+    ton: 2.0,
     desc: 'La puerta de entrada a internet sin censura. Ideal para streaming y navegación cotidiana con conexión estable.',
     features: [
       { icon: '📺', label: 'STREAMING', val: 'USA · Netflix · Hulu' },
@@ -1110,6 +1111,7 @@ const plans = {
     shadowColor: 'rgba(212,184,255,0.3)',
     price: { cup: 1800, mobile: 900, usdt: 2.8 },
     stars: 270,
+    ton: 3.0,
     desc: '2 meses completos del plan Básico. La elección inteligente para quienes planean. Más tiempo, mejor precio.',
     features: [
       { icon: '📅', label: 'DURACIÓN', val: '2 meses' },
@@ -1128,6 +1130,7 @@ const plans = {
     shadowColor: 'rgba(255,229,102,0.3)',
     price: { cup: 1200, mobile: 500, usdt: 1.9 },
     stars: 180,
+    ton: 2.2,
     desc: 'El único plan con IP Residencial Cubana real. Accede a Enzona, Transfermóvil y banca online desde cualquier lugar.',
     features: [
       { icon: '🇨🇺', label: 'IP ORIGEN', val: 'Residencial CU' },
@@ -1146,6 +1149,7 @@ const plans = {
     shadowColor: 'rgba(255,110,180,0.3)',
     price: { cup: 1500, mobile: 700, usdt: 2.3 },
     stars: 210,
+    ton: 2.5,
     desc: 'Diseñado para gamers cubanos. QoS prioritario para paquetes de juego, latencia mínima garantizada.',
     features: [
       { icon: '⚡', label: 'LATENCIA', val: '<25ms' },
@@ -1164,6 +1168,7 @@ const plans = {
     shadowColor: 'rgba(255,212,184,0.3)',
     price: { cup: 15000, mobile: 10000, usdt: 25 },
     stars: 2100,
+    ton: 26.0,
     desc: '12 meses de acceso total. Todos los planes, todas las funciones. El mayor ahorro posible. La libertad completa.',
     features: [
       { icon: '📅', label: 'DURACIÓN', val: '12 meses' },
@@ -1259,10 +1264,13 @@ function openModal(key) {
         </div>
       `).join('')}
     </div>
-    <!-- Precio en Stars -->
-    <div style="text-align:center; margin: 12px 0;">
+    <!-- Precio en Stars y TON -->
+    <div style="text-align:center; margin: 12px 0; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
       <span style="background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 100px; font-size: 13px;">
         ⭐ ${p.stars} Stars
+      </span>
+      <span style="background: rgba(0,136,204,0.15); padding: 6px 12px; border-radius: 100px; font-size: 13px;">
+        💎 ${p.ton} TON
       </span>
     </div>
     <div style="display: flex; gap: 12px; margin-top: 8px;">
@@ -1271,6 +1279,11 @@ function openModal(key) {
       </button>
       <button class="modal-cta" style="background:#5bf0ff;color:#000;box-shadow:0 0 30px rgba(91,240,255,0.3); flex:1;" onclick="payWithStars('${key}')">
         ⭐ Pagar con Stars
+      </button>
+    </div>
+    <div style="margin-top: 8px;">
+      <button class="modal-cta" style="background:#0088cc;color:#fff;box-shadow:0 0 30px rgba(0,136,204,0.3); width:100%;" onclick="payWithTON('${key}')">
+        💎 Pagar con TON
       </button>
     </div>
   `;
@@ -1406,7 +1419,95 @@ async function payWithStars(planKey) {
     alert('Error al conectar con el servidor.');
   }
 }
-  
+
+async function payWithTON(planKey) {
+  if (!currentUserId) {
+    alert('❌ Debes abrir esta Web App desde el bot de Telegram para pagar.');
+    return;
+  }
+  const apiKey = PLAN_API_KEYS[planKey];
+  if (!apiKey) { alert('Plan no válido'); return; }
+
+  try {
+    const response = await fetch('/api/initiate-ton-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: currentUserId, plan: apiKey })
+    });
+    const data = await response.json();
+    if (!data.success) { alert('❌ Error: ' + (data.error || 'No se pudo iniciar el pago.')); return; }
+
+    const { walletAddress, amount, comment, label } = data;
+
+    // Mostrar instrucciones con el comment único para identificar el pago
+    const modalContent = document.getElementById('modalContent');
+    modalContent.innerHTML = `
+      <div style="text-align:center; padding:16px;">
+        <div style="font-size:48px; margin-bottom:12px;">💎</div>
+        <div class="modal-plan-name">Pago con TON</div>
+        <div class="modal-plan-desc" style="margin:12px 0;">${label}</div>
+
+        <div style="background:rgba(0,136,204,0.1); border:1px solid rgba(0,136,204,0.3); border-radius:12px; padding:16px; margin:12px 0; text-align:left;">
+          <div style="font-size:12px; color:#aaa; margin-bottom:4px;">CANTIDAD A ENVIAR</div>
+          <div style="font-size:22px; font-weight:700; color:#5bf0ff;">💎 ${amount} TON</div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin:8px 0; text-align:left;">
+          <div style="font-size:11px; color:#aaa; margin-bottom:4px;">WALLET DESTINO</div>
+          <div style="font-size:11px; word-break:break-all; font-family:monospace;">${walletAddress}</div>
+          <button onclick="navigator.clipboard.writeText('${walletAddress}')" style="margin-top:8px; background:rgba(255,255,255,0.1); border:none; color:#fff; padding:6px 12px; border-radius:8px; font-size:11px; cursor:pointer;">📋 Copiar wallet</button>
+        </div>
+
+        <div style="background:rgba(255,200,0,0.1); border:1px solid rgba(255,200,0,0.3); border-radius:12px; padding:12px; margin:8px 0; text-align:left;">
+          <div style="font-size:11px; color:#ffcc00; margin-bottom:4px;">⚠️ COMENTARIO OBLIGATORIO (cópialo exacto)</div>
+          <div style="font-size:11px; word-break:break-all; font-family:monospace; color:#ffcc00;">${comment}</div>
+          <button onclick="navigator.clipboard.writeText('${comment}')" style="margin-top:8px; background:rgba(255,200,0,0.2); border:none; color:#ffcc00; padding:6px 12px; border-radius:8px; font-size:11px; cursor:pointer;">📋 Copiar comentario</button>
+        </div>
+
+        <div style="font-size:12px; color:#aaa; margin:12px 0; line-height:1.5;">
+          Envía exactamente <b>${amount} TON</b> desde cualquier wallet (Tonkeeper, MyTonWallet, etc.) incluyendo el comentario.<br><br>
+          Tras enviar, pulsa <b>Verificar pago</b> para confirmar automáticamente.
+        </div>
+
+        <button class="modal-cta" style="background:#0088cc;color:#fff;width:100%;margin-bottom:8px;" onclick="verifyTONPayment('${apiKey}','${comment}')">
+          ✅ Verificar pago
+        </button>
+        <button class="modal-cta" style="background:rgba(255,255,255,0.1);color:#fff;width:100%;" onclick="closeModal()">
+          Cancelar
+        </button>
+      </div>
+    `;
+  } catch (error) {
+    console.error('Error iniciando pago TON:', error);
+    alert('Error al conectar con el servidor.');
+  }
+}
+
+async function verifyTONPayment(apiKey, comment) {
+  const btn = document.querySelector('.modal-cta[onclick*="verifyTONPayment"]');
+  if (btn) { btn.textContent = '🔍 Verificando...'; btn.disabled = true; }
+
+  try {
+    const response = await fetch('/api/verify-ton-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: currentUserId, plan: apiKey, comment })
+    });
+    const result = await response.json();
+
+    if (result.verified) {
+      alert('✅ ¡Pago verificado! Tu plan ha sido activado. Revisa Telegram.');
+      closeModal();
+    } else {
+      alert('⏳ Pago no detectado aún. Espera unos segundos y vuelve a intentarlo.\n\nSi ya enviaste el TON, asegúrate de haber incluido el comentario exacto.');
+      if (btn) { btn.textContent = '✅ Verificar pago'; btn.disabled = false; }
+    }
+  } catch (error) {
+    alert('Error al verificar. Inténtalo de nuevo.');
+    if (btn) { btn.textContent = '✅ Verificar pago'; btn.disabled = false; }
+  }
+}
+
 function toggleFaq(el) {
   const wasOpen = el.classList.contains('open');
   document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
