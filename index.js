@@ -1560,6 +1560,138 @@ bot.on('message', async (ctx, next) => {
   }
 });
 
+
+// ==================== PAGO CON TON ====================
+
+const TON_CONFIG = {
+  WALLET_ADDRESS: 'UQAY_qlJ1uxM-UP2zWjLn4jbFf6nQWL4N3JDWfNIyTPy5rZO',
+  MANIFEST_URL:   'https://vpn-bryan.onrender.com/tonconnect-manifest.json',
+  TONCENTER_API:  'https://toncenter.com/api/v2',
+};
+
+const TON_PRICES = {
+  basico:   2.0,
+  avanzado: 3.0,
+  cuba_vip: 2.2,
+  premium:  2.5,
+  anual:    26.0
+};
+
+const TON_PLAN_LABELS = {
+  basico:   'Plan Básico (1 mes)',
+  avanzado: 'Plan Avanzado (2 meses)',
+  cuba_vip: 'Plan VIP Cuba (1 mes)',
+  premium:  'Plan Gaming (1 mes)',
+  anual:    'Plan Anual (12 meses)'
+};
+
+// Devuelve los datos necesarios para que el frontend inicie el pago TON
+app.post('/api/initiate-ton-payment', async (req, res) => {
+  try {
+    const { telegramId, plan } = req.body;
+    if (!telegramId) return res.status(400).json({ error: 'ID de usuario requerido' });
+    const amount = TON_PRICES[plan];
+    if (!amount) return res.status(400).json({ error: 'Plan inválido' });
+
+    const comment = `VPNCUBA-${plan.toUpperCase()}-${telegramId}-${Date.now()}`;
+
+    res.json({
+      success: true,
+      walletAddress: TON_CONFIG.WALLET_ADDRESS,
+      amount,
+      comment,
+      plan,
+      label: TON_PLAN_LABELS[plan],
+      manifestUrl: TON_CONFIG.MANIFEST_URL
+    });
+  } catch (error) {
+    console.error('Error iniciando pago TON:', error);
+    res.status(500).json({ error: 'Error iniciando pago TON: ' + error.message });
+  }
+});
+
+// El frontend llama a esto para verificar que el pago llegó on-chain
+app.post('/api/verify-ton-payment', async (req, res) => {
+  try {
+    const { telegramId, plan, comment } = req.body;
+    if (!telegramId || !plan || !comment) return res.status(400).json({ error: 'Parámetros incompletos' });
+
+    const amount = TON_PRICES[plan];
+    if (!amount) return res.status(400).json({ error: 'Plan inválido' });
+
+    const url = `${TON_CONFIG.TONCENTER_API}/getTransactions?address=${TON_CONFIG.WALLET_ADDRESS}&limit=20`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.ok || !data.result) return res.status(502).json({ error: 'No se pudo consultar la blockchain' });
+
+    const amountNano = Math.floor(amount * 1e9);
+    const found = data.result.find(tx => {
+      const inMsg = tx.in_msg;
+      if (!inMsg) return false;
+      const txValue = parseInt(inMsg.value || '0');
+      const txComment = inMsg.message || '';
+      return txValue >= amountNano * 0.99 && txComment === comment;
+    });
+
+    if (!found) return res.json({ success: false, verified: false, message: 'Pago no encontrado aún' });
+
+    const label = TON_PLAN_LABELS[plan];
+
+    await db.createPayment({
+      telegram_id: String(telegramId),
+      plan,
+      price: amount,
+      original_price: amount,
+      method: 'ton',
+      screenshot_url: '',
+      notes: `Pago TON · comment: ${comment} · tx: ${found.transaction_id?.hash || ''}`,
+      status: 'approved',
+      created_at: new Date().toISOString(),
+      coupon_used: false,
+      coupon_code: null,
+      coupon_discount: 0,
+      referral_discount: 0
+    });
+
+    await db.makeUserVIP(String(telegramId), {
+      plan,
+      plan_price: amount,
+      vip_since: new Date().toISOString()
+    });
+
+    await bot.telegram.sendMessage(telegramId,
+      `<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Pago TON confirmado!</b>\n\n` +
+      `<b>Plan:</b> ${label}\n` +
+      `<b>TON pagados:</b> 💎 ${amount}\n\n` +
+      `Un administrador te enviará el archivo de configuración WireGuard en breve.\n\n` +
+      `<b>Tiempo estimado:</b> 1-12 horas`,
+      { parse_mode: 'HTML' }
+    );
+
+    const user = await db.getUser(String(telegramId)).catch(() => null);
+    const username = user?.username ? `@${user.username}` : 'Sin usuario';
+    const firstName = user?.first_name || 'Usuario';
+    const adminMsg = `💎 *NUEVO PAGO TON*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${label}\n💎 *TON:* ${amount}\n🔖 *Comment:* \`${comment}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch (e) {}
+    }
+
+    if (user?.referrer_id) {
+      try {
+        await db.markReferralAsPaid(String(telegramId));
+        const referrerUser = await db.getUser(user.referrer_id);
+        if (referrerUser?.referrer_id) await db.markReferralAsPaid(user.referrer_id, 2);
+      } catch (e) {}
+    }
+
+    res.json({ success: true, verified: true, message: '¡Pago verificado y plan activado!' });
+  } catch (error) {
+    console.error('Error verificando pago TON:', error);
+    res.status(500).json({ error: 'Error verificando pago: ' + error.message });
+  }
+});
+
 // ==================== ARCHIVOS DE PLANES ====================
 app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
   try {
