@@ -1874,7 +1874,7 @@ bot.action('show_support', async (ctx) => {
       reply_markup: { 
         inline_keyboard: [
           [createButton("CEO", { url: 'https://t.me/rov3r777' })], 
-          [createButton("SAYKO", { url: 'https://wa.me/50793992' }), createButton("ROVER", { url: 'https://wa.me/56557646' })],
+          [createButton("Admin 2", { url: 'https://wa.me/50793992' }), createButton("Admin 1", { url: 'https://wa.me/56557646' })],
           [createButton("MOD", { url: 'https://t.me/ErenJeager129182' })],
           [createButton("WHATSAPP", { url: WHATSAPP_GROUP_LINK })], 
           [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
