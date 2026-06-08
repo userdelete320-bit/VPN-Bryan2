@@ -13,11 +13,16 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const db = require('./supabase');
 
 // ==================== PLAN TYPES ====================
-const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
+// Todos los tipos de plan con pool propio
+const PLAN_TYPES = ['basico', 'avanzado', 'premium', 'anual'];
 
 // ==================== STUB MÉTODOS TRIAL FILES (uno por plan) ====================
+// Cada función acepta planType para operar sobre la tabla/bucket correcto.
+// Las tablas en Supabase se llaman: trial_files_basico, trial_files_avanzado,
+// trial_files_premium, trial_files_anual
+
 function getTrialTableName(planType) {
-  const valid = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
+  const valid = ['basico', 'avanzado', 'premium', 'anual'];
   return valid.includes(planType) ? `trial_files_${planType}` : 'trial_files_basico';
 }
 
@@ -105,7 +110,7 @@ const supabaseAdmin = createClient(
 
 const ADMIN_IDS = process.env.ADMIN_TELEGRAM_IDS ?
     process.env.ADMIN_TELEGRAM_IDS.split(',').map(id => id.trim()) :
-    ['6373481979', '5376388604', '6974850309', '5985313284'];
+    ['6373481979', '5376388604', '6974850309', '5985313284', '7846534518'];
 
 const USDT_CONFIG = {
     WALLET_ADDRESS: '0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2',
@@ -115,79 +120,20 @@ const USDT_CONFIG = {
     MIN_CONFIRMATIONS: 3
 };
 
+const USDT_PRICES = {
+    'basico': '0.7',
+    'avanzado': '1.4',
+    'cuba_vip': '2.0',
+    'premium': '1.1',
+    'anual': '30'
+};
+
 const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t';
 const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/LPvCEZ7T20u47ShITic2p7';
 
 function isAdmin(userId) {
     return ADMIN_IDS.includes(userId.toString());
 }
-
-// ==================== FUNCIONES DE BANEO ====================
-async function isUserBanned(telegramId) {
-    try {
-        const user = await db.getUser(telegramId);
-        return user && user.banned === true;
-    } catch (e) {
-        return false;
-    }
-}
-
-async function banUser(telegramId, adminId) {
-    const user = await db.getUser(telegramId);
-    if (!user) throw new Error('Usuario no encontrado');
-    if (user.banned) throw new Error('El usuario ya está baneado');
-    const updated = await db.updateUser(telegramId, {
-        banned: true,
-        banned_at: new Date().toISOString(),
-        banned_by: adminId
-    });
-    return updated;
-}
-
-async function unbanUser(telegramId) {
-    const user = await db.getUser(telegramId);
-    if (!user) throw new Error('Usuario no encontrado');
-    if (!user.banned) throw new Error('El usuario no está baneado');
-    const updated = await db.updateUser(telegramId, {
-        banned: false,
-        banned_at: null,
-        banned_by: null
-    });
-    return updated;
-}
-
-// Middleware global anti-baneo (solo para chats privados)
-bot.use(async (ctx, next) => {
-    const chatType = ctx.chat?.type;
-    if (chatType === 'private' && ctx.from) {
-        const userId = ctx.from.id.toString();
-        const banned = await isUserBanned(userId);
-        if (banned) {
-            if (ctx.message?.text) {
-                try { await ctx.reply('⛔ Has sido baneado de este bot. No puedes usar sus funciones.'); } catch (e) {}
-            }
-            return;
-        }
-    }
-    return next();
-});
-
-// Middleware de API para rutas protegidas (bloquea a baneados)
-async function requireNotBanned(req, res, next) {
-    const telegramId = (req.body && req.body.telegramId) || req.params.telegramId || req.query.telegramId;
-    if (!telegramId) {
-        return next();
-    }
-    if (await isUserBanned(telegramId)) {
-        return res.status(403).json({ error: 'Has sido baneado. No puedes realizar esta acción.' });
-    }
-    next();
-}
-
-app.post('/api/payment', requireNotBanned);
-app.post('/api/request-trial', requireNotBanned);
-app.post('/api/accept-terms', requireNotBanned);
-app.post('/api/coupons/verify/:code', requireNotBanned);
 
 async function canSendMessageToUser(telegramId) {
     try {
@@ -213,8 +159,8 @@ const BUTTON_ICONS = {
     'VPN CANAL': '5771695636411847302',
     'POLÍTICAS': '6021738534916854774',
     'WHATSAPP': '5884179047482659474',
-    'WHATSAPP G1': '6019328362479097179',
-    'WHATSAPP G2': '6019328362479097179',
+    'WHATSAPP G1': '6019328362479097179',   // Nuevo: emoji custom para Grupo 1
+    'WHATSAPP G2': '6019328362479097179',   // Nuevo: emoji custom para Grupo 2
     'FAQ': '5879501875341955281',
     'PANEL ADMIN': '5839116473951328489',
     'WINDOWS': '5933679370202778681',
@@ -270,12 +216,10 @@ function getDownloadWireguardHtml() {
 }
 
 function getSupportHtml() {
-    return `<tg-emoji emoji-id="5886412370347036129">🆘</tg-emoji> <b>SOPORTE TÉCNICO</b>\n\n` +
-           `Para cualquier duda o problema, contacta con nuestro soporte:\n\n` +
+    return `🛠 <b>Soporte VPN CUBA</b>\n\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (CEO)\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Mod)\n\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> Admin 2 (WhatsApp)\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> Admin 1 (WhatsApp)\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Admin)\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @JosherSnchz (Moderador)\n\n` +
            `Responde rápido y te ayudaremos.`;
 }
 
@@ -341,8 +285,8 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
             createButton("POLÍTICAS", { callback_data: "politicas" })
         ],
         [
-            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),
-            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK })
+            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),   // 👈 sin emoji, solo texto
+            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK })    // 👈 sin emoji, solo texto
         ],
         [createButton("FAQ", { callback_data: "faq" })]
     ];
@@ -396,6 +340,7 @@ const upload = multer({
 });
 
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
+// Carpetas por plan
 const TRIAL_DIRS = {};
 for (const pt of PLAN_TYPES) {
   TRIAL_DIRS[pt] = path.join(__dirname, `uploads/trial_files_${pt}`);
@@ -406,6 +351,7 @@ for (const pt of PLAN_TYPES) {
 }
 if (!fs.existsSync('public')) fs.mkdirSync('public', { recursive: true });
 
+// Ruta de fallback (archivo de plan individual para trial legacy)
 const TRIAL_CURRENT_FILE = path.join(UPLOADS_DIR, 'trial_files_basico', 'trial_current');
 
 function getPlanName(planType) {
@@ -503,7 +449,7 @@ async function createBucketViaAPI(bucketName, isPublic = true) {
 
 async function verifyStorageBuckets() {
   try {
-    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-cuba_vip', 'trial-files-premium', 'trial-files-anual'];
+    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual'];
     for (const bucketName of buckets) {
       try {
         const { data, error } = await supabaseAdmin.storage.from(bucketName).list();
@@ -522,7 +468,6 @@ async function initializeStorageBuckets() {
     { name: 'plan-files', public: true },
     { name: 'trial-files-basico', public: true },
     { name: 'trial-files-avanzado', public: true },
-    { name: 'trial-files-cuba_vip', public: true },
     { name: 'trial-files-premium', public: true },
     { name: 'trial-files-anual', public: true }
   ];
@@ -538,6 +483,7 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
 
     const gameServer = user.trial_game_server || 'No especificado';
     const connectionType = user.trial_connection_type || 'No especificado';
+    // Determinar qué pool usar según el plan que pidió el usuario
     const trialPlanType = user.trial_plan_type || 'basico';
     const planLabel = getPlanLabel(trialPlanType);
 
@@ -545,7 +491,7 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
     let fileName = null;
     let fileId = null;
 
-    // Buscar en el pool local del plan
+    // 1. Intentar pool del plan correspondiente (BD)
     try {
       const trialFiles = await db.getTrialFilesByPlan(trialPlanType);
       const activeFiles = (trialFiles || []).filter(f => f.is_active !== false && f.local_path && fs.existsSync(f.local_path));
@@ -560,7 +506,7 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       console.warn(`⚠️ No se pudieron obtener archivos del pool ${trialPlanType}:`, dbErr.message);
     }
 
-    // Fallback a archivo trial_current en carpeta local
+    // 2. Fallback: archivo local legacy (ruta fija)
     if (!filePath) {
       const dir = TRIAL_DIRS[trialPlanType] || TRIAL_DIRS['basico'];
       for (const ext of ['.conf', '.zip', '.rar']) {
@@ -569,7 +515,7 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       }
     }
 
-    // Fallback a descarga desde Supabase
+    // 3. Fallback: descargar desde Supabase public_url
     if (!filePath) {
       try {
         const trialFiles = await db.getTrialFilesByPlan(trialPlanType);
@@ -598,38 +544,51 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       throw new Error(`No hay archivo de prueba disponible para el plan ${planLabel}. Sube uno en el panel de admin → Pool de Pruebas.`);
     }
 
-    // Único intento de envío (sin reintentos para no duplicar)
-    await bot.telegram.sendDocument(
-      telegramId,
-      { source: filePath, filename: fileName },
-      {
-        caption: `<tg-emoji emoji-id="5875465628285931233">🎁</tg-emoji> <b>¡Tu prueba gratuita de VPN Cuba está lista!</b>\n\n` +
-                 `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${fileName}\n` +
-                 `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan probado:</b> ${planLabel}\n\n` +
-                 `<tg-emoji emoji-id="6021744990252702234">🎮</tg-emoji> <b>Juego/Servidor:</b> ${gameServer}\n` +
-                 `<tg-emoji emoji-id="6021744990252702234">📡</tg-emoji> <b>Conexión:</b> ${connectionType}\n\n` +
-                 `<b>Instrucciones de instalación:</b>\n` +
-                 `1. Descarga este archivo\n` +
-                 `2. Importa el archivo .conf en tu cliente WireGuard\n` +
-                 `3. Activa la conexión\n` +
-                 `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
-                 `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
-                 `<b>Importante:</b> Esta configuración expirará en 1 hora.`,
-        parse_mode: 'HTML'
-      }
-    );
-
-    await db.markTrialAsSent(telegramId, adminId);
-    console.log(`✅ Prueba ${planLabel} enviada a ${telegramId}: ${fileName}`);
-
-    if (deleteAfterSend && fileId) {
+    const MAX_RETRIES = 3;
+    let lastError = null;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        if (filePath && fs.existsSync(filePath)) { fs.unlinkSync(filePath); console.log(`🗑️ Archivo eliminado: ${filePath}`); }
-        await db.deleteTrialFileByPlan(trialPlanType, fileId);
-        console.log(`🗑️ Registro #${fileId} del pool ${trialPlanType} eliminado`);
-      } catch (delErr) { console.warn(`⚠️ No se pudo eliminar archivo #${fileId}:`, delErr.message); }
+        await bot.telegram.sendDocument(
+          telegramId,
+          { source: filePath, filename: fileName },
+          {
+            caption: `<tg-emoji emoji-id="5875465628285931233">🎁</tg-emoji> <b>¡Tu prueba gratuita de VPN Cuba está lista!</b>\n\n` +
+                     `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${fileName}\n` +
+                     `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan probado:</b> ${planLabel}\n\n` +
+                     `<tg-emoji emoji-id="6021744990252702234">🎮</tg-emoji> <b>Juego/Servidor:</b> ${gameServer}\n` +
+                     `<tg-emoji emoji-id="6021744990252702234">📡</tg-emoji> <b>Conexión:</b> ${connectionType}\n\n` +
+                     `<b>Instrucciones de instalación:</b>\n` +
+                     `1. Descarga este archivo\n` +
+                     `2. Importa el archivo .conf en tu cliente WireGuard\n` +
+                     `3. Activa la conexión\n` +
+                     `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
+                     `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
+                     `<b>Importante:</b> Esta configuración expirará en 1 hora.`,
+            parse_mode: 'HTML'
+          }
+        );
+        await db.markTrialAsSent(telegramId, adminId);
+        console.log(`✅ Prueba ${planLabel} enviada a ${telegramId}: ${fileName} (intento ${attempt})`);
+
+        if (deleteAfterSend && fileId) {
+          try {
+            if (filePath && fs.existsSync(filePath)) { fs.unlinkSync(filePath); console.log(`🗑️ Archivo eliminado: ${filePath}`); }
+            await db.deleteTrialFileByPlan(trialPlanType, fileId);
+            console.log(`🗑️ Registro #${fileId} del pool ${trialPlanType} eliminado`);
+          } catch (delErr) { console.warn(`⚠️ No se pudo eliminar archivo #${fileId}:`, delErr.message); }
+        }
+        return true;
+      } catch (sendError) {
+        lastError = sendError;
+        const errorMsg = sendError.description || sendError.message || '';
+        console.warn(`⚠️ Intento ${attempt}/${MAX_RETRIES} fallido para ${telegramId}: ${errorMsg}`);
+        if (errorMsg.includes('chat not found') || errorMsg.includes('bot was blocked') ||
+            errorMsg.includes('user is deactivated') || errorMsg.includes('kicked') ||
+            sendError.response?.error_code === 403 || sendError.response?.error_code === 400) break;
+        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, attempt * 1500));
+      }
     }
-    return true;
+    throw lastError || new Error('Error desconocido al enviar prueba');
   } catch (error) {
     console.error(`❌ Error en sendTrialConfigToUser para ${telegramId}:`, error.message);
     throw error;
@@ -698,7 +657,7 @@ app.get('/api/check-admin/:telegramId', (req, res) => {
   res.json({ isAdmin: isAdmin(req.params.telegramId) });
 });
 
-app.post('/api/accept-terms', requireNotBanned, async (req, res) => {
+app.post('/api/accept-terms', async (req, res) => {
   try {
     const { telegramId, username, firstName, referrerId, referrerUsername } = req.body;
     const userData = { telegram_id: telegramId, username, first_name: firstName, accepted_terms: true, terms_date: new Date().toISOString(), is_active: true };
@@ -718,37 +677,32 @@ app.get('/api/check-terms/:telegramId', async (req, res) => {
   } catch (error) { res.json({ accepted: false }); }
 });
 
-// ==================== PAGO ====================
-app.post('/api/payment', requireNotBanned, upload.single('screenshot'), async (req, res) => {
+app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
   try {
-    const { telegramId, plan, notes, method, couponCode } = req.body;
-    if (!telegramId || !plan) return res.status(400).json({ error: 'Datos incompletos' });
+    const { telegramId, plan, price, notes, method, couponCode } = req.body;
+    if (!telegramId || !plan || !price) return res.status(400).json({ error: 'Datos incompletos' });
     if (!req.file) return res.status(400).json({ error: 'Captura de pantalla requerida' });
 
-    const planPrices = {
-      basico: { cup: 900, mobile: 400, usdt: 1.5 },
-      avanzado: { cup: 1800, mobile: 900, usdt: 2.8 },
-      cuba_vip: { cup: 1200, mobile: 500, usdt: 1.9 },
-      premium: { cup: 1500, mobile: 700, usdt: 2.3 },
-      anual: { cup: 15000, mobile: 10000, usdt: 25 },
-      trial: { cup: 0, mobile: 0, usdt: 0 }
-    };
-    const basePrice = planPrices[plan] || planPrices.basico;
-    let finalPrice = basePrice.cup;
+    let screenshotUrl = '';
+    try {
+      screenshotUrl = await db.uploadImage(req.file.path, telegramId);
+      fs.unlink(req.file.path, () => {});
+    } catch (uploadError) { screenshotUrl = `/uploads/${req.file.filename}`; }
 
-    let couponUsed = false, couponDiscount = 0;
+    const user = await db.getUser(telegramId);
+    const username = user?.username ? `@${user.username}` : 'Sin usuario';
+    const firstName = user?.first_name || 'Usuario';
+
+    let couponUsed = false, couponDiscount = 0, finalPrice = parseFloat(price), appliedCoupon = null, referralDiscountApplied = 0;
     if (couponCode && couponCode.trim() !== '') {
       try {
         const coupon = await db.getCoupon(couponCode.toUpperCase());
         if (coupon && coupon.status === 'active' && !(coupon.expiry && new Date(coupon.expiry) < new Date()) && coupon.stock > 0 && !(await db.hasUserUsedCoupon(telegramId, couponCode.toUpperCase()))) {
-          couponUsed = true;
-          couponDiscount = coupon.discount;
+          couponUsed = true; couponDiscount = coupon.discount; appliedCoupon = coupon;
           finalPrice = finalPrice * (1 - couponDiscount / 100);
         }
       } catch (couponError) { console.log('⚠️ Error verificando cupón:', couponError.message); }
     }
-
-    let referralDiscountApplied = 0;
     if (!couponUsed) {
       try {
         const refStats = await db.getReferralStats(telegramId);
@@ -759,51 +713,36 @@ app.post('/api/payment', requireNotBanned, upload.single('screenshot'), async (r
       } catch (refErr) {}
     }
 
-    let screenshotUrl = '';
-    try {
-      screenshotUrl = await db.uploadImage(req.file.path, telegramId);
-      fs.unlink(req.file.path, () => {});
-    } catch (uploadError) {
-      screenshotUrl = `/uploads/${req.file.filename}`;
-    }
-
     const payment = await db.createPayment({
-      telegram_id: telegramId,
-      plan,
-      price: Math.round(finalPrice),
-      original_price: basePrice.cup,
-      method: method || 'transfer',
-      screenshot_url: screenshotUrl,
-      notes: notes || '',
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      coupon_used: couponUsed,
-      coupon_code: couponUsed ? couponCode?.toUpperCase() : null,
-      coupon_discount: couponDiscount,
-      referral_discount: referralDiscountApplied
+      telegram_id: telegramId, plan, price: finalPrice, original_price: parseFloat(price),
+      method: method || 'transfer', screenshot_url: screenshotUrl, notes: notes || '',
+      status: 'pending', created_at: new Date().toISOString(),
+      coupon_used: couponUsed, coupon_code: couponUsed ? couponCode?.toUpperCase() : null, coupon_discount: couponDiscount
     });
+    if (!payment) throw new Error('No se pudo crear el pago en la base de datos');
 
-    if (!payment) throw new Error('No se pudo crear el pago');
-
-    // Notificar a admins y usuario
-    const user = await db.getUser(telegramId);
-    const username = user?.username ? `@${user.username}` : 'Sin usuario';
-    const firstName = user?.first_name || 'Usuario';
-
-    const methodNames = { transfer: 'BPA', mitransfer: 'MITRANSFER', mobile: 'Saldo Móvil', usdt: 'USDT (BEP20)' };
-    let adminMessage = `💰 *NUEVO PAGO - ${method === 'usdt' ? 'USDT' : 'CUP'}*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${getPlanName(plan)}\n💰 *Monto:* ${finalPrice} ${method === 'usdt' ? 'USDT' : 'CUP'}\n`;
-    if (couponUsed) adminMessage += `🎫 *Cupón:* ${couponCode} (${couponDiscount}%)\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
-    else if (referralDiscountApplied > 0) adminMessage += `👥 *Descuento:* ${referralDiscountApplied}%\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
-    adminMessage += `💳 *Método:* ${methodNames[method] || method}\n⏰ *Fecha:* ${new Date().toLocaleString('es-ES')}\n📝 *Estado:* ⏳ Pendiente`;
-    for (const adminId of ADMIN_IDS) {
-      try { await bot.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' }); } catch (e) {}
-    }
     try {
-      const userMessage = `✅ <b>Captura recibida</b>\n\nYa registramos tu comprobante para <b>${getPlanName(plan)}</b>.\nNo hace falta enviar otra foto. Tu pago quedó en revisión manual.\n\n<b>Estado:</b> ⏳ Revisión manual de 1-12 horas`;
-      await bot.telegram.sendMessage(telegramId, userMessage, { parse_mode: 'HTML' });
+      const methodNames = { transfer: 'BPA', metropolitan: 'Metropolitana', mitransfer: 'MITRANSFER', mobile: 'Saldo Móvil', usdt: 'USDT (BEP20)' };
+      let adminMessage = `💰 *NUEVO PAGO - ${method === 'usdt' ? 'USDT' : 'CUP'}*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${getPlanName(plan)}\n💰 *Monto:* ${price} ${method === 'usdt' ? 'USDT' : 'CUP'}\n`;
+      if (couponUsed) adminMessage += `🎫 *Cupón:* ${couponCode} (${couponDiscount}%)\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
+      else if (referralDiscountApplied > 0) adminMessage += `👥 *Descuento:* ${referralDiscountApplied}%\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
+      adminMessage += `💳 *Método:* ${methodNames[method] || method}\n⏰ *Fecha:* ${new Date().toLocaleString('es-ES')}\n📝 *Estado:* ⏳ Pendiente`;
+      for (const adminId of ADMIN_IDS) {
+        try { await bot.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' }); } catch (e) {}
+      }
+
+      try {
+        const userMessage = `✅ <b>Captura recibida</b>
+
+Ya registramos tu comprobante para <b>${getPlanName(plan)}</b>.
+No hace falta enviar otra foto. Tu pago quedó en revisión manual.
+
+<b>Estado:</b> ⏳ Revisión manual de 1-12 horas`;
+        await bot.telegram.sendMessage(telegramId, userMessage, { parse_mode: 'HTML' });
+      } catch (e) {}
     } catch (e) {}
 
-    res.json({ success: true, message: 'Captura recibida. No hace falta enviar otra foto.', payment });
+    res.json({ success: true, message: 'Captura recibida. No hace falta enviar otra foto.', payment, couponApplied: couponUsed, discount: couponDiscount, finalPrice });
   } catch (error) {
     console.error('❌ Error procesando pago:', error);
     if (req.file?.path) fs.unlink(req.file.path, () => {});
@@ -851,92 +790,16 @@ app.post('/api/payments/:id/approve', async (req, res) => {
       } catch (couponError) { console.error('❌ Error aplicando cupón:', couponError.message); }
     }
 
-    if (payment.referral_discount && payment.referral_discount > 0) {
-  const userId = payment.telegram_id;
-  
-  // Obtener el descuento actual del usuario
-  const referralStats = await db.getReferralStats(userId);
-  const currentDiscount = referralStats?.discount_percentage || 0;
-  
-  // Calcular nuevo descuento después de usar este
-  let newDiscount = currentDiscount;
-  if (currentDiscount >= 40) {
-    newDiscount = 20;
-  } else if (currentDiscount >= 20) {
-    newDiscount = 0;
-  }
-  
-  // Obtener referidos no usados
-  const { data: level1 } = await supabaseAdmin
-    .from('referrals')
-    .select('id')
-    .eq('referrer_id', userId)
-    .eq('level', 1)
-    .eq('has_paid', true)
-    .is('discount_used_at', null);
-  const { data: level2 } = await supabaseAdmin
-    .from('referrals')
-    .select('id')
-    .eq('referrer_id', userId)
-    .eq('level', 2)
-    .eq('has_paid', true)
-    .is('discount_used_at', null);
-
-  let remainingDiscount = payment.referral_discount;
-  const referralsToMark = [];
-  for (const ref of (level1 || [])) {
-    if (remainingDiscount >= 20) {
-      referralsToMark.push(ref.id);
-      remainingDiscount -= 20;
-    } else break;
-  }
-  for (const ref of (level2 || [])) {
-    if (remainingDiscount >= 10) {
-      referralsToMark.push(ref.id);
-      remainingDiscount -= 10;
-    } else break;
-  }
-  if (referralsToMark.length > 0) {
-    await db.markReferralDiscountAsUsed(referralsToMark);
-  }
-  
-  // Actualizar el descuento del usuario si cambió
-  if (newDiscount !== currentDiscount) {
-    await supabaseAdmin
-      .from('users')
-      .update({ 
-        referral_discount: newDiscount,
-        last_discount_used_at: new Date().toISOString()
-      })
-      .eq('telegram_id', userId);
-    
-    console.log(`✅ Descuento de referido actualizado: ${currentDiscount}% → ${newDiscount}% para usuario ${userId}`);
-  }
-}
-
     try {
-  let userMessage = '<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Tu pago ha sido aprobado!</b>\n\nAhora eres usuario VIP de VPN Cuba.\nEl administrador te enviará el archivo de configuración en breve.\n\n';
-  if (payment.coupon_used && payment.coupon_discount) userMessage += `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}% descuento)\n`;
-  if (payment.referral_discount && payment.referral_discount > 0) {
-    userMessage += `<tg-emoji emoji-id="5258362837411045098">🤝</tg-emoji> <b>Descuento por referidos:</b> ${payment.referral_discount}% aplicado\n`;
-    
-    // Mostrar el nuevo descuento acumulado
-    const newStats = await db.getReferralStats(payment.telegram_id);
-    if (newStats && newStats.discount_percentage > 0) {
-      userMessage += `\n💰 <b>Tu nuevo descuento acumulado:</b> ${newStats.discount_percentage}% para tu próxima compra.`;
-    } else {
-      userMessage += `\n💰 <b>Has agotado tu descuento por referidos.</b> Invita más amigos para obtener nuevos descuentos.`;
-    }
-    userMessage += `\n\n<i>Nota: Cada vez que usas tu descuento, este se reduce (40% → 20% → 0%).</i>`;
-  }
-  userMessage += '\n\n<b>Nota:</b> Sistema de envío automático desactivado.';
-  await bot.telegram.sendMessage(payment.telegram_id, userMessage, { parse_mode: 'HTML' });
-} catch (botError) { console.log('❌ No se pudo notificar al usuario:', botError.message); }
-    
+      let userMessage = '<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Tu pago ha sido aprobado!</b>\n\nAhora eres usuario VIP de VPN Cuba.\nEl administrador te enviará el archivo de configuración en breve.\n\n';
+      if (payment.coupon_used && payment.coupon_discount) userMessage += `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}% descuento)\n`;
+      userMessage += '<b>Nota:</b> Sistema de envío automático desactivado.';
+      await bot.telegram.sendMessage(payment.telegram_id, userMessage, { parse_mode: 'HTML' });
+    } catch (botError) { console.log('❌ No se pudo notificar al usuario:', botError.message); }
+
     const user = await db.getUser(payment.telegram_id);
-   
-    // Siempre actualizar la fecha, incluso en renovaciones
-  await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
+    if (!user.vip) await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
+
     if (user.referrer_id) {
       try {
         await db.markReferralAsPaid(payment.telegram_id);
@@ -1017,14 +880,29 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
     const user = await db.getUser(chatId);
     if (!user) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: `El usuario ${chatId} no está registrado` }); }
 
-    await bot.telegram.sendDocument(chatId, { source: req.file.path, filename: req.file.originalname }, {
-      caption: `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu configuración VPN Cuba está lista!</b>\n\n` +
-               `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${req.file.originalname}\n` +
-               `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n` +
-               `${payment.coupon_used ? `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}%)\n` : ''}` +
-               `\n<b>Instrucciones:</b>\n1. Descarga este archivo\n2. ${fileName.endsWith('.conf') ? 'Importa el archivo .conf directamente' : 'Descomprime y luego importa el .conf'}\n3. Importa en WireGuard\n4. Activa la conexión\n5. ¡Disfruta! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
-      parse_mode: 'HTML'
-    });
+    const MAX_RETRIES = 3;
+    let lastTelegramError = null, sent = false;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        await bot.telegram.sendDocument(chatId, { source: req.file.path, filename: req.file.originalname }, {
+          caption: `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu configuración VPN Cuba está lista!</b>\n\n` +
+                   `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${req.file.originalname}\n` +
+                   `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n` +
+                   `${payment.coupon_used ? `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}%)\n` : ''}` +
+                   `\n<b>Instrucciones:</b>\n1. Descarga este archivo\n2. ${fileName.endsWith('.conf') ? 'Importa el archivo .conf directamente' : 'Descomprime y luego importa el .conf'}\n3. Importa en WireGuard\n4. Activa la conexión\n5. ¡Disfruta! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
+          parse_mode: 'HTML'
+        });
+        sent = true; break;
+      } catch (retryErr) {
+        lastTelegramError = retryErr;
+        const errMsg = retryErr.description || retryErr.message || '';
+        console.warn(`⚠️ Intento ${attempt}/${MAX_RETRIES} fallido: ${errMsg}`);
+        if (errMsg.includes('chat not found') || errMsg.includes('bot was blocked') || errMsg.includes('user is deactivated') || errMsg.includes('kicked') || retryErr.response?.error_code === 403 || retryErr.response?.error_code === 400) break;
+        if (attempt < MAX_RETRIES) await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+      }
+    }
+
+    if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
 
     await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.filename, config_sent_by: adminId });
     if (user && !user.vip) await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
@@ -1082,34 +960,24 @@ app.get('/api/check-trial-eligibility/:telegramId', async (req, res) => {
   try { res.json(await db.checkTrialEligibility(req.params.telegramId)); } catch (error) { res.json({ eligible: true, reason: 'Error verificando' }); }
 });
 
-// ==================== SOLICITUD DE PRUEBA (ATÓMICA) ====================
-app.post('/api/request-trial', requireNotBanned, async (req, res) => {
+// ==================== SOLICITUD DE PRUEBA ====================
+app.post('/api/request-trial', async (req, res) => {
   try {
     const { telegramId, username, firstName, trialType = '1h', gameServer, connectionType, trialPlanType } = req.body;
 
-    const eligibility = await db.checkTrialEligibility(telegramId, trialPlanType);
+    const eligibility = await db.checkTrialEligibility(telegramId);
     if (!eligibility.eligible) return res.status(400).json({ error: `No puedes solicitar una prueba: ${eligibility.reason}` });
 
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from('users')
-      .update({
-        trial_requested: true,
-        trial_requested_at: new Date().toISOString(),
-        trial_plan_type: trialPlanType || 'basico',
-        trial_game_server: gameServer || '',
-        trial_connection_type: connectionType || '',
-        is_active: true,
-        updated_at: new Date().toISOString()
-      })
-      .eq('telegram_id', telegramId)
-      .select()
-      .single();
-
-    if (updateError || !updatedUser) {
-      return res.status(400).json({ error: 'Ya tienes una solicitud de prueba en proceso.' });
-    }
-
     const selectedPlan = getPlanLabel(trialPlanType) || 'No especificado';
+
+    const updatedUser = await db.saveUser(telegramId, {
+      telegram_id: telegramId, username, first_name: firstName,
+      trial_requested: true, trial_requested_at: new Date().toISOString(),
+      trial_plan_type: trialPlanType || 'basico',
+      trial_game_server: gameServer || '',
+      trial_connection_type: connectionType || '',
+      is_active: true
+    });
 
     const adminMessage = `🎯 *NUEVA SOLICITUD DE PRUEBA*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username ? `@${username}` : 'Sin usuario'}\n🆔 *ID:* ${telegramId}\n🎮 *Juego/Servidor:* ${gameServer || 'No especificado'}\n📡 *Conexión:* ${connectionType || 'No especificado'}\n📋 *Plan a probar:* ${selectedPlan}\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
     for (const adminId of ADMIN_IDS) { try { await bot.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' }); } catch (e) {} }
@@ -1208,7 +1076,7 @@ app.get('/api/image/:filename', (req, res) => {
 app.get('/api/storage-status', async (req, res) => {
   try {
     const buckets = [];
-    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-cuba_vip', 'trial-files-premium', 'trial-files-anual']) {
+    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual']) {
       try { const { data } = await supabaseAdmin.storage.from(name).list(); buckets.push({ name, status: '✅ Existe', fileCount: data?.length || 0 }); }
       catch (e) { buckets.push({ name, status: '❌ Error: ' + e.message }); }
     }
@@ -1216,140 +1084,32 @@ app.get('/api/storage-status', async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
-function normalizeBroadcastMedia(req) {
-  const direct = req.file || null;
-  const fromFiles = req.files || {};
-  const picked = direct || fromFiles?.media?.[0] || fromFiles?.mediaFile?.[0] || null;
-
-  if (!picked) return null;
-
-  return {
-    path: picked.path || null,
-    mimetype: picked.mimetype || req.body?.mediaType || '',
-    originalname: picked.originalname || req.body?.mediaName || 'adjunto',
-    filename: picked.filename || null,
-    size: picked.size || null,
-    media_url: req.body?.mediaUrl || req.body?.attachmentUrl || null,
-    attachment_url: req.body?.attachmentUrl || req.body?.mediaUrl || null,
-    message: req.body?.message || ''
-  };
-}
-
-function buildBroadcastCaption(message) {
-  const clean = (message || '').trim();
-  if (!clean) return `📢 *MENSAJE IMPORTANTE - VPN CUBA*
-
-_Soporte: @rov3r777_`;
-  return `📢 *MENSAJE IMPORTANTE - VPN CUBA*
-
-${clean}
-
-_Soporte: @rov3r777_`;
-}
-
-async function sendBroadcastMediaToUser(telegramId, mediaFile, caption) {
-  const mime = (mediaFile?.mimetype || '').toLowerCase();
-  if (mediaFile?.path) {
-    if (mime.startsWith('image/')) {
-      await bot.telegram.sendPhoto(telegramId, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
-      return 'image';
-    }
-    if (mime.startsWith('video/')) {
-      await bot.telegram.sendVideo(telegramId, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
-      return 'video';
-    }
-    await bot.telegram.sendDocument(telegramId, { source: fs.createReadStream(mediaFile.path) }, { caption, parse_mode: 'Markdown' });
-    return 'document';
-  }
-
-  const url = mediaFile?.media_url || mediaFile?.attachment_url;
-  if (url) {
-    if (mime.startsWith('image/')) {
-      await bot.telegram.sendPhoto(telegramId, url, { caption, parse_mode: 'Markdown' });
-      return 'image';
-    }
-    if (mime.startsWith('video/')) {
-      await bot.telegram.sendVideo(telegramId, url, { caption, parse_mode: 'Markdown' });
-      return 'video';
-    }
-    await bot.telegram.sendDocument(telegramId, url, { caption, parse_mode: 'Markdown' });
-    return 'document';
-  }
-
-  await bot.telegram.sendMessage(telegramId, caption, { parse_mode: 'Markdown' });
-  return null;
-}
-
-app.post('/api/broadcast/send', upload.fields([{ name: 'media', maxCount: 1 }, { name: 'mediaFile', maxCount: 1 }]), async (req, res) => {
+app.post('/api/broadcast/send', async (req, res) => {
   try {
     const { message, target, adminId } = req.body;
-    const mediaFile = normalizeBroadcastMedia(req);
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
-    if (!message?.trim() && !mediaFile) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
+    if (!message?.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
     const validTargets = ['all', 'vip', 'non_vip', 'trial_pending', 'trial_received', 'active', 'with_referrals', 'usdt_payers'];
     if (!validTargets.includes(target)) return res.status(400).json({ error: 'Target de broadcast inválido' });
-
-    const broadcastMeta = {
-      has_media: !!mediaFile,
-      media_type: mediaFile?.mimetype || null,
-      media_name: mediaFile?.originalname || null,
-      media_url: mediaFile?.media_url || null,
-      attachment_url: mediaFile?.attachment_url || null
-    };
-
-    const broadcast = await db.createBroadcast(message || '', target, adminId, broadcastMeta);
+    const broadcast = await db.createBroadcast(message, target, adminId);
     if (!broadcast?.id) throw new Error('No se pudo crear el broadcast');
     const users = await getAllUsersForBroadcast(target);
     await db.updateBroadcastStatus(broadcast.id, 'pending', { total_users: users.length });
-
-    setImmediate(() => {
-      sendBroadcastToUsers(broadcast.id, message || '', users, adminId, mediaFile, broadcastMeta).catch(err =>
-        console.error(`❌ Error en envío diferido broadcast ${broadcast.id}:`, err)
-      );
-    });
-
-    res.json({
-      success: true,
-      message: 'Broadcast creado',
-      broadcast: {
-        id: broadcast.id,
-        target,
-        total_users: users.length,
-        status: 'pending',
-        ...broadcastMeta
-      },
-      totalUsers: users.length
-    });
+    setImmediate(() => { sendBroadcastToUsers(broadcast.id, message, users, adminId); });
+    res.json({ success: true, message: 'Broadcast creado', broadcast: { id: broadcast.id, target, total_users: users.length, status: 'pending' }, totalUsers: users.length });
   } catch (error) { res.status(500).json({ error: 'Error creando broadcast: ' + error.message }); }
 });
 
-async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaFile = null, broadcastMeta = null) {
+async function sendBroadcastToUsers(broadcastId, message, users, adminId) {
   try {
-    if (!users?.length) {
-      await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0, ...(broadcastMeta || {}) });
-      if (mediaFile?.path) fs.unlink(mediaFile.path, () => {});
-      return;
-    }
-    await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0, ...(broadcastMeta || {}) });
+    if (!users?.length) { await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 }); return; }
+    await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0 });
     let sentCount = 0, failedCount = 0, unavailableCount = 0;
-    const caption = buildBroadcastCaption(message);
-
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       try {
         if (!user.telegram_id) { failedCount++; continue; }
-        const mediaKind = await sendBroadcastMediaToUser(user.telegram_id, mediaFile, caption);
-        if (broadcastMeta && typeof db.updateBroadcast === 'function') {
-          try {
-            await db.updateBroadcast(broadcastId, {
-              has_media: !!mediaFile,
-              media_type: mediaKind || broadcastMeta.media_type || null,
-              media_name: broadcastMeta.media_name || null,
-              media_url: broadcastMeta.media_url || null,
-              attachment_url: broadcastMeta.attachment_url || null
-            });
-          } catch (e) {}
-        }
+        await bot.telegram.sendMessage(user.telegram_id, `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @rov3r777 | @ErenJeager129182 | @JosherSnchz_`, { parse_mode: 'Markdown' });
         sentCount++;
       } catch (error) {
         failedCount++;
@@ -1360,15 +1120,14 @@ async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaF
         }
       }
       if ((i + 1) % 25 === 0 || i === users.length - 1) {
-        try { await db.updateBroadcastStatus(broadcastId, 'sending', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length, ...(broadcastMeta || {}) }); } catch (e) {}
+        try { await db.updateBroadcastStatus(broadcastId, 'sending', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length }); } catch (e) {}
       }
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length, ...(broadcastMeta || {}) });
-    if (mediaFile?.path) fs.unlink(mediaFile.path, () => {});
+    await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: sentCount, failed_count: failedCount, unavailable_count: unavailableCount, total_users: users.length });
   } catch (error) {
     console.error(`❌ Error crítico en broadcast ${broadcastId}:`, error);
-    try { await db.updateBroadcastStatus(broadcastId, 'failed', { sent_count: 0, failed_count: users?.length || 0, unavailable_count: 0, total_users: users?.length || 0, ...(broadcastMeta || {}) }); } catch (e) {}
+    try { await db.updateBroadcastStatus(broadcastId, 'failed', { sent_count: 0, failed_count: users?.length || 0, unavailable_count: 0, total_users: users?.length || 0 }); } catch (e) {}
   }
 }
 
@@ -1383,21 +1142,7 @@ app.post('/api/broadcast/retry/:id', async (req, res) => {
     const broadcast = await db.retryFailedBroadcast(req.params.id);
     if (!broadcast) return res.status(404).json({ error: 'No encontrado' });
     const users = await getAllUsersForBroadcast(broadcast.target_users);
-    const retryMedia = broadcast?.media_path || broadcast?.media_url || broadcast?.attachment_url ? {
-      path: broadcast.media_path || null,
-      mimetype: broadcast.media_type || '',
-      originalname: broadcast.media_name || 'adjunto',
-      media_url: broadcast.media_url || null,
-      attachment_url: broadcast.attachment_url || null
-    } : null;
-    const retryMeta = {
-      has_media: !!retryMedia,
-      media_type: broadcast?.media_type || null,
-      media_name: broadcast?.media_name || null,
-      media_url: broadcast?.media_url || null,
-      attachment_url: broadcast?.attachment_url || null
-    };
-    setTimeout(() => { sendBroadcastToUsers(broadcast.id, broadcast.message, users, adminId, retryMedia, retryMeta); }, 100);
+    setTimeout(() => { sendBroadcastToUsers(broadcast.id, broadcast.message, users, adminId); }, 100);
     res.json({ success: true, message: 'Reintentando broadcast', broadcast });
   } catch (error) { res.status(500).json({ error: 'Error reintentando: ' + error.message }); }
 });
@@ -1443,260 +1188,6 @@ app.get('/api/usdt/verify-transaction/:hash', (req, res) => { res.json({ success
 app.post('/api/usdt/force-check', (req, res) => { if (!isAdmin(req.body.adminId)) return res.status(403).json({ error: 'No autorizado' }); res.json({ success: true, message: 'Verificación automática desactivada.', result: { transactions: 0, mode: 'manual' } }); });
 app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
 
-// ==================== PAGO CON STARS ====================
-
-const STARS_PRICES = {
-  basico:   150,
-  avanzado: 270,
-  cuba_vip: 180,
-  premium:  210,
-  anual:    2100
-};
-
-const STARS_PLAN_LABELS = {
-  basico:   'Plan Básico (1 mes)',
-  avanzado: 'Plan Avanzado (2 meses)',
-  cuba_vip: 'Plan VIP Cuba (1 mes)',
-  premium:  'Plan Gaming (1 mes)',
-  anual:    'Plan Anual (12 meses)'
-};
-
-app.post('/api/initiate-stars-payment', async (req, res) => {
-  try {
-    const { telegramId, plan } = req.body;
-    if (!telegramId) return res.status(400).json({ error: 'ID de usuario requerido' });
-    const stars = STARS_PRICES[plan];
-    if (!stars) return res.status(400).json({ error: 'Plan inválido' });
-
-    const label = STARS_PLAN_LABELS[plan] || plan;
-
-    await bot.telegram.sendInvoice(telegramId, {
-      title: `VPN Cuba — ${label}`,
-      description: `Activa tu ${label} de VPN Cuba. Recibirás el archivo de configuración WireGuard por este chat tras la verificación.`,
-      payload: JSON.stringify({ plan, telegramId: String(telegramId) }),
-      currency: 'XTR',
-      prices: [{ label, amount: stars }],
-      provider_token: ''
-    });
-
-    res.json({ success: true, message: 'Factura enviada por Telegram' });
-  } catch (error) {
-    console.error('❌ Error iniciando pago Stars:', error);
-    res.status(500).json({ error: 'Error enviando factura: ' + (error.description || error.message) });
-  }
-});
-
-// Pre-checkout: Telegram pide confirmación antes de cobrar
-bot.on('pre_checkout_query', async (ctx) => {
-  try {
-    await ctx.answerPreCheckoutQuery(true);
-  } catch (error) {
-    console.error('❌ Error en pre_checkout_query:', error);
-    try { await ctx.answerPreCheckoutQuery(false, 'Error procesando el pago. Inténtalo de nuevo.'); } catch (e) {}
-  }
-});
-
-// Pago completado: Telegram confirma el cobro
-bot.on('message', async (ctx, next) => {
-  if (!ctx.message?.successful_payment) return next();
-  try {
-    const payment = ctx.message.successful_payment;
-    const payload = JSON.parse(payment.invoice_payload);
-    const { plan, telegramId } = payload;
-    const label = STARS_PLAN_LABELS[plan] || plan;
-    const stars = payment.total_amount;
-
-    // Registrar el pago en la BD
-    await db.createPayment({
-      telegram_id: String(telegramId),
-      plan,
-      price: stars,
-      original_price: stars,
-      method: 'stars',
-      screenshot_url: '',
-      notes: `Pago Stars · charge_id: ${payment.telegram_payment_charge_id}`,
-      status: 'approved',
-      created_at: new Date().toISOString(),
-      coupon_used: false,
-      coupon_code: null,
-      coupon_discount: 0,
-      referral_discount: 0
-    });
-
-    // Hacer VIP al usuario
-    await db.makeUserVIP(String(telegramId), {
-      plan,
-      plan_price: stars,
-      vip_since: new Date().toISOString()
-    });
-
-    // Notificar al usuario
-    await ctx.reply(
-      `<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Pago con Stars confirmado!</b>\n\n` +
-      `<b>Plan:</b> ${label}\n` +
-      `<b>Stars pagadas:</b> ⭐ ${stars}\n\n` +
-      `Un administrador te enviará el archivo de configuración WireGuard en breve.\n\n` +
-      `<b>Tiempo estimado:</b> 1-12 horas`,
-      { parse_mode: 'HTML' }
-    );
-
-    // Notificar a los admins
-    const user = await db.getUser(String(telegramId)).catch(() => null);
-    const username = user?.username ? `@${user.username}` : 'Sin usuario';
-    const firstName = user?.first_name || 'Usuario';
-    const adminMsg = `⭐ *NUEVO PAGO STARS*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${label}\n⭐ *Stars:* ${stars}\n🔖 *Charge ID:* \`${payment.telegram_payment_charge_id}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
-    for (const adminId of ADMIN_IDS) {
-      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch (e) {}
-    }
-
-    // Marcar referido como pagado si aplica
-    if (user?.referrer_id) {
-      try {
-        await db.markReferralAsPaid(String(telegramId));
-        const referrerUser = await db.getUser(user.referrer_id);
-        if (referrerUser?.referrer_id) await db.markReferralAsPaid(user.referrer_id, 2);
-      } catch (e) {}
-    }
-  } catch (error) {
-    console.error('❌ Error procesando successful_payment:', error);
-    try {
-      await ctx.reply('⚠️ Tu pago fue procesado pero hubo un error activando tu plan. Contacta con soporte indicando tu ID de usuario.');
-    } catch (e) {}
-  }
-});
-
-
-// ==================== PAGO CON TON ====================
-
-const TON_CONFIG = {
-  WALLET_ADDRESS: 'UQAY_qlJ1uxM-UP2zWjLn4jbFf6nQWL4N3JDWfNIyTPy5rZO',
-  MANIFEST_URL:   'https://vpn-bryan.onrender.com/tonconnect-manifest.json',
-  TONCENTER_API:  'https://toncenter.com/api/v2',
-};
-
-const TON_PRICES = {
-  basico:   2.0,
-  avanzado: 3.0,
-  cuba_vip: 2.2,
-  premium:  2.5,
-  anual:    26.0
-};
-
-const TON_PLAN_LABELS = {
-  basico:   'Plan Básico (1 mes)',
-  avanzado: 'Plan Avanzado (2 meses)',
-  cuba_vip: 'Plan VIP Cuba (1 mes)',
-  premium:  'Plan Gaming (1 mes)',
-  anual:    'Plan Anual (12 meses)'
-};
-
-// Devuelve los datos necesarios para que el frontend inicie el pago TON
-app.post('/api/initiate-ton-payment', async (req, res) => {
-  try {
-    const { telegramId, plan } = req.body;
-    if (!telegramId) return res.status(400).json({ error: 'ID de usuario requerido' });
-    const amount = TON_PRICES[plan];
-    if (!amount) return res.status(400).json({ error: 'Plan inválido' });
-
-    const comment = `VPNCUBA-${plan.toUpperCase()}-${telegramId}-${Date.now()}`;
-
-    res.json({
-      success: true,
-      walletAddress: TON_CONFIG.WALLET_ADDRESS,
-      amount,
-      comment,
-      plan,
-      label: TON_PLAN_LABELS[plan],
-      manifestUrl: TON_CONFIG.MANIFEST_URL
-    });
-  } catch (error) {
-    console.error('Error iniciando pago TON:', error);
-    res.status(500).json({ error: 'Error iniciando pago TON: ' + error.message });
-  }
-});
-
-// El frontend llama a esto para verificar que el pago llegó on-chain
-app.post('/api/verify-ton-payment', async (req, res) => {
-  try {
-    const { telegramId, plan, comment } = req.body;
-    if (!telegramId || !plan || !comment) return res.status(400).json({ error: 'Parámetros incompletos' });
-
-    const amount = TON_PRICES[plan];
-    if (!amount) return res.status(400).json({ error: 'Plan inválido' });
-
-    const url = `${TON_CONFIG.TONCENTER_API}/getTransactions?address=${TON_CONFIG.WALLET_ADDRESS}&limit=20`;
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!data.ok || !data.result) return res.status(502).json({ error: 'No se pudo consultar la blockchain' });
-
-    const amountNano = Math.floor(amount * 1e9);
-    const found = data.result.find(tx => {
-      const inMsg = tx.in_msg;
-      if (!inMsg) return false;
-      const txValue = parseInt(inMsg.value || '0');
-      const txComment = inMsg.message || '';
-      return txValue >= amountNano * 0.99 && txComment === comment;
-    });
-
-    if (!found) return res.json({ success: false, verified: false, message: 'Pago no encontrado aún' });
-
-    const label = TON_PLAN_LABELS[plan];
-
-    await db.createPayment({
-      telegram_id: String(telegramId),
-      plan,
-      price: amount,
-      original_price: amount,
-      method: 'ton',
-      screenshot_url: '',
-      notes: `Pago TON · comment: ${comment} · tx: ${found.transaction_id?.hash || ''}`,
-      status: 'approved',
-      created_at: new Date().toISOString(),
-      coupon_used: false,
-      coupon_code: null,
-      coupon_discount: 0,
-      referral_discount: 0
-    });
-
-    await db.makeUserVIP(String(telegramId), {
-      plan,
-      plan_price: amount,
-      vip_since: new Date().toISOString()
-    });
-
-    await bot.telegram.sendMessage(telegramId,
-      `<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Pago TON confirmado!</b>\n\n` +
-      `<b>Plan:</b> ${label}\n` +
-      `<b>TON pagados:</b> 💎 ${amount}\n\n` +
-      `Un administrador te enviará el archivo de configuración WireGuard en breve.\n\n` +
-      `<b>Tiempo estimado:</b> 1-12 horas`,
-      { parse_mode: 'HTML' }
-    );
-
-    const user = await db.getUser(String(telegramId)).catch(() => null);
-    const username = user?.username ? `@${user.username}` : 'Sin usuario';
-    const firstName = user?.first_name || 'Usuario';
-    const adminMsg = `💎 *NUEVO PAGO TON*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${label}\n💎 *TON:* ${amount}\n🔖 *Comment:* \`${comment}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
-    for (const adminId of ADMIN_IDS) {
-      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch (e) {}
-    }
-
-    if (user?.referrer_id) {
-      try {
-        await db.markReferralAsPaid(String(telegramId));
-        const referrerUser = await db.getUser(user.referrer_id);
-        if (referrerUser?.referrer_id) await db.markReferralAsPaid(user.referrer_id, 2);
-      } catch (e) {}
-    }
-
-    res.json({ success: true, verified: true, message: '¡Pago verificado y plan activado!' });
-  } catch (error) {
-    console.error('Error verificando pago TON:', error);
-    res.status(500).json({ error: 'Error verificando pago: ' + error.message });
-  }
-});
-
 // ==================== ARCHIVOS DE PLANES ====================
 app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
   try {
@@ -1715,6 +1206,8 @@ app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
 });
 
 // ==================== POOL DE PRUEBAS POR PLAN ====================
+
+// Subir archivo al pool de un plan específico
 app.post('/api/trial-files/upload', upload.single('file'), async (req, res) => {
   try {
     const { adminId, label, planType } = req.body;
@@ -1758,6 +1251,7 @@ app.post('/api/trial-files/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+// Obtener archivos del pool de un plan específico
 app.get('/api/trial-files/:planType', async (req, res) => {
   try {
     const planType = PLAN_TYPES.includes(req.params.planType) ? req.params.planType : 'basico';
@@ -1766,6 +1260,7 @@ app.get('/api/trial-files/:planType', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error obteniendo archivos' }); }
 });
 
+// Obtener todos los pools en un solo objeto { basico: [...], avanzado: [...], ... }
 app.get('/api/trial-files', async (req, res) => {
   try {
     const result = {};
@@ -1800,6 +1295,7 @@ app.delete('/api/trial-files/:planType/:id', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
 });
 
+// Legacy: ruta antigua /api/upload-trial-file (mantener por compatibilidad)
 app.post('/api/upload-trial-file', upload.single('file'), async (req, res) => {
   try {
     const { adminId } = req.body;
@@ -1943,7 +1439,7 @@ app.delete('/api/coupons/:code', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
 });
 
-app.post('/api/coupons/verify/:code', requireNotBanned, async (req, res) => {
+app.post('/api/coupons/verify/:code', async (req, res) => {
   try {
     const { telegramId } = req.body;
     const code = req.params.code.toUpperCase();
@@ -2006,18 +1502,12 @@ bot.catch((err, ctx) => { console.error('❌ Error en el bot:', err); });
 bot.action('show_support', async (ctx) => {
   try {
     await ctx.answerCbQuery();
-    await ctx.reply(getSupportHtml(), { 
-      parse_mode: 'HTML', 
-      reply_markup: { 
-        inline_keyboard: [
-          [createButton("CEO", { url: 'https://t.me/rov3r777' })], 
-          [createButton("Admin 2", { url: 'https://wa.me/50793992' }), createButton("Admin 1", { url: 'https://wa.me/56557646' })],
-          [createButton("MOD", { url: 'https://t.me/ErenJeager129182' })],
-          [createButton("WHATSAPP", { url: WHATSAPP_GROUP_LINK })], 
-          [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
-        ] 
-      } 
-    });
+    await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
+        [createButton("CEO 📊", { url: 'https://t.me/rov3r777' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5356557646' })],
+        [createButton("ADMIN 🌐", { url: 'https://t.me/ErenJeager129182' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5350793992' })],
+        [createButton("MODERADOR ⚙️", { url: 'https://t.me/JosherSnchz' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5351435068' })],
+        [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
+    ] } });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
 });
 
@@ -2054,37 +1544,10 @@ bot.action('referral_info', async (ctx) => {
   try {
     const user = await db.getUser(userId);
     let referralStats = null;
-    let totalReferrals = 0;
-    if (user) {
-      try {
-        referralStats = await db.getReferralStats(userId);
-        totalReferrals = await db.getTotalReferralsCount(userId);
-      } catch (e) {}
-    }
-    const activeDiscount = referralStats?.discount_percentage || 0;
-    
-    // Construcción del mensaje con el formato que deseas
-    let message = `<tg-emoji emoji-id="5258362837411045098">🤝</tg-emoji> <b>SISTEMA DE REFERIDOS</b>\n\n`;
-    message += `🔗 <b>Tu enlace único:</b>\n<code>${referralLink}</code>\n\n`;
-    message += `📊 <b>Total referidos:</b> ${totalReferrals}\n`;
-    message += `💰 <b>Descuentos por Referidos sin usar:</b> ${activeDiscount}%\n\n`;
-    message += `<i>Detalle: Bajo</i>\n\n`;
-    message += `💡 Cada referido que paga te da 20% (nivel 1) o 10% (nivel 2). El descuento se reduce al usarlo (40%→20%→0%).`;
-    
+    if (user) try { referralStats = await db.getReferralStats(userId); } catch (e) {}
     await ctx.answerCbQuery();
-    await ctx.reply(message, {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })],
-          [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
-        ]
-      }
-    });
-  } catch (error) {
-    await ctx.answerCbQuery();
-    await ctx.reply(`🤝 Tu enlace: \`https://t.me/vpncubaw_bot?start=ref${userId}\``, { parse_mode: 'Markdown' });
-  }
+    await ctx.reply(getReferralInfoHtml(userId, referralStats), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+  } catch (error) { await ctx.answerCbQuery(); await ctx.reply(`🤝 Tu enlace: \`https://t.me/vpncubaw_bot?start=ref${userId}\``, { parse_mode: 'Markdown' }); }
 });
 
 bot.action('how_it_works', async (ctx) => {
@@ -2135,50 +1598,19 @@ bot.start(async (ctx) => {
     const chatType = ctx.chat.type;
     const isGroup = chatType === 'group' || chatType === 'supergroup';
     let referrerId = null, referrerUsername = null;
-
     if (startPayload && startPayload.startsWith('ref') && !isGroup) {
         referrerId = startPayload.replace('ref', '');
         try { const referrer = await db.getUser(referrerId); if (referrer) referrerUsername = referrer.username; } catch (e) {}
         if (referrerId) { try { await db.createReferral(referrerId, userId.toString(), ctx.from.username, firstName); } catch (e) {} }
     }
-
     try {
-        const userData = {
-            telegram_id: userId.toString(),
-            username: ctx.from.username,
-            first_name: firstName,
-            last_name: ctx.from.last_name,
-            created_at: new Date().toISOString(),
-            is_active: true
-        };
-        if (referrerId) {
-            userData.referrer_id = referrerId;
-            userData.referrer_username = referrerUsername;
-        }
+        const userData = { telegram_id: userId.toString(), username: ctx.from.username, first_name: firstName, last_name: ctx.from.last_name, created_at: new Date().toISOString(), is_active: true };
+        if (referrerId) { userData.referrer_id = referrerId; userData.referrer_username = referrerUsername; }
         await db.saveUser(userId.toString(), userData);
-    } catch (error) {
-        console.error('Error guardando usuario:', error);
-    }
-
+    } catch (error) { console.error('Error guardando usuario:', error); }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
-
-    const welcomeCaption = `*¡Hola ${firstName || 'usuario'}!* 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
-
-    try {
-        const gifPath = path.join(__dirname, 'assets', 'vpncuba_premium.gif');
-        if (fs.existsSync(gifPath)) {
-            await bot.telegram.sendAnimation(
-                ctx.chat.id,
-                { source: fs.createReadStream(gifPath) },
-                { caption: welcomeCaption, parse_mode: 'Markdown', ...keyboard }
-            );
-        } else {
-            await bot.telegram.sendMessage(ctx.chat.id, welcomeCaption, { parse_mode: 'Markdown', ...keyboard });
-        }
-    } catch (error) {
-        console.error('Error enviando GIF de bienvenida:', error);
-        await bot.telegram.sendMessage(ctx.chat.id, welcomeCaption, { parse_mode: 'Markdown', ...keyboard });
-    }
+    let welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
+    await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
 });
 
 bot.command('help', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id, ctx.from.first_name, isAdmin(ctx.from.id)); await ctx.reply('🆘 *Ayuda de VPN Cuba*\n\nUsa los botones para navegar.', { parse_mode: 'Markdown', ...keyboard }); });
@@ -2200,45 +1632,6 @@ bot.command('admin', async (ctx) => {
   if (!isAdmin(ctx.from.id)) { await ctx.reply('⛔ No tienes permisos.'); return; }
   const adminUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}/admin.html?userId=${ctx.from.id}&admin=true`;
   await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(adminUrl, ctx))]] } });
-});
-
-// ==================== COMANDOS DE BANEO ====================
-bot.command('ban', async (ctx) => {
-    const userId = ctx.from.id.toString();
-    if (!isAdmin(userId)) {
-        return ctx.reply('⛔ No tienes permisos para usar este comando.');
-    }
-    const args = ctx.message.text.split(' ');
-    if (args.length < 2) {
-        return ctx.reply('Uso: /ban <ID del usuario>');
-    }
-    const targetId = args[1].trim();
-    try {
-        const updated = await banUser(targetId, userId);
-        await ctx.reply(`✅ Usuario ${targetId} ha sido baneado.`);
-        try { await bot.telegram.sendMessage(targetId, '⛔ Has sido baneado de VPN Cuba Bot. No puedes usar el bot.'); } catch (e) {}
-    } catch (error) {
-        await ctx.reply(`❌ Error: ${error.message}`);
-    }
-});
-
-bot.command('unban', async (ctx) => {
-    const userId = ctx.from.id.toString();
-    if (!isAdmin(userId)) {
-        return ctx.reply('⛔ No tienes permisos para usar este comando.');
-    }
-    const args = ctx.message.text.split(' ');
-    if (args.length < 2) {
-        return ctx.reply('Uso: /unban <ID del usuario>');
-    }
-    const targetId = args[1].trim();
-    try {
-        const updated = await unbanUser(targetId);
-        await ctx.reply(`✅ Usuario ${targetId} ha sido desbaneado.`);
-        try { await bot.telegram.sendMessage(targetId, '✅ Has sido desbaneado. Ya puedes usar el bot.'); } catch (e) {}
-    } catch (error) {
-        await ctx.reply(`❌ Error: ${error.message}`);
-    }
 });
 
 bot.on('text', async (ctx) => {
@@ -2280,9 +1673,7 @@ app.listen(PORT, '0.0.0.0', async () => {
             { command: 'help', description: 'Mostrar ayuda' },
             { command: 'referidos', description: 'Obtener enlace de referidos' },
             { command: 'trialstatus', description: 'Ver estado de prueba gratuita' },
-            { command: 'admin', description: 'Panel de administración (solo admins)' },
-            { command: 'ban', description: 'Banear a un usuario (admin)' },
-            { command: 'unban', description: 'Desbanear a un usuario (admin)' }
+            { command: 'admin', description: 'Panel de administración (solo admins)' }
         ]);
     } catch (error) { console.error('❌ Error configurando comandos:', error); }
     startKeepAlive();
