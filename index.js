@@ -225,24 +225,16 @@ function getSupportHtml() {
 
 function getReferralInfoHtml(userId, referralStats) {
     const referralLink = `https://t.me/vpncubaw_bot?start=ref${userId}`;
-    let html = `<tg-emoji emoji-id="5258362837411045098">🤝</tg-emoji> <b>SISTEMA DE REFERIDOS</b> <tg-emoji emoji-id="5877410604225924969">🚀</tg-emoji>\n\n` +
-               `¡Comparte tu enlace y gana descuentos en tus próximas compras!\n\n` +
-               `<b>Tu enlace único:</b>\n<code>${referralLink}</code>\n\n` +
-               `<b>Cómo funciona:</b>\n` +
-               `1. Comparte este enlace con amigos\n` +
-               `2. Cuando alguien se registra con tu enlace, se convierte en tu referido\n` +
-               `3. Por cada referido que pague un plan, obtienes un descuento:\n` +
-               `   • Nivel 1 (referido directo): 20% de descuento\n` +
-               `   • Nivel 2 (referido de tu referido): 10% de descuento\n\n`;
-    if (referralStats) {
-        html += `<b>Tus estadísticas:</b>\n` +
-                `• Referidos directos (Nivel 1): ${referralStats.level1?.total || 0} (${referralStats.level1?.paid || 0} pagados)\n` +
-                `• Referidos nivel 2: ${referralStats.level2?.total || 0} (${referralStats.level2?.paid || 0} pagados)\n` +
-                `• Descuento total acumulado: ${referralStats.discount_percentage || 0}%\n\n`;
-    } else {
-        html += `<b>Tus estadísticas:</b>\n• Aún no tienes referidos. ¡Comparte tu enlace y empieza a ganar!\n\n`;
-    }
-    html += `¡Cada vez que un referido pague, tu descuento aumentará! <tg-emoji emoji-id="6021793768196282527">🎉</tg-emoji>`;
+    const totalReferidos = (referralStats?.level1?.total || 0) + (referralStats?.level2?.total || 0);
+    const descuento = referralStats?.discount_percentage || 0;
+    const detalle = descuento >= 30 ? 'Alto' : descuento >= 15 ? 'Medio' : 'Bajo';
+
+    let html = `🤝 <b>SISTEMA DE REFERIDOS</b>\n\n` +
+               `🔗 <b>Tu enlace único:</b>\n${referralLink}\n\n` +
+               `📊 Total referidos: ${totalReferidos}\n` +
+               `💰 Descuentos por Referidos sin usar: ${descuento}%\n\n` +
+               `<i>Detalle: ${detalle}</i>\n\n` +
+               `💡 Cada referido que paga te da 20% (nivel 1) o 10% (nivel 2). El descuento se reduce al usarlo (40%→20%→0%).`;
     return html;
 }
 
@@ -1187,6 +1179,107 @@ app.get('/api/usdt/wallet-status', async (req, res) => {
 app.get('/api/usdt/verify-transaction/:hash', (req, res) => { res.json({ success: true, status: 'manual_review_required', mode: 'manual' }); });
 app.post('/api/usdt/force-check', (req, res) => { if (!isAdmin(req.body.adminId)) return res.status(403).json({ error: 'No autorizado' }); res.json({ success: true, message: 'Verificación automática desactivada.', result: { transactions: 0, mode: 'manual' } }); });
 app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
+
+
+// ==================== PAGO CON TON ====================
+
+const TON_CONFIG = {
+  WALLET_ADDRESS: 'UQAY_qlJ1uxM-UP2zWjLn4jbFf6nQWL4N3JDWfNIyTPy5rZO',
+  MANIFEST_URL:   'https://vpn-bryan.onrender.com/tonconnect-manifest.json',
+  TONCENTER_API:  'https://toncenter.com/api/v2',
+};
+
+const TON_PRICES = {
+  basico:   2.0,
+  avanzado: 3.0,
+  cuba_vip: 2.2,
+  premium:  2.5,
+  anual:    26.0
+};
+
+const TON_PLAN_LABELS = {
+  basico:   'Plan Básico (1 mes)',
+  avanzado: 'Plan Avanzado (2 meses)',
+  cuba_vip: 'Plan VIP Cuba (1 mes)',
+  premium:  'Plan Gaming (1 mes)',
+  anual:    'Plan Anual (12 meses)'
+};
+
+app.post('/api/initiate-ton-payment', async (req, res) => {
+  try {
+    const { telegramId, plan } = req.body;
+    if (!telegramId) return res.status(400).json({ error: 'ID de usuario requerido' });
+    const amount = TON_PRICES[plan];
+    if (!amount) return res.status(400).json({ error: 'Plan inválido' });
+    const comment = `VPNCUBA-${plan.toUpperCase()}-${telegramId}-${Date.now()}`;
+    res.json({ success: true, walletAddress: TON_CONFIG.WALLET_ADDRESS, amount, comment, plan, label: TON_PLAN_LABELS[plan], manifestUrl: TON_CONFIG.MANIFEST_URL });
+  } catch (error) {
+    console.error('Error iniciando pago TON:', error);
+    res.status(500).json({ error: 'Error iniciando pago TON: ' + error.message });
+  }
+});
+
+app.post('/api/verify-ton-payment', async (req, res) => {
+  try {
+    const { telegramId, plan, comment } = req.body;
+    if (!telegramId || !plan || !comment) return res.status(400).json({ error: 'Parámetros incompletos' });
+    const amount = TON_PRICES[plan];
+    if (!amount) return res.status(400).json({ error: 'Plan inválido' });
+
+    const url = `${TON_CONFIG.TONCENTER_API}/getTransactions?address=${TON_CONFIG.WALLET_ADDRESS}&limit=20`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (!data.ok || !data.result) return res.status(502).json({ error: 'No se pudo consultar la blockchain' });
+
+    const amountNano = Math.floor(amount * 1e9);
+    const found = data.result.find(tx => {
+      const inMsg = tx.in_msg;
+      if (!inMsg) return false;
+      return parseInt(inMsg.value || '0') >= amountNano * 0.99 && (inMsg.message || '') === comment;
+    });
+
+    if (!found) return res.json({ success: false, verified: false, message: 'Pago no encontrado aún' });
+
+    const label = TON_PLAN_LABELS[plan];
+
+    await db.createPayment({
+      telegram_id: String(telegramId), plan, price: amount, original_price: amount, method: 'ton',
+      screenshot_url: '', notes: `Pago TON · comment: ${comment} · tx: ${found.transaction_id?.hash || ''}`,
+      status: 'approved', created_at: new Date().toISOString(),
+      coupon_used: false, coupon_code: null, coupon_discount: 0, referral_discount: 0
+    });
+
+    await db.makeUserVIP(String(telegramId), { plan, plan_price: amount, vip_since: new Date().toISOString() });
+
+    await bot.telegram.sendMessage(telegramId,
+      `<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Pago TON confirmado!</b>\n\n` +
+      `<b>Plan:</b> ${label}\n<b>TON pagados:</b> 💎 ${amount}\n\n` +
+      `Un administrador te enviará el archivo de configuración WireGuard en breve.\n\n<b>Tiempo estimado:</b> 1-12 horas`,
+      { parse_mode: 'HTML' }
+    );
+
+    const user = await db.getUser(String(telegramId)).catch(() => null);
+    const username = user?.username ? `@${user.username}` : 'Sin usuario';
+    const firstName = user?.first_name || 'Usuario';
+    const adminMsg = `💎 *NUEVO PAGO TON*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${label}\n💎 *TON:* ${amount}\n🔖 *Comment:* \`${comment}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch (e) {}
+    }
+
+    if (user?.referrer_id) {
+      try {
+        await db.markReferralAsPaid(String(telegramId));
+        const referrerUser = await db.getUser(user.referrer_id);
+        if (referrerUser?.referrer_id) await db.markReferralAsPaid(user.referrer_id, 2);
+      } catch (e) {}
+    }
+
+    res.json({ success: true, verified: true, message: '¡Pago verificado y plan activado!' });
+  } catch (error) {
+    console.error('Error verificando pago TON:', error);
+    res.status(500).json({ error: 'Error verificando pago: ' + error.message });
+  }
+});
 
 // ==================== ARCHIVOS DE PLANES ====================
 app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
