@@ -198,11 +198,19 @@ body::after {
   position:relative;
   overflow:hidden;
 }
+
+.plan-hero-inner > *:not(svg) {
+  position:relative;
+  z-index:1;
+  }
+  
 .plan-hero-glow {
   position:absolute; top:-40%; right:-20%;
   width:70%; height:80%;
   pointer-events:none;
-}
+  z-index:0;
+  }
+  
 .plan-hero-tag {
   display:inline-flex; align-items:center; gap:5px;
   border-radius:100px; padding:3px 10px;
