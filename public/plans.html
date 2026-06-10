@@ -849,6 +849,7 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 </style>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 </head>
 <body>
 
@@ -1420,6 +1421,25 @@ async function payWithStars(planKey) {
   }
 }
 
+// ── TON Connect setup ──
+let tonConnectUI = null;
+let tonPendingPayment = null; // { apiKey, amount, walletAddress, comment, label }
+
+function getTonConnectUI() {
+  if (!tonConnectUI) {
+    tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: 'https://vpn-bryan.onrender.com/tonconnect-manifest.json'
+    });
+    // Escuchar cambios de estado de la wallet
+    tonConnectUI.onStatusChange(wallet => {
+      if (wallet && tonPendingPayment) {
+        sendTONTransaction();
+      }
+    });
+  }
+  return tonConnectUI;
+}
+
 async function payWithTON(planKey) {
   if (!currentUserId) {
     alert('❌ Debes abrir esta Web App desde el bot de Telegram para pagar.');
@@ -1438,56 +1458,115 @@ async function payWithTON(planKey) {
     if (!data.success) { alert('❌ Error: ' + (data.error || 'No se pudo iniciar el pago.')); return; }
 
     const { walletAddress, amount, comment, label } = data;
+    tonPendingPayment = { apiKey, amount, walletAddress, comment, label };
 
-    // Mostrar instrucciones con el comment único para identificar el pago
     const modalContent = document.getElementById('modalContent');
     modalContent.innerHTML = `
       <div style="text-align:center; padding:16px;">
         <div style="font-size:48px; margin-bottom:12px;">💎</div>
-        <div class="modal-plan-name">Pago con TON</div>
+        <div class="modal-plan-name">Pagar con TON</div>
         <div class="modal-plan-desc" style="margin:12px 0;">${label}</div>
 
-        <div style="background:rgba(0,136,204,0.1); border:1px solid rgba(0,136,204,0.3); border-radius:12px; padding:16px; margin:12px 0; text-align:left;">
-          <div style="font-size:12px; color:#aaa; margin-bottom:4px;">CANTIDAD A ENVIAR</div>
-          <div style="font-size:22px; font-weight:700; color:#5bf0ff;">💎 ${amount} TON</div>
+        <div style="background:rgba(0,136,204,0.1); border:1px solid rgba(0,136,204,0.3); border-radius:12px; padding:16px; margin:12px 0;">
+          <div style="font-size:12px; color:#aaa; margin-bottom:4px;">CANTIDAD</div>
+          <div style="font-size:26px; font-weight:700; color:#5bf0ff;">💎 ${amount} TON</div>
         </div>
 
-        <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin:8px 0; text-align:left;">
-          <div style="font-size:11px; color:#aaa; margin-bottom:4px;">WALLET DESTINO</div>
-          <div style="font-size:11px; word-break:break-all; font-family:monospace;">${walletAddress}</div>
-          <button onclick="navigator.clipboard.writeText('${walletAddress}')" style="margin-top:8px; background:rgba(255,255,255,0.1); border:none; color:#fff; padding:6px 12px; border-radius:8px; font-size:11px; cursor:pointer;">📋 Copiar wallet</button>
+        <div id="ton-connect-status" style="margin:12px 0; font-size:13px; color:#aaa;">
+          Conecta tu wallet para continuar
         </div>
 
-        <div style="background:rgba(255,200,0,0.1); border:1px solid rgba(255,200,0,0.3); border-radius:12px; padding:12px; margin:8px 0; text-align:left;">
-          <div style="font-size:11px; color:#ffcc00; margin-bottom:4px;">⚠️ COMENTARIO OBLIGATORIO (cópialo exacto)</div>
-          <div style="font-size:11px; word-break:break-all; font-family:monospace; color:#ffcc00;">${comment}</div>
-          <button onclick="navigator.clipboard.writeText('${comment}')" style="margin-top:8px; background:rgba(255,200,0,0.2); border:none; color:#ffcc00; padding:6px 12px; border-radius:8px; font-size:11px; cursor:pointer;">📋 Copiar comentario</button>
-        </div>
-
-        <div style="font-size:12px; color:#aaa; margin:12px 0; line-height:1.5;">
-          Envía exactamente <b>${amount} TON</b> desde cualquier wallet (Tonkeeper, MyTonWallet, etc.) incluyendo el comentario.<br><br>
-          Tras enviar, pulsa <b>Verificar pago</b> para confirmar automáticamente.
-        </div>
-
-        <button class="modal-cta" style="background:#0088cc;color:#fff;width:100%;margin-bottom:8px;" onclick="verifyTONPayment('${apiKey}','${comment}')">
-          ✅ Verificar pago
+        <button id="ton-connect-btn" class="modal-cta" style="background:#0088cc;color:#fff;width:100%;margin-bottom:8px;" onclick="connectTONWallet()">
+          🔗 Conectar Wallet
         </button>
         <button class="modal-cta" style="background:rgba(255,255,255,0.1);color:#fff;width:100%;" onclick="closeModal()">
           Cancelar
         </button>
       </div>
     `;
+
+    // Si ya hay wallet conectada, ir directo a enviar
+    const ui = getTonConnectUI();
+    if (ui.connected) {
+      updateTONConnectStatus('✅ Wallet conectada. Enviando transacción...');
+      await sendTONTransaction();
+    }
+
   } catch (error) {
     console.error('Error iniciando pago TON:', error);
     alert('Error al conectar con el servidor.');
   }
 }
 
-async function verifyTONPayment(apiKey, comment) {
-  const btn = document.querySelector('.modal-cta[onclick*="verifyTONPayment"]');
-  if (btn) { btn.textContent = '🔍 Verificando...'; btn.disabled = true; }
+async function connectTONWallet() {
+  try {
+    const ui = getTonConnectUI();
+    if (ui.connected) {
+      await sendTONTransaction();
+    } else {
+      await ui.openModal();
+    }
+  } catch (error) {
+    console.error('Error conectando wallet:', error);
+    alert('Error al abrir el selector de wallets.');
+  }
+}
+
+function updateTONConnectStatus(msg) {
+  const el = document.getElementById('ton-connect-status');
+  if (el) el.textContent = msg;
+  const btn = document.getElementById('ton-connect-btn');
+  if (btn) { btn.textContent = msg; btn.disabled = true; }
+}
+
+async function sendTONTransaction() {
+  if (!tonPendingPayment) return;
+  const { apiKey, amount, walletAddress, comment, label } = tonPendingPayment;
+
+  updateTONConnectStatus('⏳ Esperando confirmación en tu wallet...');
 
   try {
+    const ui = getTonConnectUI();
+    const amountNano = Math.floor(amount * 1e9).toString();
+
+    // Codificar el comment en base64 para el payload
+    const commentBytes = new TextEncoder().encode(comment);
+    const payload = new Uint8Array(4 + commentBytes.length);
+    new DataView(payload.buffer).setUint32(0, 0, false); // op code 0 = comment
+    payload.set(commentBytes, 4);
+    const payloadB64 = btoa(String.fromCharCode(...payload));
+
+    await ui.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600, // 10 min
+      messages: [{
+        address: walletAddress,
+        amount: amountNano,
+        payload: payloadB64
+      }]
+    });
+
+    // Transacción enviada — verificar en backend
+    updateTONConnectStatus('🔍 Verificando pago en blockchain...');
+    await verifyTONPayment(apiKey, comment);
+
+  } catch (error) {
+    if (error?.message?.includes('User declined')) {
+      updateTONConnectStatus('❌ Transacción cancelada');
+      const btn = document.getElementById('ton-connect-btn');
+      if (btn) { btn.textContent = '🔗 Reintentar'; btn.disabled = false; btn.onclick = () => sendTONTransaction(); }
+    } else {
+      console.error('Error enviando TON:', error);
+      alert('Error al enviar la transacción. Inténtalo de nuevo.');
+    }
+    tonPendingPayment = null;
+  }
+}
+
+async function verifyTONPayment(apiKey, comment) {
+  try {
+    // Esperar unos segundos para que la tx se propague
+    await new Promise(r => setTimeout(r, 5000));
+
     const response = await fetch('/api/verify-ton-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1497,14 +1576,29 @@ async function verifyTONPayment(apiKey, comment) {
 
     if (result.verified) {
       alert('✅ ¡Pago verificado! Tu plan ha sido activado. Revisa Telegram.');
+      tonPendingPayment = null;
       closeModal();
     } else {
-      alert('⏳ Pago no detectado aún. Espera unos segundos y vuelve a intentarlo.\n\nSi ya enviaste el TON, asegúrate de haber incluido el comentario exacto.');
-      if (btn) { btn.textContent = '✅ Verificar pago'; btn.disabled = false; }
+      // Reintentar hasta 3 veces con 5s de espera
+      const modalContent = document.getElementById('modalContent');
+      if (modalContent) {
+        modalContent.innerHTML = `
+          <div style="text-align:center; padding:24px;">
+            <div style="font-size:48px; margin-bottom:12px;">⏳</div>
+            <div class="modal-plan-name">Verificando pago</div>
+            <div class="modal-plan-desc" style="margin:12px 0;">La transacción puede tardar unos segundos en confirmarse.</div>
+            <button class="modal-cta" style="background:#0088cc;color:#fff;width:100%;margin-bottom:8px;" onclick="verifyTONPayment('${apiKey}','${comment}')">
+              🔄 Verificar de nuevo
+            </button>
+            <button class="modal-cta" style="background:rgba(255,255,255,0.1);color:#fff;width:100%;" onclick="closeModal()">
+              Cerrar
+            </button>
+          </div>
+        `;
+      }
     }
   } catch (error) {
     alert('Error al verificar. Inténtalo de nuevo.');
-    if (btn) { btn.textContent = '✅ Verificar pago'; btn.disabled = false; }
   }
 }
 
