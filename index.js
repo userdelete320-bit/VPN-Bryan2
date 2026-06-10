@@ -229,12 +229,12 @@ function getReferralInfoHtml(userId, referralStats) {
     const descuento = referralStats?.discount_percentage || 0;
     const detalle = descuento >= 30 ? 'Alto' : descuento >= 15 ? 'Medio' : 'Bajo';
 
-    let html = `🤝 <b>SISTEMA DE REFERIDOS</b>\n\n` +
-               `🔗 <b>Tu enlace único:</b>\n${referralLink}\n\n` +
-               `📊 Total referidos: ${totalReferidos}\n` +
-               `💰 Descuentos por Referidos sin usar: ${descuento}%\n\n` +
+    let html = `<tg-emoji emoji-id="5944956300759668915">🤝</tg-emoji> <b>SISTEMA DE REFERIDOS</b>\n\n` +
+               `<tg-emoji emoji-id="5778168620278354602">🔗</tg-emoji> <b>Tu enlace único:</b>\n${referralLink}\n\n` +
+               `<tg-emoji emoji-id="5190806721286657692">📊</tg-emoji> Total referidos: ${totalReferidos}\n` +
+               `<tg-emoji emoji-id="5987880246865565644">💰</tg-emoji> Descuentos por Referidos sin usar: ${descuento}%\n\n` +
                `<i>Detalle: ${detalle}</i>\n\n` +
-               `💡 Cada referido que paga te da 20% (nivel 1) o 10% (nivel 2). El descuento se reduce al usarlo (40%→20%→0%).`;
+               `<tg-emoji emoji-id="6023897907034330805">💡</tg-emoji> Cada referido que paga te da 20% (nivel 1) o 10% (nivel 2). El descuento se reduce al usarlo (40%→20%→0%).`;
     return html;
 }
 
@@ -1596,9 +1596,9 @@ bot.action('show_support', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-        [createButton("CEO 📊", { url: 'https://t.me/rov3r777' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5356557646' })],
-        [createButton("ADMIN 🌐", { url: 'https://t.me/ErenJeager129182' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5350793992' })],
-        [createButton("MODERADOR ⚙️", { url: 'https://t.me/JosherSnchz' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5351435068' })],
+        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5356557646' })],
+        [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5350793992' })],
+        [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5351435068' })],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
     ] } });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
