@@ -127,6 +127,14 @@ const USDT_PRICES = {
     'premium': '1.1',
     'anual': '30'
 };
+const STARS_PRICES = {
+    'basico': 150,
+    'avanzado': 270,
+    'cuba_vip': 180,
+    'premium': 210, // Corresponde al plan gaming
+    'anual': 2100
+};
+  
 
 const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t';
 const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/LPvCEZ7T20u47ShITic2p7';
@@ -1181,6 +1189,45 @@ app.post('/api/usdt/force-check', (req, res) => { if (!isAdmin(req.body.adminId)
 app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
 
 
+//====================PAGO CON STARS ================{
+// Endpoint para generar link de pago con Telegram Stars
+app.post('/api/create-stars-invoice', async (req, res) => {
+    try {
+        const { userId, planType } = req.body;
+        if (!userId || !planType) {
+            return res.status(400).json({ success: false, error: 'Faltan parámetros indispensables.' });
+        }
+
+        const starsAmount = STARS_PRICES[planType];
+        if (!starsAmount) {
+            return res.status(400).json({ success: false, error: 'Plan no soportado en este método.' });
+        }
+
+        const title = `Plan ${getPlanName(planType)}`;
+        const description = `Acceso VIP a VPN CUBA - Modalidad ${getPlanName(planType)}`;
+        const payload = JSON.stringify({ userId: userId.toString(), planType, method: 'stars' });
+        const currency = 'XTR'; // Código oficial para Telegram Stars
+
+        // Generar el enlace de la factura mediante la API nativa de Telegraf
+        const invoiceLink = await bot.telegram.createInvoiceLink({
+            title,
+            description,
+            payload,
+            provider_token: '', // Debe ir vacío para Telegram Stars
+            currency,
+            prices: [{ label: title, amount: starsAmount }]
+        });
+
+        res.json({ success: true, invoiceLink });
+    } catch (error) {
+        console.error('❌ Error creando factura Stars:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+
+
 // ==================== PAGO CON TON ====================
 
 const TON_CONFIG = {
@@ -1773,6 +1820,82 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🎯 Pool de pruebas: separado por plan (basico/avanzado/cuba_vip/premium/anual)`);
     console.log(`💰 Sistema USDT: MODO MANUAL`);
 });
+
+// =========================================================================
+//  ESCUCHADORES NATIVOS PARA TELEGRAM STARS (INSERTAR AQUÍ)
+// =========================================================================
+
+// 1. Responder obligatoriamente al PreCheckoutQuery (dentro del tiempo límite de 10 segs)
+bot.on('pre_checkout_query', async (ctx) => {
+    try {
+        await ctx.answerPreCheckoutQuery(true);
+    } catch (error) {
+        console.error('❌ Error en answerPreCheckoutQuery:', error);
+    }
+});
+
+// 2. Procesar la entrega automática una vez completada la transferencia de Estrellas
+bot.on('successful_payment', async (ctx) => {
+    try {
+        const payment = ctx.message.successful_payment;
+        const payload = JSON.parse(payment.invoice_payload);
+        
+        if (payload.method === 'stars') {
+            const userId = payload.userId;
+            const planType = payload.planType;
+
+            // Buscamos al usuario en base de datos para actualizar su suscripción
+            const { data: user, error: fetchError } = await supabaseAdmin
+                .from('users')
+                .select('*')
+                .eq('telegram_id', userId)
+                .single();
+
+            if (fetchError || !user) {
+                return await ctx.reply(`⚠️ Pago recibido pero no localizamos tu ID en la base de datos. Contacta a soporte informando este ID: ${userId}`);
+            }
+
+            // Calculamos días adicionales manteniendo coherencia con calcularDiasRestantes
+            let diasAdicionales = 30;
+            if (planType === 'avanzado') diasAdicionales = 60;
+            if (planType === 'anual') diasAdicionales = 365;
+
+            let nuevaFechaInicio = new Date();
+            if (user.vip && user.vip_since) {
+                const fechaActual = new Date();
+                const fechaVipPrevia = new Date(user.vip_since);
+                // Si ya era VIP y no ha expirado, extendemos su tiempo sumando sobre la fecha previa
+                if (fechaVipPrevia > fechaActual) {
+                    nuevaFechaInicio = fechaVipPrevia;
+                }
+            }
+            
+            // Guardamos los cambios simulando la aprobación manual que ya usas
+            const { error: updateError } = await supabaseAdmin
+                .from('users')
+                .update({
+                    vip: true,
+                    vip_since: nuevaFechaInicio.toISOString(),
+                    plan: planType,
+                    plan_price: payment.total_amount.toString() + " Estrellas",
+                    updated_at: new Date().toISOString()
+                })
+                .eq('telegram_id', userId);
+
+            if (updateError) throw updateError;
+
+            // Enviar confirmación al usuario por el bot corporativo
+            await ctx.reply(`👑 ¡Pago Exitoso! Tu plan ${getPlanName(planType)} ha sido activado mediante Telegram Stars. ¡Gracias por confiar en VPN CUBA! 🚀`);
+            
+            // Notificar de manera independiente al canal de Administración/Logs si existiese
+            console.log(`💰 [STARS] Usuario ${userId} adquirió exitosamente el plan ${planType}`);
+        }
+    } catch (error) {
+        console.error('❌ Error procesando successful_payment:', error);
+        await ctx.reply('⚠️ Ocurrió un error al intentar procesar tu entrega VIP de forma automatizada, por favor contacta al administrador con el comprobante.');
+    }
+});
+
 
 process.on('uncaughtException', (error) => { console.error('❌ Error no capturado:', error); });
 process.on('unhandledRejection', (reason) => { console.error('❌ Promesa rechazada:', reason); });
