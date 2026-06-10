@@ -523,7 +523,7 @@ select option{background:var(--ink)}
 // ==================== SIGNAL ADMIN v3.0 (CORREGIDO) ====================
 const tg = window.Telegram?.WebApp ?? { initDataUnsafe: {} };
 let currentUserId = null, isAdminUser = false, currentTab = 'stats';
-let currentPaymentId = null, currentUserDetailsId = null, currentCouponCode = null;
+let currentPaymentId = null, currentPaymentPlan = null, currentUserDetailsId = null, currentCouponCode = null;
 let allUsers = [], filteredUsers = [], currentUsersPage = 1, usersPerPage = 50, totalUsersPages = 1;
 let allReferrals = [], filteredReferrals = [], currentReferralsPage = 1, referralsPerPage = 30;
 let allCoupons = [];
@@ -653,6 +653,7 @@ async function rejectPayment(paymentId) {
 
 function openConfigModal(paymentId, telegramId, plan) {
   currentPaymentId = paymentId;
+  currentPaymentPlan = plan;
   document.getElementById('configPaymentId').textContent = paymentId;
   document.getElementById('configUserId').textContent = telegramId;
   document.getElementById('configPlan').textContent = getPlanName(plan);
@@ -666,12 +667,16 @@ async function sendConfigFile() {
   const file = document.getElementById('configFile').files[0];
   if (!file) { showNotification('❌ Selecciona archivo', 'error'); return; }
   showNotification('⏳ Enviando...', 'info');
-  const fd = new FormData(); fd.append('configFile', file); fd.append('paymentId', currentPaymentId); fd.append('adminId', currentUserId);
+  const fd = new FormData();
+  fd.append('configFile', file);
+  fd.append('paymentId', currentPaymentId);
+  fd.append('adminId', currentUserId);
+  if (currentPaymentPlan) fd.append('plan', currentPaymentPlan);
   try {
     const res = await fetch('/api/send-config', { method: 'POST', body: fd });
     const data = await res.json();
     if (res.ok && data.success) { showNotification('✅ Enviado', 'success'); closeConfigModal(); loadApprovedPayments(); }
-    else showNotification('❌ Error al enviar', 'error');
+    else showNotification('❌ ' + (data.error || 'Error al enviar'), 'error');
   } catch(e) { showNotification('Error', 'error'); }
 }
 

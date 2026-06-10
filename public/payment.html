@@ -1314,7 +1314,7 @@ function goBack() { if(currentStep > 1) goToStep(currentStep - 1); }
 
 function switchTab(id) {
   document.querySelectorAll('.method-tab').forEach((t,i)=>{
-    const ids=['bpa','movil','usdt'];
+    const ids=['bpa','movil','usdt','stars'];
     t.classList.toggle('active', ids[i]===id);
   });
   document.querySelectorAll('.method-panel').forEach(p=>p.classList.remove('active'));
