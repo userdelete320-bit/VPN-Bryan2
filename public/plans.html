@@ -1399,27 +1399,42 @@ async function payWithStars(planKey) {
   }
 
   try {
-    const response = await fetch('/api/initiate-stars-payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        telegramId: currentUserId,
-        plan: apiKey
-      })
-    });
+  const response = await fetch('/api/initiate-stars-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      telegramId: currentUserId,
+      plan: apiKey
+    })
+  });
 
-    const result = await response.json();
-    if (result.success) {
-      alert('✅ Factura enviada a Telegram. Revísala para completar el pago.');
-      closeModal();
-    } else {
-      alert('❌ Error: ' + (result.error || 'No se pudo iniciar el pago.'));
-    }
-  } catch (error) {
-    console.error('Error al iniciar pago con Stars:', error);
-    alert('Error al conectar con el servidor.');
+  console.log('STATUS:', response.status);
+
+  const text = await response.text();
+
+  console.log('RESPONSE:', text);
+
+  let result;
+
+  try {
+    result = JSON.parse(text);
+  } catch (e) {
+    alert('Respuesta inválida del servidor:\n' + text);
+    return;
   }
-}
+
+  if (result.success) {
+    alert('✅ Factura enviada a Telegram.');
+    closeModal();
+  } else {
+    alert('❌ Error: ' + (result.error || 'No se pudo iniciar el pago.'));
+  }
+
+} catch (error) {
+  console.error('STARS ERROR:', error);
+  alert('STARS ERROR:\n' + error.message);
+  }
+    }
 
 // ── TON Connect setup ──
 let tonConnectUI = null;
