@@ -966,15 +966,15 @@ body::after {
   </div>
   
 <!-- Stars ⭐ -->
-  <div id="tab-stars" class="method-panel">
-  <div class="payment-info-box">
-    <div class="pib-label">Monto a pagar en Estrellas</div>
-    <div class="pib-val" id="starsAmount">0 ⭐</div>
-  </div>
-  <button class="next-btn green" onclick="payWithStars()">
-    <span>Pagar Ahora con Stars</span>
-  </button>
-  </div>
+      <div id="tab-stars" class="method-panel">
+        <div class="payment-info-box">
+          <div class="pib-label">Monto a pagar en Estrellas</div>
+          <div class="pib-val" id="starsAmount">0 ⭐</div>
+        </div>
+        <button class="next-btn green" onclick="payWithStars()">
+          <span>Pagar Ahora con Stars</span>
+        </button>
+      </div>
   
 
   <!-- ===================== PAGE 3: COMPROBANTE ===================== -->
@@ -1182,6 +1182,9 @@ function updatePricing() {
   safeText('sumMobile', p.mobile ? formatCUP(priceMobile) : '—');
   safeText('sumUSDT', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
   safeText('usdtAmount', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
+
+  const starsEl = document.getElementById('starsAmount');
+  if (starsEl) starsEl.textContent = (p.stars || 0) + ' ⭐';
 
   const mobileAmountEl = document.getElementById('movilAmount');
   if (p.mobile) {
@@ -1498,7 +1501,6 @@ function openTelegram() {
 }
   
 function payWithStars() {
-  const currentPlan = urlParams.get('plan') || 'anual'; // Captura el plan activo de la URL
   
   if (!currentUserId) {
     alert('No se pudo identificar tu cuenta de Telegram.');
@@ -1509,12 +1511,12 @@ function payWithStars() {
   const btn = document.querySelector('#tab-stars .next-btn');
   if(btn) btn.disabled = true;
 
-  fetch('/api/create-stars-invoice', {
+  fetch('/api/initiate-stars-payment', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      userId: currentUserId,
-      planType: currentPlan
+      telegramId: currentUserId, 
+      plan: PLAN_KEYS[currentPlan] || currentPlan
     })
   })
   .then(res => res.json())
