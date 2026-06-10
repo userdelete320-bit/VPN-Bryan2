@@ -1191,7 +1191,7 @@ app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
 
 //====================PAGO CON STARS ================{
 // Endpoint para generar link de pago con Telegram Stars
-/*app.post('/api/create-stars-invoice', async (req, res) => {
+app.post('/api/create-stars-invoice', async (req, res) => {
     try {
         const { userId, planType } = req.body;
         if (!userId || !planType) {
@@ -1223,7 +1223,7 @@ app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
         console.error('❌ Error creando factura Stars:', error);
         res.status(500).json({ success: false, error: error.message });
     }
-}); */
+}); 
 
 app.post('/api/initiate-stars-payment', async (req, res) => {
   try {
