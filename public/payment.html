@@ -1259,8 +1259,13 @@ function selectPlan(key) {
     );
   });
 
-  const heroTagText = document.getElementById('heroTag')?.childNodes?.[1];
-  if (heroTagText) heroTagText.textContent = ' '+p.tag;
+  const heroTagEl = document.getElementById('heroTag');
+if (heroTagEl) {
+  const dot = heroTagEl.querySelector('span');
+  heroTagEl.innerHTML = '';
+  if (dot) heroTagEl.appendChild(dot);
+  heroTagEl.appendChild(document.createTextNode(' ' + p.tag));
+}
   safeText('heroName', p.name);
   safeText('heroSub', p.sub);
   const heroPrice = document.getElementById('heroPrice');
