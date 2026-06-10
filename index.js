@@ -1226,35 +1226,6 @@ app.post('/api/create-stars-invoice', async (req, res) => {
 });
 
 
-// Alias para compatibilidad con el frontend (plans.html llama a este endpoint)
-app.post('/api/initiate-stars-payment', async (req, res) => {
-    try {
-        const { telegramId, plan } = req.body;
-        if (!telegramId || !plan) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
-        const starsAmount = STARS_PRICES[plan];
-        if (!starsAmount) return res.status(400).json({ success: false, error: 'Plan no soportado.' });
-
-        const title = `Plan ${getPlanName(plan)}`;
-        const description = `Acceso VIP a VPN CUBA - Modalidad ${getPlanName(plan)}`;
-        const payload = JSON.stringify({ userId: telegramId.toString(), planType: plan, method: 'stars' });
-
-        await bot.telegram.sendInvoice(telegramId, {
-            title,
-            description,
-            payload,
-            provider_token: '',
-            currency: 'XTR',
-            prices: [{ label: title, amount: starsAmount }]
-        });
-
-        res.json({ success: true, message: 'Factura enviada por Telegram' });
-    } catch (error) {
-        console.error('❌ Error en initiate-stars-payment:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-
 
 
 // ==================== PAGO CON TON ====================
@@ -1666,6 +1637,22 @@ app.get('/politicas.html', (req, res) => { res.sendFile(path.join(__dirname, 'pu
 
 // ==================== BOT DE TELEGRAM ====================
 
+// Middleware: bloquear usuarios baneados
+bot.use(async (ctx, next) => {
+  if (!ctx.from) return next();
+  const userId = ctx.from.id.toString();
+  if (isAdmin(userId)) return next(); // Admins nunca baneados
+  try {
+    const user = await db.getUser(userId);
+    if (user?.banned) {
+      if (ctx.callbackQuery) await ctx.answerCbQuery('🚫 Estás baneado.', { show_alert: true }).catch(() => {});
+      else await ctx.reply('🚫 Tu cuenta ha sido suspendida. Contacta con soporte.').catch(() => {});
+      return;
+    }
+  } catch (e) {}
+  return next();
+});
+
 bot.catch((err, ctx) => { console.error('❌ Error en el bot:', err); });
 
 bot.action('show_support', async (ctx) => {
@@ -1801,6 +1788,34 @@ bot.command('admin', async (ctx) => {
   if (!isAdmin(ctx.from.id)) { await ctx.reply('⛔ No tienes permisos.'); return; }
   const adminUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}/admin.html?userId=${ctx.from.id}&admin=true`;
   await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(adminUrl, ctx))]] } });
+});
+
+bot.command('ban', async (ctx) => {
+  if (!isAdmin(ctx.from.id)) { await ctx.reply('⛔ No tienes permisos.'); return; }
+  const args = ctx.message.text.split(' ').slice(1);
+  const targetId = args[0];
+  if (!targetId) { await ctx.reply('❌ Uso: /ban <telegram_id> [motivo]'); return; }
+  const reason = args.slice(1).join(' ') || 'Baneado por administrador';
+  try {
+    const user = await db.getUser(targetId);
+    if (!user) { await ctx.reply(`❌ Usuario ${targetId} no encontrado.`); return; }
+    await db.updateUser(targetId, { banned: true, ban_reason: reason, banned_at: new Date().toISOString(), banned_by: ctx.from.id.toString() });
+    try { await bot.telegram.sendMessage(targetId, `🚫 <b>Has sido baneado de VPN Cuba.</b>\n\nMotivo: ${reason}\n\nContacta con soporte si crees que es un error.`, { parse_mode: 'HTML' }); } catch (e) {}
+    await ctx.reply(`✅ Usuario <b>${user.first_name || targetId}</b> (@${user.username || 'sin usuario'}) baneado.\nMotivo: ${reason}`, { parse_mode: 'HTML' });
+  } catch (error) { await ctx.reply('❌ Error al banear: ' + error.message); }
+});
+
+bot.command('unban', async (ctx) => {
+  if (!isAdmin(ctx.from.id)) { await ctx.reply('⛔ No tienes permisos.'); return; }
+  const targetId = ctx.message.text.split(' ')[1];
+  if (!targetId) { await ctx.reply('❌ Uso: /unban <telegram_id>'); return; }
+  try {
+    const user = await db.getUser(targetId);
+    if (!user) { await ctx.reply(`❌ Usuario ${targetId} no encontrado.`); return; }
+    await db.updateUser(targetId, { banned: false, ban_reason: null, banned_at: null, banned_by: null });
+    try { await bot.telegram.sendMessage(targetId, `✅ <b>Tu ban ha sido levantado.</b>\n\nYa puedes usar VPN Cuba con normalidad.`, { parse_mode: 'HTML' }); } catch (e) {}
+    await ctx.reply(`✅ Usuario <b>${user.first_name || targetId}</b> desbaneado.`, { parse_mode: 'HTML' });
+  } catch (error) { await ctx.reply('❌ Error al desbanear: ' + error.message); }
 });
 
 bot.on('text', async (ctx) => {
