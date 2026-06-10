@@ -894,6 +894,8 @@ body::after {
   <!--      <button class="method-tab" onclick="switchTab('metropolitan')">🏦 METROPOLITANA</button> -->
         <button class="method-tab" onclick="switchTab('movil')">📱 Saldo Móvil</button>
         <button class="method-tab" onclick="switchTab('usdt')">₮ USDT</button>
+        <button class="method-tab" onclick="switchTab('stars')">⭐ Telegram Stars</button>
+        
       </div>
 
       <!-- BPA -->
@@ -962,6 +964,18 @@ body::after {
     </button>
     <button class="next-btn outline" onclick="goToStep(1)" style="margin-top:4px">← Volver al resumen</button>
   </div>
+  
+<!-- Stars ⭐ -->
+  <div id="tab-stars" class="method-panel">
+  <div class="payment-info-box">
+    <div class="pib-label">Monto a pagar en Estrellas</div>
+    <div class="pib-val" id="starsAmount">0 ⭐</div>
+  </div>
+  <button class="next-btn green" onclick="payWithStars()">
+    <span>Pagar Ahora con Stars</span>
+  </button>
+  </div>
+  
 
   <!-- ===================== PAGE 3: COMPROBANTE ===================== -->
   <div class="page" id="page3">
@@ -1037,7 +1051,7 @@ body::after {
 const planData = {
   basic: {
     tag:'BÁSICO · 1 MES', name:'BÁSICO', sub:'Streaming USA · Navegación libre',
-    price:'900 CUP', mobile:'400 CUP', usdt:'1.5 USDT', duration:'1 MES',
+    price:'900 CUP', mobile:'400 CUP', usdt:'1.5 USDT', stars: 150, duration:'1 MES',
     sumPlan:'Plan Básico', sumDuration:'1 mes',
     features:[['🌐','Streaming USA'],['📺','Netflix/Hulu'],['⚡','2 Mbps'],['🔒','AES-256'],['📡','WireGuard'],['🆘','Soporte']],
     accentColor:'#a8dcff', tagBg:'rgba(168,220,255,0.08)', tagBorder:'rgba(168,220,255,0.25)',
@@ -1045,7 +1059,7 @@ const planData = {
   },
   advanced: {
     tag:'AVANZADO · 2 MESES', name:'AVANZADO', sub:'2 meses del plan básico · Mejor precio',
-    price:'1,800 CUP', mobile:'900 CUP', usdt:'2.8 USDT', duration:'2 MESES',
+    price:'1,800 CUP', mobile:'900 CUP', usdt:'2.8 USDT', stars: 270, duration:'2 MESES',
     sumPlan:'Plan Avanzado', sumDuration:'2 meses',
     features:[['🚀','2 meses'],['🌐','Streaming USA'],['⚡','2 Mbps'],['💰','Ahorro'],['🔒','AES-256'],['🆘','Soporte']],
     accentColor:'#d4b8ff', tagBg:'rgba(212,184,255,0.08)', tagBorder:'rgba(212,184,255,0.25)',
@@ -1061,7 +1075,7 @@ const planData = {
   },
   anual: {
     tag:'FREQ·FULL · ACCESO TOTAL', name:'ANUAL', sub:'Exclusivo · 12 meses · Todo desbloqueado',
-    price:'15,000 CUP', mobile:'10,000 CUP', usdt:'25 USDT', duration:'12 MESES',
+    price:'15,000 CUP', mobile:'10,000 CUP', usdt:'25 USDT', stars: 2100, duration:'12 MESES',
     sumPlan:'Plan Anual', sumDuration:'12 meses',
     features:[['♾️','Acceso total'],['🏦','VIP Cuba'],['🎮','Gaming QoS'],['⚡','Turbo'],['🔒','AES-256'],['🆘','24/7']],
     accentColor:'#ffd4b8', tagBg:'rgba(255,212,184,0.08)', tagBorder:'rgba(255,212,184,0.25)',
@@ -1069,7 +1083,7 @@ const planData = {
   },
   vip: {
     tag:'VIP · IP RESIDENCIAL CUBANA', name:'VIP CUBA', sub:'IP Cubana real · Enzona · Transfermóvil',
-    price:'1,200 CUP', mobile:'500 CUP', usdt:'1.9 USDT', duration:'1 MES',
+    price:'1,200 CUP', mobile:'500 CUP', usdt:'1.9 USDT', stars: 180, duration:'1 MES',
     sumPlan:'Plan VIP Cuba', sumDuration:'1 mes',
     features:[['🇨🇺','IP Cubana'],['🏦','Enzona'],['📲','Transfermóvil'],['🔒','AES-256'],['⚡','5 Mbps'],['🆘','Prioritario']],
     accentColor:'#ffe566', tagBg:'rgba(255,229,102,0.08)', tagBorder:'rgba(255,229,102,0.3)',
@@ -1077,7 +1091,7 @@ const planData = {
   },
   gaming: {
     tag:'GAMING · QoS PRIORITARIO', name:'GAMING', sub:'Latencia mínima · MLBB · CoD · Free Fire',
-    price:'1,500 CUP', mobile:'700 CUP', usdt:'2.3 USDT', duration:'1 MES',
+    price:'1,500 CUP', mobile:'700 CUP', usdt:'2.3 USDT', stars: 210, duration:'1 MES',
     sumPlan:'Plan Gaming', sumDuration:'1 mes',
     features:[['🎮','MLBB·CoD·FF'],['⚡','<25ms latencia'],['🎯','QoS traffic'],['📦','~0% loss'],['🔒','AES-256'],['🆘','Soporte']],
     accentColor:'#ff6eb4', tagBg:'rgba(255,110,180,0.08)', tagBorder:'rgba(255,110,180,0.25)',
@@ -1109,12 +1123,12 @@ const PLAN_KEYS = {
 };
 
 const PLAN_BASE = {
-  basic: { cup: 900, mobile: 400, usdt: 1.5 },
-  advanced: { cup: 1800, mobile: 900, usdt: 2.8 },
-  vip: { cup: 1200, mobile: 500, usdt: 1.9 },
-  gaming: { cup: 1500, mobile: 700, usdt: 2.3 },
-  anual: { cup: 15000, mobile: 10000, usdt: 25 },
-  trial: { cup: 0, mobile: 0, usdt: 0 }
+  basic: { cup: 900, mobile: 400, usdt: 1.5, stars: 150 },
+  advanced: { cup: 1800, mobile: 900, usdt: 2.8, stars: 270},
+  vip: { cup: 1200, mobile: 500, usdt: 1.9, stars: 180 },
+  gaming: { cup: 1500, mobile: 700, usdt: 2.3, stars: 210 },
+  anual: { cup: 15000, mobile: 10000, usdt: 25, stars: 2100},
+  trial: { cup: 0, mobile: 0, usdt: 0, stars: 0 }
 };
 
 // Descuento de referido (viene del backend, ya neto)
@@ -1482,7 +1496,62 @@ function openTelegram() {
   if (window.Telegram?.WebApp) { window.Telegram.WebApp.close(); }
   else { window.open('https://t.me/rov3r777','_blank'); }
 }
+  
+function payWithStars() {
+  const currentPlan = urlParams.get('plan') || 'anual'; // Captura el plan activo de la URL
+  
+  if (!currentUserId) {
+    alert('No se pudo identificar tu cuenta de Telegram.');
+    return;
+  }
 
+  // Deshabilitar botón visualmente durante la carga
+  const btn = document.querySelector('#tab-stars .next-btn');
+  if(btn) btn.disabled = true;
+
+  fetch('/api/create-stars-invoice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: currentUserId,
+      planType: currentPlan
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success && data.invoiceLink) {
+      // Abre la interfaz nativa de pagos de Telegram mediante el WebApp SDK
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.openInvoice(data.invoiceLink, function(status) {
+          if (status === 'paid') {
+            window.Telegram.WebApp.close(); // Cierra el checkout al finalizar con éxito
+          } else if (status === 'cancelled') {
+            alert('Pago cancelado por el usuario.');
+            if(btn) btn.disabled = false;
+          } else {
+            alert('Estado del pago: ' + status);
+            if(btn) btn.disabled = false;
+          }
+        });
+      } else {
+        // Fallback por si lo abren fuera de Telegram
+        window.open(data.invoiceLink, '_blank');
+      }
+    } else {
+      alert('Error al generar la factura: ' + (data.error || 'Inténtelo más tarde.'));
+      if(btn) btn.disabled = false;
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    alert('Error de conexión con el servidor.');
+    if(btn) btn.disabled = false;
+  });
+}
+
+// Asegúrate de enlazar la actualización de texto en la función que cambia de pestaña o plan:
+// Ejemplo: document.getElementById('stars-amount-display').innerText = planDetails[currentPlan].stars + ' ⭐';
+  
 // ===== INICIALIZACIÓN =====
 (function init() {
   try {
