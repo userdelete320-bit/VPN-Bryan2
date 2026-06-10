@@ -1191,7 +1191,7 @@ app.get('/api/usdt/unassigned-transactions', (req, res) => { res.json([]); });
 
 //====================PAGO CON STARS ================{
 // Endpoint para generar link de pago con Telegram Stars
-app.post('/api/create-stars-invoice', async (req, res) => {
+/*app.post('/api/create-stars-invoice', async (req, res) => {
     try {
         const { userId, planType } = req.body;
         if (!userId || !planType) {
@@ -1223,9 +1223,27 @@ app.post('/api/create-stars-invoice', async (req, res) => {
         console.error('❌ Error creando factura Stars:', error);
         res.status(500).json({ success: false, error: error.message });
     }
+}); */
+
+app.post('/api/initiate-stars-payment', async (req, res) => {
+  try {
+    const { telegramId, plan } = req.body;
+    if (!telegramId || !plan) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
+    const starsAmount = STARS_PRICES[plan];
+    if (!starsAmount) return res.status(400).json({ success: false, error: 'Plan no soportado.' });
+    const title = `Plan ${getPlanName(plan)}`;
+    const payload = JSON.stringify({ userId: telegramId.toString(), planType: plan, method: 'stars' });
+    await bot.telegram.sendInvoice(telegramId, {
+      title, description: `Acceso VIP a VPN CUBA - ${title}`,
+      payload, provider_token: '', currency: 'XTR',
+      prices: [{ label: title, amount: starsAmount }]
+    });
+    res.json({ success: true, message: 'Factura enviada por Telegram' });
+  } catch (error) {
+    console.error('❌ Error en initiate-stars-payment:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
-
-
 
 
 // ==================== PAGO CON TON ====================
