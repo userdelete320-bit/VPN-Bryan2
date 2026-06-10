@@ -1521,47 +1521,47 @@ function updateTONConnectStatus(msg) {
 
 async function sendTONTransaction() {
   if (!tonPendingPayment) return;
-  const { apiKey, amount, walletAddress, comment, label } = tonPendingPayment;
+
+  const { apiKey, amount, walletAddress, comment } = tonPendingPayment;
 
   updateTONConnectStatus('⏳ Esperando confirmación en tu wallet...');
 
   try {
     const ui = getTonConnectUI();
+
     const amountNano = Math.floor(amount * 1e9).toString();
 
-    // Codificar el comment en base64 para el payload
-    const commentBytes = new TextEncoder().encode(comment);
-    const payload = new Uint8Array(4 + commentBytes.length);
-    new DataView(payload.buffer).setUint32(0, 0, false); // op code 0 = comment
-    payload.set(commentBytes, 4);
-    const payloadB64 = btoa(String.fromCharCode(...payload));
+    console.log('TON TX', {
+      walletAddress,
+      amountNano,
+      comment
+    });
 
-    await ui.sendTransaction({
-      validUntil: Math.floor(Date.now() / 1000) + 600, // 10 min
+    const result = await ui.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
       messages: [{
         address: walletAddress,
-        amount: amountNano,
-        payload: payloadB64
+        amount: amountNano
       }]
     });
 
-    // Transacción enviada — verificar en backend
-    updateTONConnectStatus('🔍 Verificando pago en blockchain...');
+    console.log('TON RESULT', result);
+
+    updateTONConnectStatus('🔍 Verificando pago...');
     await verifyTONPayment(apiKey, comment);
 
   } catch (error) {
-    if (error?.message?.includes('User declined')) {
-      updateTONConnectStatus('❌ Transacción cancelada');
-      const btn = document.getElementById('ton-connect-btn');
-      if (btn) { btn.textContent = '🔗 Reintentar'; btn.disabled = false; btn.onclick = () => sendTONTransaction(); }
-    } else {
-      console.error('Error enviando TON:', error);
-      alert('Error al enviar la transacción. Inténtalo de nuevo.');
-    }
+
+    console.error('TON ERROR COMPLETO:', error);
+
+    alert(
+      'TON ERROR:\n' +
+      (error?.message || JSON.stringify(error))
+    );
+
     tonPendingPayment = null;
   }
 }
-
 async function verifyTONPayment(apiKey, comment) {
   try {
     // Esperar unos segundos para que la tx se propague
