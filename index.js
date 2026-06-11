@@ -166,7 +166,7 @@ const BUTTON_ICONS = {
     'CÓMO FUNCIONA': '5873121512445187130',
     'VPN CANAL': '5771695636411847302',
     'POLÍTICAS': '6021738534916854774',
-    'WHATSAPP': '5884179047482659474',
+    'WHATSAPP': '5935973359480213803',
     'WHATSAPP G1': '6019328362479097179',   // Nuevo: emoji custom para Grupo 1
     'WHATSAPP G2': '6019328362479097179',   // Nuevo: emoji custom para Grupo 2
     'FAQ': '5879501875341955281',
@@ -1677,7 +1677,7 @@ bot.action('show_support', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), { text: "5935973359480213803 WhatsApp", url: 'https://wa.me/5356557646' }],
+        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), { text: "5935973359480213803 WHATSAPP", url: 'https://wa.me/5356557646' }],
         [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: 5935973359480213803 })],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WhatsApp 💬", { url: 'https://wa.me/5351435068', icon_custom_emoji_id: 5935973359480213803 })],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
