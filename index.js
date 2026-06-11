@@ -14,8 +14,7 @@ const db = require('./supabase');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
-const PLAN_TYPES = ['basico', 'avanzado', 'premium', 'anual'];
-
+const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
 // ==================== STUB MÉTODOS TRIAL FILES (uno por plan) ====================
 // Cada función acepta planType para operar sobre la tabla/bucket correcto.
 // Las tablas en Supabase se llaman: trial_files_basico, trial_files_avanzado,
