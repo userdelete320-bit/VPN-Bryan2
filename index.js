@@ -22,7 +22,7 @@ const PLAN_TYPES = ['basico', 'avanzado', 'premium', 'anual'];
 // trial_files_premium, trial_files_anual
 
 function getTrialTableName(planType) {
-  const valid = ['basico', 'avanzado', 'premium', 'anual'];
+  const valid = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
   return valid.includes(planType) ? `trial_files_${planType}` : 'trial_files_basico';
 }
 
