@@ -1677,7 +1677,7 @@ bot.action('show_support', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), [createButton("WHATSAPP 💬", { callback_data: 'wa_ceo' })],
+        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP 💬", { callback_data: 'wa_ceo' })],
         [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP 💬", { callback_data: 'wa_admin' })],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WhatsApp 💬", { callback_data: 'wa_mod' })],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
