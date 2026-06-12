@@ -186,7 +186,8 @@ const BUTTON_ICONS = {
     'RENOVAR AHORA': '6019175208240289774',
     'ABRIR PANEL WEB': '5839116473951328489',
     'SAYKO': '5884179047482659474',
-    'ROVER': '5884179047482659474'
+    'ROVER': '5884179047482659474',
+    'Solicitar Reembolso': '5444856076954520455'
 };
 
 function createButton(text, options) {
@@ -1755,7 +1756,7 @@ bot.action('show_support', async (ctx) => {
         [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/5356557646', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
-        [createButton("🔄 Solicitar Reembolso", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx))],
+        [createButton("Solicitar Reembolso", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), icon_custom_emoji_id: '5444856076954520455')],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
     ] } });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
@@ -1833,7 +1834,7 @@ bot.action('politicas', async (ctx) => {
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     const userId = ctx.from.id.toString();
     await ctx.answerCbQuery();
-    await ctx.reply(getPoliticasHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("TÉRMINOS DE SERVICIO", wa(`${webappUrl}/politicas.html?section=terminos`, ctx))], [createButton("POLÍTICA DE REEMBOLSO", wa(`${webappUrl}/politicas.html?section=reembolso`, ctx))], [createButton("POLÍTICA DE PRIVACIDAD", wa(`${webappUrl}/politicas.html?section=privacidad`, ctx))], [createButton("🔄 Solicitar Reembolso", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+    await ctx.reply(getPoliticasHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("TÉRMINOS DE SERVICIO", wa(`${webappUrl}/politicas.html?section=terminos`, ctx))], [createButton("POLÍTICA DE REEMBOLSO", wa(`${webappUrl}/politicas.html?section=reembolso`, ctx))], [createButton("POLÍTICA DE PRIVACIDAD", wa(`${webappUrl}/politicas.html?section=privacidad`, ctx))], [createButton("Solicitar Reembolso", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), icon_custom_emoji_id: '5444856076954520455')], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
 });
 
