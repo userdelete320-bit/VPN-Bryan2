@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VPN Cuba — Centro de Garantías</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080a0f;
+  --surface: #0f1117;
+  --surface2: #161920;
+  --border: #1e2330;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --neon: #39ffa0;
+  --red: #ff6b6b;
+  --red-dim: rgba(255,107,107,0.12);
+  --yellow: #ffd166;
+  --blue: #5bf0ff;
+  --radius: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; padding-bottom: 40px; }
+
+/* HEADER */
+.header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
+.header-back { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.header-back svg { width: 16px; height: 16px; stroke: var(--text); }
+.header-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; }
+.header-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* HERO */
+.hero { margin: 20px 16px 8px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.hero-eyebrow { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: var(--neon); text-transform: uppercase; margin-bottom: 8px; }
+.hero-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; line-height: 1.2; margin-bottom: 8px; }
+.hero-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* POLICY BADGE */
+.policy-strip { margin: 12px 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+.policy-badge { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 100px; padding: 6px 12px; font-size: 11px; color: var(--muted); }
+.policy-badge span { color: var(--neon); font-weight: 600; }
+
+/* SECTION TITLE */
+.section-label { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; padding: 0 16px; margin: 20px 0 10px; }
+
+/* PLAN CARD */
+.plan-card { margin: 0 16px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; transition: border-color 0.2s; }
+.plan-card.eligible { border-color: rgba(57,255,160,0.2); }
+.plan-card-info { flex: 1; min-width: 0; }
+.plan-card-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plan-card-meta { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.plan-card-method { display: inline-flex; align-items: center; gap: 4px; background: rgba(91,240,255,0.08); border: 1px solid rgba(91,240,255,0.15); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-family: 'Space Mono', monospace; color: var(--blue); }
+.plan-card-timer { font-size: 11px; color: var(--yellow); margin-top: 5px; display: flex; align-items: center; gap: 4px; }
+
+.btn-request { background: var(--red-dim); border: 1px solid rgba(255,107,107,0.3); color: var(--red); border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+.btn-request:hover { background: rgba(255,107,107,0.2); }
+.btn-expired { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 10px; padding: 8px 14px; font-size: 12px; cursor: not-allowed; opacity: 0.5; white-space: nowrap; font-family: 'Inter', sans-serif; }
+
+/* EMPTY STATE */
+.empty-state { margin: 30px 16px; text-align: center; padding: 30px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.empty-icon { font-size: 36px; margin-bottom: 12px; }
+.empty-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.empty-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* LOADING */
+.skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-card { margin: 0 16px 10px; height: 90px; border-radius: var(--radius); }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(8,10,15,0.85); backdrop-filter: blur(8px); display: flex; align-items: flex-end; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px 20px 0 0; padding: 24px 20px 36px; width: 100%; max-width: 520px; transform: translateY(30px); transition: transform 0.25s; max-height: 85vh; overflow-y: auto; }
+.modal-overlay.active .modal { transform: translateY(0); }
+.modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+.modal-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.modal-plan-name { font-size: 13px; color: var(--neon); margin-bottom: 20px; font-family: 'Space Mono', monospace; }
+.modal-warning { background: var(--red-dim); border: 1px solid rgba(255,107,107,0.25); border-radius: 10px; padding: 12px 14px; font-size: 12px; color: var(--red); line-height: 1.5; margin-bottom: 20px; display: flex; gap: 8px; }
+.field-label { font-size: 11px; font-family: 'Space Mono', monospace; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; display: block; }
+select, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 12px 14px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s; appearance: none; }
+select:focus, textarea:focus { border-color: var(--neon); }
+textarea { resize: none; height: 90px; line-height: 1.5; }
+.field-wrap { margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.btn-cancel { flex: 1; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 10px; padding: 13px; font-size: 14px; font-family: 'Inter', sans-serif; cursor: pointer; transition: all 0.2s; }
+.btn-cancel:hover { border-color: var(--text); color: var(--text); }
+.btn-confirm { flex: 2; background: var(--red); border: none; color: #000; border-radius: 10px; padding: 13px; font-size: 14px; font-weight: 700; font-family: 'Inter', sans-serif; cursor: pointer; transition: opacity 0.2s; }
+.btn-confirm:hover { opacity: 0.85; }
+.btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* SUCCESS */
+.success-screen { display: none; text-align: center; padding: 20px 0 10px; }
+.success-icon { font-size: 48px; margin-bottom: 16px; }
+.success-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+.success-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* FAQ */
+.faq-item { margin: 0 16px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.faq-q { padding: 14px 16px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.faq-q svg { flex-shrink: 0; transition: transform 0.2s; }
+.faq-item.open .faq-q svg { transform: rotate(180deg); }
+.faq-a { font-size: 13px; color: var(--muted); line-height: 1.6; padding: 0 16px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s; }
+.faq-item.open .faq-a { max-height: 300px; padding: 0 16px 14px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-back" onclick="history.back()">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  </div>
+  <div>
+    <div class="header-title">Centro de Garantías</div>
+    <div class="header-sub">Solicitudes de reembolso · VPN Cuba</div>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-eyebrow">Política de reembolso</div>
+  <div class="hero-title">Tu satisfacción,<br>nuestra prioridad</div>
+  <div class="hero-desc">Si el servicio no cumple lo prometido, puedes solicitar un reembolso dentro de las primeras 48 horas tras la activación.</div>
+</div>
+
+<div class="policy-strip">
+  <div class="policy-badge">⏱ Plazo: <span>48 horas</span></div>
+  <div class="policy-badge">👤 Revisión: <span>Manual</span></div>
+  <div class="policy-badge">📋 Respuesta: <span>1–24 h</span></div>
+</div>
+
+<div class="section-label">Tus planes activos</div>
+<div id="plansContainer">
+  <div class="skeleton-card skeleton"></div>
+  <div class="skeleton-card skeleton"></div>
+</div>
+
+<div class="section-label" style="margin-top:24px">Preguntas frecuentes</div>
+
+<div class="faq-item">
+  <div class="faq-q" onclick="toggleFaq(this)">
+    ¿Cuándo puedo pedir un reembolso?
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+  <div class="faq-a">Dentro de las primeras 48 horas desde la activación de tu plan. Pasado ese plazo, el botón de solicitud queda deshabilitado.</div>
+</div>
+
+<div class="faq-item">
+  <div class="faq-q" onclick="toggleFaq(this)">
+    ¿Cómo se procesa el reembolso?
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+  <div class="faq-a">Un administrador revisa tu solicitud en un plazo de 1 a 24 horas. Si es aprobada, el reembolso se realiza por el mismo método de pago original. Tu acceso VPN se desactivará en el momento de la aprobación.</div>
+</div>
+
+<div class="faq-item">
+  <div class="faq-q" onclick="toggleFaq(this)">
+    ¿Qué pasa con los pagos en Stars o TON?
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+  <div class="faq-a">Para Telegram Stars, el reembolso se tramita directamente con Telegram y puede tardar hasta 72 horas adicionales. Para TON, la devolución se hace a la wallet desde la que realizaste el pago.</div>
+</div>
+
+<div class="faq-item">
+  <div class="faq-q" onclick="toggleFaq(this)">
+    ¿Puedo solicitar reembolso si usé una prueba?
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+  <div class="faq-a">No. Las pruebas gratuitas no son elegibles para reembolso ya que el servicio fue entregado sin costo.</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="modalForm">
+      <div class="modal-title">Solicitar reembolso</div>
+      <div class="modal-plan-name" id="modalPlanName">—</div>
+      <div class="modal-warning">
+        ⚠️ Al confirmar, tu acceso VPN vinculado a este plan será suspendido de inmediato.
+      </div>
+      <div class="field-wrap">
+        <label class="field-label" for="motivoSelect">Motivo de la solicitud</label>
+        <select id="motivoSelect" required>
+          <option value="" disabled selected>Selecciona un motivo</option>
+          <option value="incompatibilidad">Incompatibilidad con mi dispositivo</option>
+          <option value="conexion">Error de conexión persistente</option>
+          <option value="velocidad">Velocidad inferior a la prometida</option>
+          <option value="error_compra">Compra por error / plan equivocado</option>
+          <option value="otros">Otros motivos</option>
+        </select>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label" for="detallesText">Detalles adicionales <span style="color:var(--muted)">(opcional)</span></label>
+        <textarea id="detallesText" placeholder="Cuéntanos qué ocurrió para ayudarte mejor..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+        <button class="btn-confirm" id="btnConfirm" onclick="submitRefund()">Confirmar solicitud</button>
+      </div>
+    </div>
+    <div class="success-screen" id="successScreen">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Solicitud enviada</div>
+      <div class="success-desc">Un administrador revisará tu caso en las próximas 1–24 horas y te notificará por este chat.<br><br>Tu acceso permanece activo hasta la resolución.</div>
+      <button class="btn-cancel" style="margin-top:20px; width:100%;" onclick="closeModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+const urlParams = new URLSearchParams(window.location.search);
+const currentUserId = urlParams.get('userId') || tg?.initDataUnsafe?.user?.id || '';
+if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#080a0f'); tg.setBackgroundColor('#080a0f'); }
+
+const METHOD_LABELS = {
+  transfer: 'BPA', mitransfer: 'MITRANSFER', mobile: 'Saldo Móvil',
+  usdt: 'USDT (BEP20)', stars: 'Telegram Stars', ton: 'TON', trial: 'Prueba'
+};
+const PLAN_NAMES = {
+  basico: 'Plan Básico', avanzado: 'Plan Avanzado', cuba_vip: 'Plan VIP Cuba',
+  premium: 'Plan Gaming', anual: 'Plan Anual', trial: 'Prueba gratuita'
+};
+
+let currentPaymentId = null;
+let currentPlanName = '';
+
+async function loadPlans() {
+  const container = document.getElementById('plansContainer');
+  if (!currentUserId) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">🔒</div><div class="empty-title">Sin sesión</div><div class="empty-desc">Abre esta página desde el bot de Telegram.</div></div>`;
+    return;
+  }
+  try {
+    const res = await fetch(`/api/user-payments/${currentUserId}`);
+    const payments = await res.json();
+    const approved = (payments || []).filter(p => p.status === 'approved' && p.plan !== 'trial');
+
+    if (!approved.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Sin planes activos</div><div class="empty-desc">No tienes planes activos en este momento.</div></div>`;
+      return;
+    }
+
+    const now = Date.now();
+    container.innerHTML = approved.map(p => {
+      const activatedAt = new Date(p.approved_at || p.created_at).getTime();
+      const hoursElapsed = (now - activatedAt) / 3600000;
+      const hoursLeft = Math.max(0, 48 - hoursElapsed);
+      const eligible = hoursElapsed <= 48;
+      const planName = PLAN_NAMES[p.plan] || p.plan;
+      const method = METHOD_LABELS[p.method] || p.method;
+      const date = new Date(p.approved_at || p.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+
+      if (eligible) {
+        const h = Math.floor(hoursLeft);
+        const m = Math.floor((hoursLeft % 1) * 60);
+        return `<div class="plan-card eligible">
+          <div class="plan-card-info">
+            <div class="plan-card-name">${planName}</div>
+            <div class="plan-card-meta">Activado: ${date}</div>
+            <div class="plan-card-method">${method}</div>
+            <div class="plan-card-timer">⏳ Expira en ${h}h ${m}m</div>
+          </div>
+          <button class="btn-request" onclick="openModal('${p.id}','${planName}')">Solicitar</button>
+        </div>`;
+      } else {
+        return `<div class="plan-card">
+          <div class="plan-card-info">
+            <div class="plan-card-name">${planName}</div>
+            <div class="plan-card-meta">Activado: ${date}</div>
+            <div class="plan-card-method">${method}</div>
+          </div>
+          <button class="btn-expired" disabled>Expirado</button>
+        </div>`;
+      }
+    }).join('');
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Error al cargar</div><div class="empty-desc">No se pudieron cargar tus planes. Inténtalo de nuevo.</div></div>`;
+  }
+}
+
+function openModal(paymentId, planName) {
+  currentPaymentId = paymentId;
+  currentPlanName = planName;
+  document.getElementById('modalPlanName').textContent = planName;
+  document.getElementById('motivoSelect').value = '';
+  document.getElementById('detallesText').value = '';
+  document.getElementById('modalForm').style.display = 'block';
+  document.getElementById('successScreen').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('active');
+  currentPaymentId = null;
+}
+
+async function submitRefund() {
+  const motivo = document.getElementById('motivoSelect').value;
+  if (!motivo) { alert('Por favor selecciona un motivo.'); return; }
+  const detalles = document.getElementById('detallesText').value.trim();
+  const btn = document.getElementById('btnConfirm');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    const res = await fetch('/api/refund-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: currentUserId, paymentId: currentPaymentId, motivo, detalles, planName: currentPlanName })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('modalForm').style.display = 'none';
+      document.getElementById('successScreen').style.display = 'block';
+      loadPlans();
+    } else {
+      alert('❌ ' + (data.error || 'Error al enviar. Inténtalo de nuevo.'));
+    }
+  } catch(e) {
+    alert('Error de conexión. Inténtalo de nuevo.');
+  }
+  btn.disabled = false; btn.textContent = 'Confirmar solicitud';
+}
+
+function toggleFaq(el) {
+  const item = el.parentElement;
+  const wasOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+  if (!wasOpen) item.classList.add('open');
+}
+
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+loadPlans();
+</script>
+</body>
+</html>

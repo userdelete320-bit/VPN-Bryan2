@@ -524,12 +524,23 @@
                     </ul>
 
                     <h2><i class="fas fa-envelope"></i> 4. Proceso de Solicitud de Reembolso</h2>
-                    <p>Para iniciar el proceso:</p>
+                    <p>Para iniciar el proceso usa nuestro centro de garantías:</p>
                     <ul>
-                        <li>Ponte en contacto con nuestro equipo de Soporte, en el botón de SOPORTE</li>
-                        <li>Incluye tu ID de Cliente, la Fecha de Compra y una Explicación Detallada del problema técnico no resuelto.</li>
-                        <li>El equipo de soporte revisará la solicitud y responderá en un plazo máximo de 72 horas hábiles.</li>
+                        <li>Accede al <strong>Centro de Garantías</strong> desde el botón de abajo o desde el menú de Soporte en el bot.</li>
+                        <li>Selecciona el plan para el que deseas solicitar el reembolso y elige el motivo.</li>
+                        <li>El equipo de soporte revisará la solicitud y responderá en un plazo máximo de 24 horas.</li>
+                        <li><strong>Importante:</strong> Solo puedes solicitar reembolso dentro de las primeras <strong>48 horas</strong> tras la activación del plan.</li>
                     </ul>
+                    <div style="text-align:center; margin-top:20px;">
+                      <a id="refundBtn" href="garantias.html" style="display:inline-block; background:#3b82f6; color:#fff; padding:12px 28px; border-radius:10px; font-weight:700; text-decoration:none; font-size:14px;">🔄 Ir al Centro de Garantías</a>
+                    </div>
+                    <script>
+                      (function(){
+                        const params = new URLSearchParams(window.location.search);
+                        const uid = params.get('userId');
+                        if (uid) document.getElementById('refundBtn').href = 'garantias.html?userId=' + uid;
+                      })();
+                    </script>
 
                     <div class="separator"></div>
                 </div>
