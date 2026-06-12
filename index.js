@@ -1663,6 +1663,26 @@ app.get('/api/user-payments/:telegramId', async (req, res) => {
 });
 
 // Solicitud de reembolso
+// Fallback: obtener solicitudes de reembolso pendientes
+if (!db.getRefundRequests) {
+  db.getRefundRequests = async () => {
+    try {
+      const sb = getSbClient();
+      const { data, error } = await sb.from('payments').select('*').eq('status', 'refund_pending').order('refund_requested_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (e) { console.error('❌ Error en getRefundRequests:', e); return []; }
+  };
+}
+
+const REFUND_MOTIVOS = {
+  incompatibilidad: 'Incompatibilidad con dispositivo',
+  conexion: 'Error de conexión persistente',
+  velocidad: 'Velocidad inferior a la prometida',
+  error_compra: 'Compra por error / plan equivocado',
+  otros: 'Otros motivos'
+};
+
 app.post('/api/refund-request', async (req, res) => {
   try {
     const { telegramId, paymentId, motivo, detalles, planName } = req.body;
@@ -1683,13 +1703,14 @@ app.post('/api/refund-request', async (req, res) => {
     const username = user?.username ? `@${user.username}` : 'Sin usuario';
     const firstName = user?.first_name || 'Usuario';
 
-    const MOTIVOS = {
-      incompatibilidad: 'Incompatibilidad con dispositivo',
-      conexion: 'Error de conexión persistente',
-      velocidad: 'Velocidad inferior a la prometida',
-      error_compra: 'Compra por error / plan equivocado',
-      otros: 'Otros motivos'
-    };
+    // Guardar la solicitud en el pago para que aparezca en el panel admin
+    await db.updatePayment(paymentId, {
+      status: 'refund_pending',
+      refund_motivo: motivo,
+      refund_detalles: detalles || '',
+      refund_plan_name: planName || payment.plan,
+      refund_requested_at: new Date().toISOString()
+    });
 
     // Notificar a todos los admins
     const adminMsg =
@@ -1700,9 +1721,11 @@ app.post('/api/refund-request', async (req, res) => {
       `📋 *Plan:* ${planName || payment.plan}\n` +
       `💳 *Método de pago:* ${payment.method}\n` +
       `🔖 *ID de pago:* \`${paymentId}\`\n` +
-      `📌 *Motivo:* ${MOTIVOS[motivo] || motivo}\n` +
+      `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
+      `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
       `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
-      `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}`;
+      `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
+      `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
 
     for (const adminId of ADMIN_IDS) {
       try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch(e) {}
@@ -1713,7 +1736,7 @@ app.post('/api/refund-request', async (req, res) => {
       await bot.telegram.sendMessage(telegramId,
         `✅ <b>Solicitud de reembolso recibida</b>\n\n` +
         `<b>Plan:</b> ${planName || payment.plan}\n` +
-        `<b>Motivo:</b> ${MOTIVOS[motivo] || motivo}\n\n` +
+        `<b>Motivo:</b> ${REFUND_MOTIVOS[motivo] || motivo}\n\n` +
         `Un administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.\n\n` +
         `<i>Si tienes alguna duda adicional, contacta con soporte.</i>`,
         { parse_mode: 'HTML' }
@@ -1724,6 +1747,72 @@ app.post('/api/refund-request', async (req, res) => {
   } catch(error) {
     console.error('❌ Error en refund-request:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Listar solicitudes de reembolso pendientes (panel admin)
+app.get('/api/refund-requests', async (req, res) => {
+  try {
+    const requests = await db.getRefundRequests();
+    // Enriquecer con datos de usuario
+    const enriched = await Promise.all(requests.map(async (r) => {
+      const user = await db.getUser(String(r.telegram_id)).catch(() => null);
+      return {
+        ...r,
+        first_name: user?.first_name || 'Usuario',
+        username: user?.username || ''
+      };
+    }));
+    res.json(enriched);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// Responder a una solicitud de reembolso (aceptar/denegar) con mensaje del admin
+app.post('/api/refund-requests/:id/respond', async (req, res) => {
+  try {
+    const { adminId, action, message } = req.body;
+    if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
+    if (!['accept', 'reject'].includes(action)) return res.status(400).json({ error: 'Acción inválida' });
+
+    const payment = await db.getPayment(req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Solicitud no encontrada' });
+
+    const telegramId = String(payment.telegram_id);
+    const planName = payment.refund_plan_name || getPlanName(payment.plan);
+
+    if (action === 'accept') {
+      await db.removeVIP(telegramId);
+      await db.updatePayment(req.params.id, {
+        status: 'refunded',
+        refunded_at: new Date().toISOString(),
+        refunded_by: adminId,
+        refund_response_message: message || ''
+      });
+
+      const finalMsg = message && message.trim()
+        ? message.trim()
+        : `✅ <b>Su solicitud de reembolso fue aceptada</b>\n\nSu plan <b>${planName}</b> ha sido cancelado y el reembolso se procesará por su método de pago original en las próximas horas.\n\nGracias por su paciencia.`;
+
+      try { await bot.telegram.sendMessage(telegramId, finalMsg, { parse_mode: 'HTML' }); } catch(e) {}
+    } else {
+      await db.updatePayment(req.params.id, {
+        status: 'approved',
+        refund_rejected_at: new Date().toISOString(),
+        refund_rejected_by: adminId,
+        refund_response_message: message || ''
+      });
+
+      const finalMsg = message && message.trim()
+        ? message.trim()
+        : `ℹ️ <b>Su solicitud de reembolso fue denegada</b>\n\nTras revisar su caso, no procede el reembolso según nuestra política de garantías. Su plan <b>${planName}</b> sigue activo con normalidad.\n\nSi tiene dudas, contacte con soporte.`;
+
+      try { await bot.telegram.sendMessage(telegramId, finalMsg, { parse_mode: 'HTML' }); } catch(e) {}
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error respondiendo reembolso:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
