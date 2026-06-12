@@ -1651,6 +1651,80 @@ app.get('/admin.html', (req, res) => { res.sendFile(path.join(__dirname, 'public
 app.get('/how.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/how.html')); });
 app.get('/faq.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/faq.html')); });
 app.get('/politicas.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/politicas.html')); });
+app.get('/garantias.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/garantias.html')); });
+
+// Pagos de un usuario (para garantias.html)
+app.get('/api/user-payments/:telegramId', async (req, res) => {
+  try {
+    const payments = await db.getUserPayments(req.params.telegramId);
+    res.json(payments || []);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Solicitud de reembolso
+app.post('/api/refund-request', async (req, res) => {
+  try {
+    const { telegramId, paymentId, motivo, detalles, planName } = req.body;
+    if (!telegramId || !paymentId || !motivo) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
+
+    // Verificar que el pago existe y pertenece al usuario
+    const payment = await db.getPayment(paymentId);
+    if (!payment) return res.status(404).json({ success: false, error: 'Pago no encontrado.' });
+    if (String(payment.telegram_id) !== String(telegramId)) return res.status(403).json({ success: false, error: 'No autorizado.' });
+
+    // Verificar plazo de 48 horas
+    const activatedAt = new Date(payment.approved_at || payment.created_at).getTime();
+    const hoursElapsed = (Date.now() - activatedAt) / 3600000;
+    if (hoursElapsed > 48) return res.status(400).json({ success: false, error: 'El plazo de 48 horas para solicitar reembolso ha expirado.' });
+
+    // Obtener datos del usuario
+    const user = await db.getUser(String(telegramId)).catch(() => null);
+    const username = user?.username ? `@${user.username}` : 'Sin usuario';
+    const firstName = user?.first_name || 'Usuario';
+
+    const MOTIVOS = {
+      incompatibilidad: 'Incompatibilidad con dispositivo',
+      conexion: 'Error de conexión persistente',
+      velocidad: 'Velocidad inferior a la prometida',
+      error_compra: 'Compra por error / plan equivocado',
+      otros: 'Otros motivos'
+    };
+
+    // Notificar a todos los admins
+    const adminMsg =
+      `🔴 *SOLICITUD DE REEMBOLSO*\n\n` +
+      `👤 *Usuario:* ${firstName}\n` +
+      `📱 *Telegram:* ${username}\n` +
+      `🆔 *ID:* ${telegramId}\n` +
+      `📋 *Plan:* ${planName || payment.plan}\n` +
+      `💳 *Método de pago:* ${payment.method}\n` +
+      `🔖 *ID de pago:* \`${paymentId}\`\n` +
+      `📌 *Motivo:* ${MOTIVOS[motivo] || motivo}\n` +
+      `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
+      `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}`;
+
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch(e) {}
+    }
+
+    // Confirmar al usuario por Telegram
+    try {
+      await bot.telegram.sendMessage(telegramId,
+        `✅ <b>Solicitud de reembolso recibida</b>\n\n` +
+        `<b>Plan:</b> ${planName || payment.plan}\n` +
+        `<b>Motivo:</b> ${MOTIVOS[motivo] || motivo}\n\n` +
+        `Un administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.\n\n` +
+        `<i>Si tienes alguna duda adicional, contacta con soporte.</i>`,
+        { parse_mode: 'HTML' }
+      );
+    } catch(e) {}
+
+    res.json({ success: true });
+  } catch(error) {
+    console.error('❌ Error en refund-request:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // ==================== BOT DE TELEGRAM ====================
 
@@ -1675,10 +1749,13 @@ bot.catch((err, ctx) => { console.error('❌ Error en el bot:', err); });
 bot.action('show_support', async (ctx) => {
   try {
     await ctx.answerCbQuery();
+    const userId = ctx.from.id.toString();
+    const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
         [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/5356557646', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
+        [createButton("🔄 Solicitar Reembolso", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx))],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
     ] } });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
@@ -1755,7 +1832,7 @@ bot.action('politicas', async (ctx) => {
   try {
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     await ctx.answerCbQuery();
-    await ctx.reply(getPoliticasHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("TÉRMINOS DE SERVICIO", wa(`${webappUrl}/politicas.html?section=terminos`, ctx))], [createButton("POLÍTICA DE REEMBOLSO", wa(`${webappUrl}/politicas.html?section=reembolso`, ctx))], [createButton("POLÍTICA DE PRIVACIDAD", wa(`${webappUrl}/politicas.html?section=privacidad`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+    await ctx.reply(getPoliticasHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("TÉRMINOS DE SERVICIO", wa(`${webappUrl}/politicas.html?section=terminos`, ctx))], [createButton("POLÍTICA DE REEMBOLSO", wa(`${webappUrl}/politicas.html?section=reembolso`, ctx))], [createButton("POLÍTICA DE PRIVACIDAD", wa(`${webappUrl}/politicas.html?section=privacidad`, ctx))], [createButton("🔄 Solicitar Reembolso", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
 });
 
