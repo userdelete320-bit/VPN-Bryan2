@@ -273,7 +273,7 @@ select option{background:var(--ink)}
     <div class="sidebar-brand"><div class="brand-title">VPN CUBA</div><div class="brand-freq"><span class="brand-dot"></span> ADMIN · PANEL</div></div>
     <div class="sidebar-nav">
       <div class="nav-group"><div class="nav-group-label">// Dashboard</div><div class="nav-item active" data-tab="stats" onclick="switchTab('stats')"><i class="fas fa-chart-line"></i> Estadísticas</div></div>
-      <div class="nav-group"><div class="nav-group-label">// Pagos</div><div class="nav-item" data-tab="pending" onclick="switchTab('pending')"><i class="fas fa-clock"></i> Pendientes <span class="nav-badge" id="badge-pending">0</span></div><div class="nav-item" data-tab="approved" onclick="switchTab('approved')"><i class="fas fa-check"></i> Aprobados</div></div>
+      <div class="nav-group"><div class="nav-group-label">// Pagos</div><div class="nav-item" data-tab="pending" onclick="switchTab('pending')"><i class="fas fa-clock"></i> Pendientes <span class="nav-badge" id="badge-pending">0</span></div><div class="nav-item" data-tab="approved" onclick="switchTab('approved')"><i class="fas fa-check"></i> Aprobados</div><div class="nav-item" data-tab="refunds" onclick="switchTab('refunds')"><i class="fas fa-rotate-left"></i> Reembolsos <span class="nav-badge" id="badge-refunds">0</span></div></div>
       <div class="nav-group"><div class="nav-group-label">// Pruebas</div><div class="nav-item" data-tab="trial-pending" onclick="switchTab('trial-pending')"><i class="fas fa-gift"></i> Solicitudes <span class="nav-badge" id="badge-trial">0</span></div><div class="nav-item" data-tab="trial-files" onclick="switchTab('trial-files')"><i class="fas fa-database"></i> Pool de Pruebas</div></div>
       <div class="nav-group"><div class="nav-group-label">// Usuarios</div><div class="nav-item" data-tab="users" onclick="switchTab('users')"><i class="fas fa-users"></i> Usuarios</div><div class="nav-item" data-tab="referrals" onclick="switchTab('referrals')"><i class="fas fa-share-alt"></i> Referidos</div></div>
       <div class="nav-group"><div class="nav-group-label">// Contenido</div><div class="nav-item" data-tab="plan-files" onclick="switchTab('plan-files')"><i class="fas fa-folder"></i> Archivos Planes</div><div class="nav-item" data-tab="coupons" onclick="switchTab('coupons')"><i class="fas fa-tag"></i> Cupones</div></div>
@@ -319,6 +319,13 @@ select option{background:var(--ink)}
         <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-check"></i> Pagos Aprobados</div><button class="btn green" onclick="loadApprovedPayments()"><i class="fas fa-sync-alt"></i> <span>Refrescar</span></button></div>
         <div class="card-body"><div class="loading" id="approvedLoading"><div class="spinner"></div> Cargando...</div><div class="no-data" id="approvedNoData" style="display:none"><i class="fas fa-inbox"></i>Sin pagos aprobados</div>
         <div class="table-wrap" id="approvedTableWrap" style="display:none"><table><thead><tr><th>ID</th><th>Usuario</th><th>Plan</th><th>Método</th><th>Monto</th><th>Cupón</th><th>Fecha</th><th>Config.</th><th>Acción</th></tr></thead><tbody id="approvedTableBody"></tbody></table></div></div></div>
+      </div>
+
+      <!-- ── SOLICITUDES DE REEMBOLSO ── -->
+      <div id="refundsPanel" class="tab-panel">
+        <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-rotate-left"></i> Solicitudes de Reembolso</div><button class="btn" onclick="loadRefundRequests()"><i class="fas fa-sync-alt"></i> <span>Refrescar</span></button></div>
+        <div class="card-body"><div class="loading" id="refundsLoading"><div class="spinner"></div> Cargando...</div><div class="no-data" id="refundsNoData" style="display:none"><i class="fas fa-check-circle"></i>No hay solicitudes de reembolso</div>
+        <div class="table-wrap" id="refundsTableWrap" style="display:none"><table><thead><tr><th>ID</th><th>Usuario</th><th>Plan</th><th>Método</th><th>Motivo</th><th>Detalles</th><th>Archivo</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody id="refundsTableBody"></tbody></table></div></div></div>
       </div>
 
       <!-- ── PRUEBAS PENDIENTES ── -->
@@ -472,6 +479,16 @@ select option{background:var(--ink)}
   </div>
 </div>
 
+<div class="modal-bg" id="refundResponseModal">
+  <div class="modal-box"><button class="modal-close" onclick="closeRefundResponseModal()">×</button><div class="modal-title" id="refundResponseTitle">// RESPONDER SOLICITUD</div>
+  <div class="detail-grid"><div class="detail-item"><div class="detail-lbl">Usuario</div><div class="detail-val" id="refundRespUser"></div></div><div class="detail-item"><div class="detail-lbl">Plan</div><div class="detail-val" id="refundRespPlan"></div></div></div>
+  <div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-2);margin:14px 0 6px">Mensaje para el usuario (opcional — si lo dejas vacío se enviará el mensaje predeterminado)</div>
+  <textarea id="refundRespMessage" rows="5" placeholder="Escribe aquí un mensaje personalizado, o deja vacío para usar el predeterminado..." style="width:100%;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--txt);padding:10px;font-family:var(--f-mono);font-size:.75rem;resize:vertical"></textarea>
+  <div id="refundRespPreview" style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-2);margin-top:10px;padding:10px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;line-height:1.5"></div>
+  <button class="btn" id="refundRespConfirmBtn" style="margin-top:14px;width:100%" onclick="confirmRefundResponse()"><i class="fas fa-paper-plane"></i> <span>Enviar respuesta</span></button>
+  </div>
+</div>
+
 <div class="modal-bg" id="userDetailsModal">
   <div class="modal-box"><button class="modal-close" onclick="closeUserDetailsModal()">×</button><div class="modal-title">// DETALLES DE USUARIO</div>
   <div class="loading" id="userDetailsModalLoading"><div class="spinner"></div></div>
@@ -585,6 +602,7 @@ async function loadStats() {
     document.getElementById('couponsCount').textContent = stats.coupons?.active ?? '—';
     document.getElementById('badge-pending').textContent = stats.payments?.pending || 0;
     document.getElementById('badge-trial').textContent = stats.users?.trial_pending || 0;
+    fetch('/api/refund-requests').then(r=>r.json()).then(reqs=>{ const b=document.getElementById('badge-refunds'); if(b) b.textContent = reqs?.length||0; }).catch(()=>{});
   } catch(e) { showNotification('Error al cargar estadísticas', 'error'); }
 }
 
@@ -619,6 +637,105 @@ async function loadApprovedPayments() {
     document.getElementById('approvedTableWrap').style.display = 'block';
   } catch(e) { document.getElementById('approvedLoading').style.display = 'none'; showNotification('Error al cargar pagos aprobados', 'error'); }
 }
+
+// ── REEMBOLSOS ────────────────────────────────────────
+const REFUND_MOTIVO_LABELS = {
+  incompatibilidad: 'Incompatibilidad con dispositivo',
+  conexion: 'Error de conexión persistente',
+  velocidad: 'Velocidad inferior a la prometida',
+  error_compra: 'Compra por error / plan equivocado',
+  otros: 'Otros motivos'
+};
+
+let currentRefundId = null, currentRefundAction = null, currentRefundPlanName = '';
+
+async function loadRefundRequests() {
+  document.getElementById('refundsLoading').style.display = 'flex';
+  document.getElementById('refundsTableWrap').style.display = 'none';
+  document.getElementById('refundsNoData').style.display = 'none';
+  try {
+    const requests = await (await fetch('/api/refund-requests')).json();
+    document.getElementById('refundsLoading').style.display = 'none';
+    const badge = document.getElementById('badge-refunds');
+    if (badge) badge.textContent = requests?.length || 0;
+    if (!requests?.length) { document.getElementById('refundsNoData').style.display = 'block'; return; }
+    const tb = document.getElementById('refundsTableBody'); tb.innerHTML = '';
+    requests.forEach(r => {
+      const motivo = REFUND_MOTIVO_LABELS[r.refund_motivo] || r.refund_motivo || '—';
+      const planName = r.refund_plan_name || getPlanName(r.plan);
+      const fecha = r.refund_requested_at ? new Date(r.refund_requested_at).toLocaleString('es-ES') : '';
+      tb.innerHTML += `<tr>
+        <td>${r.id}</td>
+        <td><strong>${r.first_name||'Usuario'}</strong><br><small>@${r.username||''} · ${r.telegram_id}</small></td>
+        <td>${planName}</td>
+        <td>${getMethodBadge(r.method)}</td>
+        <td>${motivo}</td>
+        <td style="max-width:220px;white-space:normal">${r.refund_detalles || '—'}</td>
+        <td>${r.config_file || '—'}</td>
+        <td>${fecha}</td>
+        <td style="white-space:nowrap">
+          <button class="btn green" onclick='openRefundResponseModal("${r.id}","accept","${r.telegram_id}","${(r.first_name||'Usuario').replace(/"/g,'')}","${planName.replace(/"/g,'')}")'><i class="fas fa-check"></i> <span>Aceptar</span></button>
+          <button class="btn red" onclick='openRefundResponseModal("${r.id}","reject","${r.telegram_id}","${(r.first_name||'Usuario').replace(/"/g,'')}","${planName.replace(/"/g,'')}")'><i class="fas fa-times"></i> <span>Denegar</span></button>
+        </td>
+      </tr>`;
+    });
+    document.getElementById('refundsTableWrap').style.display = 'block';
+  } catch(e) { document.getElementById('refundsLoading').style.display = 'none'; showNotification('Error al cargar reembolsos', 'error'); }
+}
+
+function openRefundResponseModal(id, action, telegramId, firstName, planName) {
+  currentRefundId = id;
+  currentRefundAction = action;
+  currentRefundPlanName = planName;
+  document.getElementById('refundResponseTitle').textContent = action === 'accept' ? '// ACEPTAR REEMBOLSO' : '// DENEGAR REEMBOLSO';
+  document.getElementById('refundRespUser').textContent = `${firstName} (${telegramId})`;
+  document.getElementById('refundRespPlan').textContent = planName;
+  document.getElementById('refundRespMessage').value = '';
+  document.getElementById('refundRespConfirmBtn').className = action === 'accept' ? 'btn green' : 'btn red';
+  updateRefundPreview();
+  document.getElementById('refundRespMessage').oninput = updateRefundPreview;
+  document.getElementById('refundResponseModal').classList.add('active');
+}
+
+function updateRefundPreview() {
+  const custom = document.getElementById('refundRespMessage').value.trim();
+  const preview = document.getElementById('refundRespPreview');
+  if (custom) {
+    preview.innerHTML = `<strong>Vista previa (mensaje personalizado):</strong><br>${custom.replace(/\n/g,'<br>')}`;
+  } else if (currentRefundAction === 'accept') {
+    preview.innerHTML = `<strong>Vista previa (predeterminado):</strong><br>✅ Su solicitud de reembolso fue aceptada<br><br>Su plan ${currentRefundPlanName} ha sido cancelado y el reembolso se procesará por su método de pago original en las próximas horas.<br><br>Gracias por su paciencia.`;
+  } else {
+    preview.innerHTML = `<strong>Vista previa (predeterminado):</strong><br>ℹ️ Su solicitud de reembolso fue denegada<br><br>Tras revisar su caso, no procede el reembolso según nuestra política de garantías. Su plan ${currentRefundPlanName} sigue activo con normalidad.<br><br>Si tiene dudas, contacte con soporte.`;
+  }
+}
+
+function closeRefundResponseModal() {
+  document.getElementById('refundResponseModal').classList.remove('active');
+  currentRefundId = null; currentRefundAction = null;
+}
+
+async function confirmRefundResponse() {
+  if (!currentRefundId || !currentRefundAction) return;
+  const message = document.getElementById('refundRespMessage').value.trim();
+  const verb = currentRefundAction === 'accept' ? 'Aceptando' : 'Denegando';
+  showNotification(`⏳ ${verb}...`, 'info');
+  try {
+    const res = await fetch(`/api/refund-requests/${currentRefundId}/respond`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId: currentUserId, action: currentRefundAction, message })
+    });
+    if (res.ok) {
+      showNotification(currentRefundAction === 'accept' ? '✅ Reembolso aceptado' : '✅ Reembolso denegado', 'success');
+      closeRefundResponseModal();
+      loadRefundRequests();
+      loadStats();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showNotification('Error: ' + (err.error || 'No se pudo procesar'), 'error');
+    }
+  } catch(e) { showNotification('Error de conexión', 'error'); }
+}
+
 
 function viewScreenshot(paymentId, telegramId, plan, amount, date, screenshotUrl, method) {
   currentPaymentId = paymentId;
@@ -1359,7 +1476,7 @@ async function loadGamesStats() {
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────
-const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos' };
+const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos' };
 
 function switchTab(name) {
   stopBroadcastPolling(); // detener polling al cambiar de pestaña
@@ -1375,6 +1492,7 @@ function switchTab(name) {
     stats: loadStats,
     pending: loadPendingPayments,
     approved: loadApprovedPayments,
+    refunds: loadRefundRequests,
     'trial-pending': loadPendingTrials,
     'trial-files': () => { buildPoolCards(); loadAllTrialPools(); },
     users: loadUsers,
