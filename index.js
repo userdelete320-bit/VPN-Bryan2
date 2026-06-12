@@ -1831,6 +1831,7 @@ bot.action('copy_referral_link', async (ctx) => {
 bot.action('politicas', async (ctx) => {
   try {
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
+    const userId = ctx.from.id.toString();
     await ctx.answerCbQuery();
     await ctx.reply(getPoliticasHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("TÉRMINOS DE SERVICIO", wa(`${webappUrl}/politicas.html?section=terminos`, ctx))], [createButton("POLÍTICA DE REEMBOLSO", wa(`${webappUrl}/politicas.html?section=reembolso`, ctx))], [createButton("POLÍTICA DE PRIVACIDAD", wa(`${webappUrl}/politicas.html?section=privacidad`, ctx))], [createButton("🔄 Solicitar Reembolso", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
