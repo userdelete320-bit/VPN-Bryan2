@@ -484,6 +484,9 @@ select option{background:var(--ink)}
   <div class="detail-grid"><div class="detail-item"><div class="detail-lbl">Usuario</div><div class="detail-val" id="refundRespUser"></div></div><div class="detail-item"><div class="detail-lbl">Plan</div><div class="detail-val" id="refundRespPlan"></div></div></div>
   <div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-2);margin:14px 0 6px">Mensaje para el usuario (opcional — si lo dejas vacío se enviará el mensaje predeterminado)</div>
   <textarea id="refundRespMessage" rows="5" placeholder="Escribe aquí un mensaje personalizado, o deja vacío para usar el predeterminado..." style="width:100%;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--txt);padding:10px;font-family:var(--f-mono);font-size:.75rem;resize:vertical"></textarea>
+  <div class="upload-zone" onclick="document.getElementById('refundProofFile').click()" style="margin-top:10px"><i class="fas fa-receipt"></i><div class="uz-title">Adjuntar comprobante (opcional)</div><div class="uz-sub">Captura del pago/transferencia · JPG, PNG, WebP</div></div>
+  <input type="file" id="refundProofFile" accept="image/jpeg,image/png,image/webp,image/gif" hidden onchange="handleRefundProofChange(event)">
+  <div id="refundProofPreview" style="margin-top:8px"></div>
   <div id="refundRespPreview" style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-2);margin-top:10px;padding:10px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;line-height:1.5"></div>
   <button class="btn" id="refundRespConfirmBtn" style="margin-top:14px;width:100%" onclick="confirmRefundResponse()"><i class="fas fa-paper-plane"></i> <span>Enviar respuesta</span></button>
   </div>
@@ -691,6 +694,8 @@ function openRefundResponseModal(id, action, telegramId, firstName, planName) {
   document.getElementById('refundRespUser').textContent = `${firstName} (${telegramId})`;
   document.getElementById('refundRespPlan').textContent = planName;
   document.getElementById('refundRespMessage').value = '';
+  document.getElementById('refundProofFile').value = '';
+  document.getElementById('refundProofPreview').innerHTML = '';
   document.getElementById('refundRespConfirmBtn').className = action === 'accept' ? 'btn green' : 'btn red';
   updateRefundPreview();
   document.getElementById('refundRespMessage').oninput = updateRefundPreview;
@@ -709,6 +714,14 @@ function updateRefundPreview() {
   }
 }
 
+function handleRefundProofChange(e) {
+  const file = e.target.files[0];
+  const preview = document.getElementById('refundProofPreview');
+  if (!file) { preview.innerHTML = ''; return; }
+  const url = URL.createObjectURL(file);
+  preview.innerHTML = `<div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-2);margin-bottom:4px"><i class="fas fa-check-circle" style="color:var(--green)"></i> ${file.name}</div><img src="${url}" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border)">`;
+}
+
 function closeRefundResponseModal() {
   document.getElementById('refundResponseModal').classList.remove('active');
   currentRefundId = null; currentRefundAction = null;
@@ -717,12 +730,18 @@ function closeRefundResponseModal() {
 async function confirmRefundResponse() {
   if (!currentRefundId || !currentRefundAction) return;
   const message = document.getElementById('refundRespMessage').value.trim();
+  const proofFile = document.getElementById('refundProofFile').files[0];
   const verb = currentRefundAction === 'accept' ? 'Aceptando' : 'Denegando';
   showNotification(`⏳ ${verb}...`, 'info');
   try {
+    const fd = new FormData();
+    fd.append('adminId', currentUserId);
+    fd.append('action', currentRefundAction);
+    fd.append('message', message);
+    if (proofFile) fd.append('refundProof', proofFile);
+
     const res = await fetch(`/api/refund-requests/${currentRefundId}/respond`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminId: currentUserId, action: currentRefundAction, message })
+      method: 'POST', body: fd
     });
     if (res.ok) {
       showNotification(currentRefundAction === 'accept' ? '✅ Reembolso aceptado' : '✅ Reembolso denegado', 'success');
