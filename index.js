@@ -319,7 +319,7 @@ const upload = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
-    if (file.fieldname === 'screenshot') {
+    if (file.fieldname === 'screenshot' || file.fieldname === 'refundProof') {
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
       if (allowedTypes.includes(file.mimetype)) cb(null, true);
       else cb(new Error('Solo se permiten imágenes JPG, PNG, GIF o WebP'));
@@ -1768,17 +1768,28 @@ app.get('/api/refund-requests', async (req, res) => {
 });
 
 // Responder a una solicitud de reembolso (aceptar/denegar) con mensaje del admin
-app.post('/api/refund-requests/:id/respond', async (req, res) => {
+app.post('/api/refund-requests/:id/respond', upload.single('refundProof'), async (req, res) => {
   try {
     const { adminId, action, message } = req.body;
-    if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
-    if (!['accept', 'reject'].includes(action)) return res.status(400).json({ error: 'Acción inválida' });
+    if (!isAdmin(adminId)) { if (req.file?.path) fs.unlink(req.file.path, () => {}); return res.status(403).json({ error: 'No autorizado' }); }
+    if (!['accept', 'reject'].includes(action)) { if (req.file?.path) fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Acción inválida' }); }
 
     const payment = await db.getPayment(req.params.id);
-    if (!payment) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    if (!payment) { if (req.file?.path) fs.unlink(req.file.path, () => {}); return res.status(404).json({ error: 'Solicitud no encontrada' }); }
 
     const telegramId = String(payment.telegram_id);
     const planName = payment.refund_plan_name || getPlanName(payment.plan);
+
+    // Subir comprobante si se adjuntó
+    let proofUrl = null;
+    if (req.file) {
+      try {
+        proofUrl = await db.uploadImage(req.file.path, telegramId);
+        fs.unlink(req.file.path, () => {});
+      } catch (e) {
+        proofUrl = `/uploads/${req.file.filename}`;
+      }
+    }
 
     if (action === 'accept') {
       await db.removeVIP(telegramId);
@@ -1786,27 +1797,41 @@ app.post('/api/refund-requests/:id/respond', async (req, res) => {
         status: 'refunded',
         refunded_at: new Date().toISOString(),
         refunded_by: adminId,
-        refund_response_message: message || ''
+        refund_response_message: message || '',
+        refund_proof_url: proofUrl || null
       });
 
       const finalMsg = message && message.trim()
         ? message.trim()
         : `✅ <b>Su solicitud de reembolso fue aceptada</b>\n\nSu plan <b>${planName}</b> ha sido cancelado y el reembolso se procesará por su método de pago original en las próximas horas.\n\nGracias por su paciencia.`;
 
-      try { await bot.telegram.sendMessage(telegramId, finalMsg, { parse_mode: 'HTML' }); } catch(e) {}
+      try {
+        if (proofUrl) {
+          await bot.telegram.sendPhoto(telegramId, proofUrl, { caption: finalMsg, parse_mode: 'HTML' });
+        } else {
+          await bot.telegram.sendMessage(telegramId, finalMsg, { parse_mode: 'HTML' });
+        }
+      } catch(e) {}
     } else {
       await db.updatePayment(req.params.id, {
         status: 'approved',
         refund_rejected_at: new Date().toISOString(),
         refund_rejected_by: adminId,
-        refund_response_message: message || ''
+        refund_response_message: message || '',
+        refund_proof_url: proofUrl || null
       });
 
       const finalMsg = message && message.trim()
         ? message.trim()
         : `ℹ️ <b>Su solicitud de reembolso fue denegada</b>\n\nTras revisar su caso, no procede el reembolso según nuestra política de garantías. Su plan <b>${planName}</b> sigue activo con normalidad.\n\nSi tiene dudas, contacte con soporte.`;
 
-      try { await bot.telegram.sendMessage(telegramId, finalMsg, { parse_mode: 'HTML' }); } catch(e) {}
+      try {
+        if (proofUrl) {
+          await bot.telegram.sendPhoto(telegramId, proofUrl, { caption: finalMsg, parse_mode: 'HTML' });
+        } else {
+          await bot.telegram.sendMessage(telegramId, finalMsg, { parse_mode: 'HTML' });
+        }
+      } catch(e) {}
     }
 
     res.json({ success: true });
