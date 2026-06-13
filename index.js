@@ -1980,7 +1980,13 @@ bot.start(async (ctx) => {
     } catch (error) { console.error('Error guardando usuario:', error); }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
-    await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
+    try {
+        const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
+        await bot.telegram.sendAnimation(ctx.chat.id, `${webappUrl}/assets/vpncuba-premium.gif`, { caption: welcomeMessage, parse_mode: 'Markdown', ...keyboard });
+    } catch (e) {
+        console.error('Error enviando GIF de bienvenida:', e);
+        await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
+    }
 });
 
 bot.command('help', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id, ctx.from.first_name, isAdmin(ctx.from.id)); await ctx.reply('🆘 *Ayuda de VPN Cuba*\n\nUsa los botones para navegar.', { parse_mode: 'Markdown', ...keyboard }); });
