@@ -1982,8 +1982,8 @@ bot.start(async (ctx) => {
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
     try {
-        const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
-        await bot.telegram.sendAnimation(ctx.chat.id, `${webappUrl}/assets/vpncuba-premium.gif`, { caption: welcomeMessage, parse_mode: 'Markdown', ...keyboard });
+        const gifPath = path.join(__dirname, 'assets', 'vpncuba-premium.gif');
+        await bot.telegram.sendAnimation(ctx.chat.id, { source: gifPath }, { caption: welcomeMessage, parse_mode: 'Markdown', ...keyboard });
     } catch (e) {
         console.error('Error enviando GIF de bienvenida:', e);
         await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
