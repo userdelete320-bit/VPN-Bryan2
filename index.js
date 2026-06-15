@@ -907,7 +907,7 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
 
     if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
 
-    await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.filename, config_sent_by: adminId });
+    await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.originalname, config_sent_by: adminId });
     if (user && !user.vip) await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
     fs.unlink(req.file.path, () => {});
     res.json({ success: true, message: 'Configuración enviada manualmente', filename: req.file.filename, telegramId: chatId });
