@@ -888,13 +888,13 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         await bot.telegram.sendDocument(chatId, { source: req.file.path, filename: req.file.originalname }, {
-          caption: `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu configuración VPN Cuba está lista!</b>\n\n` +
-                   `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${req.file.originalname}\n` +
-                   `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n` +
-                   `${payment.coupon_used ? `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}%)\n` : ''}` +
-                   `\n<b>Instrucciones:</b>\n1. Descarga este archivo\n2. ${fileName.endsWith('.conf') ? 'Importa el archivo .conf directamente' : 'Descomprime y luego importa el .conf'}\n3. Importa en WireGuard\n4. Activa la conexión\n5. ¡Disfruta! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
-          parse_mode: 'HTML'
-        });
+  caption: `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu configuración VPN Cuba está lista!</b>\n\n` +
+           `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${req.file.originalname}\n` +
+           `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n` +
+           `${payment.coupon_used ? `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}%)\n` : ''}` +
+           `\n<b>Instrucciones:</b>\n1. Descarga este archivo\n2. ${fileName.endsWith('.conf') ? 'Importa el archivo .conf directamente en WireGuard' : 'Descomprime y luego importa el archivo .conf en WireGuard'}\n3. Activa la conexión\n4. ¡Disfruta! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
+  parse_mode: 'HTML'
+});
         sent = true; break;
       } catch (retryErr) {
         lastTelegramError = retryErr;
