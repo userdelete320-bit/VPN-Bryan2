@@ -136,7 +136,7 @@ const STARS_PRICES = {
   
 
 const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t';
-const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/LPvCEZ7T20u47ShITic2p7';
+const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/JlRxfIjxlLI7aF4f9YRGJI';
 
 function isAdmin(userId) {
     return ADMIN_IDS.includes(userId.toString());
@@ -157,32 +157,32 @@ async function canSendMessageToUser(telegramId) {
 }
 
 const BUTTON_ICONS = {
-    'VER PLANES': '5983399041197675256',
-    'MI PERFIL': '6021659919835469581',
-    'DESCARGAR WIREGUARD': '5899757765743615694',
-    'SOPORTE': '6019320644422867543',
-    'REFERIDOS': '5944970130554359187',
-    'CÓMO FUNCIONA': '5873121512445187130',
-    'VPN CANAL': '5771695636411847302',
-    'POLÍTICAS': '6021738534916854774',
+    'VER PLANES': '5312361253610475399',
+    'MI PERFIL': '5197269100878907942',
+    'DESCARGAR WIREGUARD': '5443127283898405358',
+    'SOPORTE': '5337080053119336309',
+    'REFERIDOS': '5332724926216428039',
+    'CÓMO FUNCIONA': '5422439311196834318',
+    'VPN CANAL': '5332455502917949981',
+    'POLÍTICAS': '5444856076954520455',
     'WHATSAPP': '5935973359480213803',
-    'WHATSAPP G1': '6019328362479097179',   // Nuevo: emoji custom para Grupo 1
-    'WHATSAPP G2': '6019328362479097179',   // Nuevo: emoji custom para Grupo 2
-    'FAQ': '5879501875341955281',
+    'WHATSAPP G1': '5282843764451195532',
+    'WHATSAPP G2': '5282843764451195532',   // Nuevo: emoji custom para Grupo 2
+    'FAQ': '5443038326535759644',
     'PANEL ADMIN': '5839116473951328489',
-    'WINDOWS': '5933679370202778681',
-    'ANDROID': '5931415565955503486',
-    'IOS': '5931415565955503486',
+    'WINDOWS': '6005916300600152073',
+    'IOS': '5931544299010266023',
+    'ANDROID': '5931594395508805861',
     'CEO': '6021659919835469581',
     'ADMIN': '5839116473951328489',
     'MOD': '6021401276904905698',
     'COPIAR ENLACE': '5877465816030515018',
     'VER GUÍA COMPLETA': '6028435952299413210',
-    'TÉRMINOS DE SERVICIO': '6021744990252702234',
-    'POLÍTICA DE REEMBOLSO': '6021435576513730578',
-    'POLÍTICA DE PRIVACIDAD': '6021745995275048956',
+    'TÉRMINOS DE SERVICIO': '5440539497383087970',
+    'POLÍTICA DE REEMBOLSO': '5447203607294265305',
+    'POLÍTICA DE PRIVACIDAD': '5453902265922376865',
     'VER PREGUNTAS FRECUENTES': '5873121512445187130',
-    'MENÚ PRINCIPAL': '5984794970263018051',
+    'MENÚ PRINCIPAL': '5415655814079723871',
     'RENOVAR AHORA': '6019175208240289774',
     'ABRIR PANEL WEB': '5839116473951328489',
     'SAYKO': '5884179047482659474',
@@ -1932,7 +1932,14 @@ bot.action('main_menu', async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const keyboard = buildMainMenuKeyboard(userId, ctx.from.first_name, isAdmin(userId), isGroupCtx(ctx));
-  await ctx.reply('*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nSelecciona una opción:', { parse_mode: 'Markdown', ...keyboard });
+  await ctx.reply(
+`<tg-emoji emoji-id="5199814019325646173">🚀</tg-emoji> <b>VPN CUBA - MENÚ PRINCIPAL</b>
+
+<tg-emoji emoji-id="5406745015365943482">📋</tg-emoji> Selecciona una opción:`,
+{
+    parse_mode: 'HTML',
+    ...keyboard
+});
 });
 
 bot.action('copy_referral_link', async (ctx) => {
@@ -1980,18 +1987,33 @@ bot.start(async (ctx) => {
         await db.saveUser(userId.toString(), userData);
     } catch (error) { console.error('Error guardando usuario:', error); }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
-    let welcomeMessage = `¡Hola ${firstName || 'usuario'}! 👋\n\n*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nConéctate con la mejor latencia para gaming y navegación.\n\n${isGroup ? '' : (referrerId ? '👥 *¡Te invitó un amigo!*\n\n' : '')}${esAdmin ? '🔧 *Eres Administrador*\n\n' : ''}*Selecciona una opción:*`;
+    let welcomeMessage =
+`<tg-emoji emoji-id="5339262759794123186">👋</tg-emoji> ¡Hola @${ctx.from.username || firstName}
+
+<tg-emoji emoji-id="5199814019325646173">🚀</tg-emoji> <b>VPN CUBA - MENÚ PRINCIPAL</b>
+
+<tg-emoji emoji-id="5861561131226632101">⚡</tg-emoji> Conéctate con la mejor latencia para gaming y navegación.
+
+<tg-emoji emoji-id="5406745015365943482">📋</tg-emoji> Selecciona una opción:`;
     try {
         const gifPath = path.join(__dirname, 'assets', 'vpncuba-premium.gif');
-        await bot.telegram.sendAnimation(ctx.chat.id, { source: gifPath }, { caption: welcomeMessage, parse_mode: 'Markdown', ...keyboard });
+        await bot.telegram.sendAnimation(ctx.chat.id, { source: gifPath }, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
     } catch (e) {
         console.error('Error enviando GIF de bienvenida:', e);
-        await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
+        await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'HTML', ...keyboard });
     }
 });
 
 bot.command('help', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id, ctx.from.first_name, isAdmin(ctx.from.id)); await ctx.reply('🆘 *Ayuda de VPN Cuba*\n\nUsa los botones para navegar.', { parse_mode: 'Markdown', ...keyboard }); });
-bot.command('menu', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id.toString(), ctx.from.first_name, isAdmin(ctx.from.id)); await ctx.reply('*VPN CUBA - MENÚ PRINCIPAL* 🚀\n\nSelecciona una opción:', { parse_mode: 'Markdown', ...keyboard }); });
+bot.command('menu', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id.toString(), ctx.from.first_name, isAdmin(ctx.from.id)); 
+                                    await ctx.reply(
+`<tg-emoji emoji-id="5199814019325646173">🚀</tg-emoji> <b>VPN CUBA - MENÚ PRINCIPAL</b>
+
+<tg-emoji emoji-id="5406745015365943482">📋</tg-emoji> Selecciona una opción:`,
+{
+    parse_mode: 'HTML',
+    ...keyboard
+});
 bot.command('referidos', async (ctx) => {
   const userId = ctx.from.id;
   try {
