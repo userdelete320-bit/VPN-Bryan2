@@ -1688,8 +1688,8 @@ const REFUND_MOTIVOS = {
 
 app.post('/api/refund-request', async (req, res) => {
   try {
-    const { telegramId, paymentId, motivo, detalles, planName } = req.body;
-    if (!telegramId || !paymentId || !motivo) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
+    const { telegramId, paymentId, motivo, detalles, planName, refundDestination } = req.body;
+    if (!telegramId || !paymentId || !motivo || !refundDestination) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
 
     // Verificar que el pago existe y pertenece al usuario
     const payment = await db.getPayment(paymentId);
@@ -1708,28 +1708,29 @@ app.post('/api/refund-request', async (req, res) => {
 
     // Guardar la solicitud en el pago para que aparezca en el panel admin
     await db.updatePayment(paymentId, {
-      status: 'refund_pending',
-      refund_motivo: motivo,
-      refund_detalles: detalles || '',
-      refund_plan_name: planName || payment.plan,
-      refund_requested_at: new Date().toISOString()
-    });
+  status: 'refund_pending',
+  refund_motivo: motivo,
+  refund_detalles: detalles || '',
+  refund_plan_name: planName || payment.plan,
+  refund_requested_at: new Date().toISOString(),
+  refund_destination: refundDestination || null   // <-- nuevo campo
+});
 
     // Notificar a todos los admins
-    const adminMsg =
-      `🔴 *SOLICITUD DE REEMBOLSO*\n\n` +
-      `👤 *Usuario:* ${firstName}\n` +
-      `📱 *Telegram:* ${username}\n` +
-      `🆔 *ID:* ${telegramId}\n` +
-      `📋 *Plan:* ${planName || payment.plan}\n` +
-      `💳 *Método de pago:* ${payment.method}\n` +
-      `🔖 *ID de pago:* \`${paymentId}\`\n` +
-      `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
-      `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
-      `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
-      `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
-      `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
-
+    const adminMsg = `🔴 *SOLICITUD DE REEMBOLSO*\n\n` +
+  `👤 *Usuario:* ${firstName}\n` +
+  `📱 *Telegram:* ${username}\n` +
+  `🆔 *ID:* ${telegramId}\n` +
+  `📋 *Plan:* ${planName || payment.plan}\n` +
+  `💳 *Método de pago:* ${payment.method}\n` +
+  `🔖 *ID de pago:* \`${paymentId}\`\n` +
+  `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
+  `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
+  `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
+  `💰 *Destino del reembolso:* ${refundDestination || 'No especificado'}\n` +   // <-- línea añadida
+  `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
+  `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
+    
     for (const adminId of ADMIN_IDS) {
       try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch(e) {}
     }
