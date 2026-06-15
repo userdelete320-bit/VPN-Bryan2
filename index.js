@@ -603,7 +603,7 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
     console.error(`❌ Error en sendTrialConfigToUser para ${telegramId}:`, error.message);
     throw error;
   }
-        }
+        
 
 async function sendTrialToValidUsers(adminId) {
   try {
@@ -1760,18 +1760,16 @@ const REFUND_MOTIVOS = {
   otros: 'Otros motivos'
 };
 
-
-      app.post('/api/refund-request', upload.single('refundProof'), async (req, res) => {
+/////REFUND REQUEST /////
+app.post('/api/refund-request', upload.single('refundProof'), async (req, res) => {
   try {
     const { telegramId, paymentId, motivo, detalles, planName, refundDestination } = req.body;
 
-    // Validar campos obligatorios
     if (!telegramId || !paymentId || !motivo || !refundDestination) {
       if (req.file?.path) fs.unlink(req.file.path, () => {});
       return res.status(400).json({ success: false, error: 'Faltan parámetros obligatorios.' });
     }
 
-    // Verificar que el pago existe y pertenece al usuario
     const payment = await db.getPayment(paymentId);
     if (!payment) {
       if (req.file?.path) fs.unlink(req.file.path, () => {});
@@ -1782,7 +1780,6 @@ const REFUND_MOTIVOS = {
       return res.status(403).json({ success: false, error: 'No autorizado.' });
     }
 
-    // Verificar plazo de 48 horas desde la activación
     const activatedAt = new Date(payment.approved_at || payment.created_at).getTime();
     const hoursElapsed = (Date.now() - activatedAt) / 3600000;
     if (hoursElapsed > 48) {
@@ -1790,12 +1787,10 @@ const REFUND_MOTIVOS = {
       return res.status(400).json({ success: false, error: 'El plazo de 48 horas para solicitar reembolso ha expirado.' });
     }
 
-    // Obtener datos del usuario
     const user = await db.getUser(String(telegramId)).catch(() => null);
     const username = user?.username ? `@${user.username}` : 'Sin usuario';
     const firstName = user?.first_name || 'Usuario';
 
-    // Subir comprobante (si existe)
     let proofUrl = null;
     if (req.file) {
       try {
@@ -1806,7 +1801,6 @@ const REFUND_MOTIVOS = {
       }
     }
 
-    // Guardar la solicitud en la base de datos
     await db.updatePayment(paymentId, {
       status: 'refund_pending',
       refund_motivo: motivo,
@@ -1817,40 +1811,59 @@ const REFUND_MOTIVOS = {
       refund_proof_url: proofUrl || null
     });
 
-    // Notificar a todos los administradores
     const adminMsgText = `🔴 *SOLICITUD DE REEMBOLSO*\n\n` +
-  `👤 *Usuario:* ${firstName}\n` +
-  `📱 *Telegram:* ${username}\n` +
-  `🆔 *ID:* ${telegramId}\n` +
-  `📋 *Plan:* ${planName || payment.plan}\n` +
-  `💳 *Método de pago:* ${payment.method}\n` +
-  `🔖 *ID de pago:* \`${paymentId}\`\n` +
-  `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
-  `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
-  `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
-  `💰 *Destino del reembolso:* ${refundDestination || 'No especificado'}\n` +
-  `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
-  `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
+      `👤 *Usuario:* ${firstName}\n` +
+      `📱 *Telegram:* ${username}\n` +
+      `🆔 *ID:* ${telegramId}\n` +
+      `📋 *Plan:* ${planName || payment.plan}\n` +
+      `💳 *Método de pago:* ${payment.method}\n` +
+      `🔖 *ID de pago:* \`${paymentId}\`\n` +
+      `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
+      `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
+      `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
+      `💰 *Destino del reembolso:* ${refundDestination || 'No especificado'}\n` +
+      `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
+      `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
 
-for (const adminId of ADMIN_IDS) {
-  try {
-    if (proofUrl) {
-      // Detectar si es video por extensión o mime (asumimos que la URL termina en extensión)
-      const ext = (proofUrl.split('.').pop() || '').toLowerCase();
-      const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'gif'].includes(ext);
-      if (isVideo) {
-        await bot.telegram.sendVideo(adminId, proofUrl, { caption: adminMsgText, parse_mode: 'Markdown' });
-      } else {
-        await bot.telegram.sendPhoto(adminId, proofUrl, { caption: adminMsgText, parse_mode: 'Markdown' });
+    for (const adminId of ADMIN_IDS) {
+      try {
+        if (proofUrl) {
+          const ext = (proofUrl.split('.').pop() || '').toLowerCase();
+          const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'gif'].includes(ext);
+          if (isVideo) {
+            await bot.telegram.sendVideo(adminId, proofUrl, { caption: adminMsgText, parse_mode: 'Markdown' });
+          } else {
+            await bot.telegram.sendPhoto(adminId, proofUrl, { caption: adminMsgText, parse_mode: 'Markdown' });
+          }
+        } else {
+          await bot.telegram.sendMessage(adminId, adminMsgText, { parse_mode: 'Markdown' });
+        }
+      } catch(e) {
+        console.error(`Error notificando a admin ${adminId}:`, e.message);
       }
-    } else {
-      await bot.telegram.sendMessage(adminId, adminMsgText, { parse_mode: 'Markdown' });
     }
-  } catch(e) {
-    console.error(`Error notificando a admin ${adminId}:`, e.message);
+
+    // Confirmar al usuario
+    try {
+      await bot.telegram.sendMessage(telegramId,
+        `✅ <b>Solicitud de reembolso recibida</b>\n\n` +
+        `<b>Plan:</b> ${planName || payment.plan}\n` +
+        `<b>Motivo:</b> ${REFUND_MOTIVOS[motivo] || motivo}\n` +
+        `\nUn administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.`,
+        { parse_mode: 'HTML' }
+      );
+    } catch(e) {}
+
+    // ✅ RESPONDER AL CLIENTE
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('❌ Error en refund-request:', error);
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    res.status(500).json({ success: false, error: error.message });
   }
-}
 });
+  
 // Listar solicitudes de reembolso pendientes (panel admin)
 app.get('/api/refund-requests', async (req, res) => {
   try {
