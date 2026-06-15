@@ -190,8 +190,9 @@ textarea { resize: none; height: 90px; line-height: 1.5; }
         </select>
       </div>
       <div class="field-wrap">
-        <label class="field-label" for="detallesText">Detalles adicionales <span style="color:var(--muted)">(opcional)</span></label>
-        <textarea id="detallesText" placeholder="Cuéntanos qué ocurrió para ayudarte mejor..."></textarea>
+         <label class="field-label" for="refundDestination">Datos para el reembolso <span style="color:var(--neon)">(obligatorio)</span></label>
+         <textarea id="refundDestination" rows="2" placeholder="Ej: Número de tarjeta (BPA/Metropolitana), dirección USDT (BEP20), cuenta TON, o número de teléfono para saldo móvil..." required></textarea>
+         <div style="font-size:11px; color:var(--muted); margin-top:6px;">Necesitamos saber exactamente a dónde enviar tu dinero.</div>
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
@@ -284,7 +285,7 @@ function openModal(paymentId, planName) {
   currentPlanName = planName;
   document.getElementById('modalPlanName').textContent = planName;
   document.getElementById('motivoSelect').value = '';
-  document.getElementById('detallesText').value = '';
+  document.getElementById('refundDestination').value = '';
   document.getElementById('modalForm').style.display = 'block';
   document.getElementById('successScreen').style.display = 'none';
   document.getElementById('modalOverlay').classList.add('active');
@@ -296,6 +297,9 @@ function closeModal() {
 }
 
 async function submitRefund() {
+  const destination = document.getElementById('refundDestination').value.trim();
+  if (!destination) { alert('Por favor indica los datos para recibir el reembolso.'); return; }
+  
   const motivo = document.getElementById('motivoSelect').value;
   if (!motivo) { alert('Por favor selecciona un motivo.'); return; }
   const detalles = document.getElementById('detallesText').value.trim();
@@ -305,7 +309,14 @@ async function submitRefund() {
     const res = await fetch('/api/refund-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramId: currentUserId, paymentId: currentPaymentId, motivo, detalles, planName: currentPlanName })
+      body: JSON.stringify({ 
+            telegramId: currentUserId, 
+            paymentId: currentPaymentId, 
+            motivo, 
+            detalles, 
+            planName: currentPlanName,
+            refundDestination: destination   // <-- nuevo campo
+})
     });
     const data = await res.json();
     if (data.success) {
