@@ -1760,74 +1760,103 @@ const REFUND_MOTIVOS = {
   otros: 'Otros motivos'
 };
 
-app.post('/api/refund-request', async (req, res) => {
+
+      app.post('/api/refund-request', upload.single('refundProof'), async (req, res) => {
   try {
     const { telegramId, paymentId, motivo, detalles, planName, refundDestination } = req.body;
-    if (!telegramId || !paymentId || !motivo || !refundDestination) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
+
+    // Validar campos obligatorios
+    if (!telegramId || !paymentId || !motivo || !refundDestination) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ success: false, error: 'Faltan parámetros obligatorios.' });
+    }
 
     // Verificar que el pago existe y pertenece al usuario
     const payment = await db.getPayment(paymentId);
-    if (!payment) return res.status(404).json({ success: false, error: 'Pago no encontrado.' });
-    if (String(payment.telegram_id) !== String(telegramId)) return res.status(403).json({ success: false, error: 'No autorizado.' });
+    if (!payment) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+      return res.status(404).json({ success: false, error: 'Pago no encontrado.' });
+    }
+    if (String(payment.telegram_id) !== String(telegramId)) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+      return res.status(403).json({ success: false, error: 'No autorizado.' });
+    }
 
-    // Verificar plazo de 48 horas
+    // Verificar plazo de 48 horas desde la activación
     const activatedAt = new Date(payment.approved_at || payment.created_at).getTime();
     const hoursElapsed = (Date.now() - activatedAt) / 3600000;
-    if (hoursElapsed > 48) return res.status(400).json({ success: false, error: 'El plazo de 48 horas para solicitar reembolso ha expirado.' });
+    if (hoursElapsed > 48) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ success: false, error: 'El plazo de 48 horas para solicitar reembolso ha expirado.' });
+    }
 
     // Obtener datos del usuario
     const user = await db.getUser(String(telegramId)).catch(() => null);
     const username = user?.username ? `@${user.username}` : 'Sin usuario';
     const firstName = user?.first_name || 'Usuario';
 
-    // Guardar la solicitud en el pago para que aparezca en el panel admin
-    await db.updatePayment(paymentId, {
-  status: 'refund_pending',
-  refund_motivo: motivo,
-  refund_detalles: detalles || '',
-  refund_plan_name: planName || payment.plan,
-  refund_requested_at: new Date().toISOString(),
-  refund_destination: refundDestination || null   // <-- nuevo campo
-});
+    // Subir comprobante (si existe)
+    let proofUrl = null;
+    if (req.file) {
+      try {
+        proofUrl = await db.uploadImage(req.file.path, telegramId);
+        fs.unlink(req.file.path, () => {});
+      } catch (uploadError) {
+        proofUrl = `/uploads/${req.file.filename}`;
+      }
+    }
 
-    // Notificar a todos los admins
+    // Guardar la solicitud en la base de datos
+    await db.updatePayment(paymentId, {
+      status: 'refund_pending',
+      refund_motivo: motivo,
+      refund_detalles: detalles || '',
+      refund_plan_name: planName || payment.plan,
+      refund_requested_at: new Date().toISOString(),
+      refund_destination: refundDestination,
+      refund_proof_url: proofUrl || null
+    });
+
+    // Notificar a todos los administradores
     const adminMsg = `🔴 *SOLICITUD DE REEMBOLSO*\n\n` +
-  `👤 *Usuario:* ${firstName}\n` +
-  `📱 *Telegram:* ${username}\n` +
-  `🆔 *ID:* ${telegramId}\n` +
-  `📋 *Plan:* ${planName || payment.plan}\n` +
-  `💳 *Método de pago:* ${payment.method}\n` +
-  `🔖 *ID de pago:* \`${paymentId}\`\n` +
-  `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
-  `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
-  `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
-  `💰 *Destino del reembolso:* ${refundDestination || 'No especificado'}\n` +   // <-- línea añadida
-  `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
-  `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
-    
+      `👤 *Usuario:* ${firstName}\n` +
+      `📱 *Telegram:* ${username}\n` +
+      `🆔 *ID:* ${telegramId}\n` +
+      `📋 *Plan:* ${planName || payment.plan}\n` +
+      `💳 *Método de pago:* ${payment.method}\n` +
+      `🔖 *ID de pago:* \`${paymentId}\`\n` +
+      `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
+      `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
+      `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
+      `💰 *Destino del reembolso:* ${refundDestination}\n` +
+      (proofUrl ? `📎 *Comprobante adjunto:* ${proofUrl}\n` : '') +
+      `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
+      `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
+
     for (const adminId of ADMIN_IDS) {
       try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch(e) {}
     }
 
-    // Confirmar al usuario por Telegram
+    // Confirmar al usuario
     try {
       await bot.telegram.sendMessage(telegramId,
         `✅ <b>Solicitud de reembolso recibida</b>\n\n` +
         `<b>Plan:</b> ${planName || payment.plan}\n` +
-        `<b>Motivo:</b> ${REFUND_MOTIVOS[motivo] || motivo}\n\n` +
-        `Un administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.\n\n` +
+        `<b>Motivo:</b> ${REFUND_MOTIVOS[motivo] || motivo}\n` +
+        (proofUrl ? `\n<b>Comprobante adjunto:</b> ✅ recibido\n` : '') +
+        `\nUn administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.\n\n` +
         `<i>Si tienes alguna duda adicional, contacta con soporte.</i>`,
         { parse_mode: 'HTML' }
       );
     } catch(e) {}
 
     res.json({ success: true });
-  } catch(error) {
+  } catch (error) {
     console.error('❌ Error en refund-request:', error);
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
 // Listar solicitudes de reembolso pendientes (panel admin)
 app.get('/api/refund-requests', async (req, res) => {
   try {
