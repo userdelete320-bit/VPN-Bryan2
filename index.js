@@ -2013,7 +2013,8 @@ bot.command('menu', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.
 {
     parse_mode: 'HTML',
     ...keyboard
-});
+}); 
+                  });
 bot.command('referidos', async (ctx) => {
   const userId = ctx.from.id;
   try {
