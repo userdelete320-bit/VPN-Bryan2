@@ -190,9 +190,17 @@ textarea { resize: none; height: 90px; line-height: 1.5; }
         </select>
       </div>
       <div class="field-wrap">
-         <label class="field-label" for="refundDestination">Datos para el reembolso <span style="color:var(--neon)">(obligatorio)</span></label>
-         <textarea id="refundDestination" rows="2" placeholder="Ej: Número de tarjeta (BPA/Metropolitana), dirección USDT (BEP20), cuenta TON, o número de teléfono para saldo móvil..." required></textarea>
-         <div style="font-size:11px; color:var(--muted); margin-top:6px;">Necesitamos saber exactamente a dónde enviar tu dinero.</div>
+        <label class="field-label" for="detallesText">Detalles adicionales (opcional)</label>
+        <textarea id="detallesText" placeholder="Cuéntanos qué ocurrió para ayudarte mejor..."></textarea>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label" for="refundDestination">Datos para el reembolso (obligatorio)</label>
+        <textarea id="refundDestination" rows="2" placeholder="Ej: Número de tarjeta (BPA/Metropolitana), dirección USDT (BEP20), cuenta TON, o número de teléfono para saldo móvil..." required></textarea>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label" for="refundPhoto">Adjuntar comprobante o evidencia (opcional)</label>
+        <input type="file" id="refundPhoto" accept="image/*,video/*">
+        <div style="font-size:11px; color:var(--muted); margin-top:6px;">Puedes subir capturas de errores, logs o cualquier evidencia.</div>
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
@@ -297,26 +305,29 @@ function closeModal() {
 }
 
 async function submitRefund() {
-  const destination = document.getElementById('refundDestination').value.trim();
-  if (!destination) { alert('Por favor indica los datos para recibir el reembolso.'); return; }
-  
   const motivo = document.getElementById('motivoSelect').value;
   if (!motivo) { alert('Por favor selecciona un motivo.'); return; }
+  const destino = document.getElementById('refundDestination').value.trim();
+  if (!destino) { alert('Por favor indica los datos para recibir el reembolso.'); return; }
   const detalles = document.getElementById('detallesText').value.trim();
+  const photoFile = document.getElementById('refundPhoto').files[0];
+
   const btn = document.getElementById('btnConfirm');
   btn.disabled = true; btn.textContent = 'Enviando...';
+
+  const formData = new FormData();
+  formData.append('telegramId', currentUserId);
+  formData.append('paymentId', currentPaymentId);
+  formData.append('motivo', motivo);
+  formData.append('detalles', detalles);
+  formData.append('planName', currentPlanName);
+  formData.append('refundDestination', destino);
+  if (photoFile) formData.append('refundProof', photoFile);
+
   try {
     const res = await fetch('/api/refund-request', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-            telegramId: currentUserId, 
-            paymentId: currentPaymentId, 
-            motivo, 
-            detalles, 
-            planName: currentPlanName,
-            refundDestination: destination   // <-- nuevo campo
-})
+      body: formData
     });
     const data = await res.json();
     if (data.success) {
