@@ -931,7 +931,7 @@ body::after {
         <div class="payment-info-box">
           <div class="pib-label"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/></svg> MÓVIL A CONFIRMAR</div>
           <div class="pib-val">52072775</div>
-          <button class="copy-btn" onclick="copyText('63806513',this)">COPIAR NÚMERO</button>
+          <button class="copy-btn" onclick="copyText('52072775',this)">COPIAR NÚMERO</button>
         </div>
         <div class="method-info-note"><span class="ni">ℹ</span> Incluye el número de confirmación de la transacción en el comprobante de pago.</div>
       </div>
@@ -1329,17 +1329,12 @@ function goToStep(n) {
 function goBack() { if(currentStep > 1) goToStep(currentStep - 1); }
 
 function switchTab(id) {
-  document.querySelectorAll('.method-tab').forEach((t,i)=>{
-    const ids=['bpa','movil','usdt','stars'];
-    t.classList.toggle('active', ids[i]===id);
+  const ids = ['bpa', 'movil', 'usdt', 'stars', 'metropolitan'];
+  document.querySelectorAll('.method-tab').forEach((t, i) => {
+    t.classList.toggle('active', ids[i] === id);
   });
-  document.querySelectorAll('.method-panel').forEach(p=>p.classList.remove('active'));
-  const panel = document.getElementById('tab-'+id);
-  if (panel) panel.classList.add('active');
-}
-  
-  document.querySelectorAll('.method-panel').forEach(p=>p.classList.remove('active'));
-  const panel = document.getElementById('tab-'+id);
+  document.querySelectorAll('.method-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-' + id);
   if (panel) panel.classList.add('active');
 }
 
