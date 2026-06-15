@@ -163,7 +163,7 @@ async function canSendMessageToUser(telegramId) {
 const BUTTON_ICONS = {
     'VER PLANES': '5312361253610475399',
     'MI PERFIL': '5197269100878907942',
-    'DESCARGAR WIREGUARD': '5443127283898405358',
+    'DESCARGAR VPN': '5443127283898405358',
     'SOPORTE': '5337080053119336309',
     'REFERIDOS': '5332724926216428039',
     'CÓMO FUNCIONA': '5422439311196834318',
@@ -173,7 +173,7 @@ const BUTTON_ICONS = {
     'WHATSAPP G1': '5282843764451195532',
     'WHATSAPP G2': '5282843764451195532',   // Nuevo: emoji custom para Grupo 2
     'FAQ': '5443038326535759644',
-    'PANEL ADMIN': '5839116473951328489',
+    'PANEL ADMIN': '6325570573044815610',
     'WINDOWS': '6005916300600152073',
     'IOS': '5931544299010266023',
     'ANDROID': '5931594395508805861',
@@ -220,7 +220,7 @@ function getVipStatusHtml(user) {
 }
 
 function getDownloadWireguardHtml() {
-    return `<tg-emoji emoji-id="6019168392127190964">💻</tg-emoji> <b>DESCARGAR WIREGUARD</b> <tg-emoji emoji-id="6019099814384378473">📱</tg-emoji>\n\n` +
+    return `<tg-emoji emoji-id="6019168392127190964">💻</tg-emoji> <b>DESCARGAR VPN</b> <tg-emoji emoji-id="6019099814384378473">📱</tg-emoji>\n\n` +
            `<b>Para Windows</b>\nAplicación Oficial de WireGuard para Windows:\nEnlace: https://www.wireguard.com/install/\n\n` +
            `<b>Para Android</b>\nAplicación Oficial de WireGuard en Google Play Store:\nEnlace: https://play.google.com/store/apps/details?id=com.wireguard.android\n\n` +
            `<b>Para iOS (iPhone / iPad)</b>\nAplicación Oficial de WireGuard en App Store:\nEnlace: https://apps.apple.com/app/id1441195209\n\n` +
@@ -277,7 +277,7 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
             createButton("MI PERFIL", { callback_data: "check_status" })
         ],
         [
-            createButton("DESCARGAR WIREGUARD", { callback_data: "download_wireguard" }),
+            createButton("DESCARGAR VPN", { callback_data: "download_wireguard" }),
             createButton("SOPORTE", { callback_data: "show_support" })
         ],
         [
@@ -1818,44 +1818,38 @@ const REFUND_MOTIVOS = {
     });
 
     // Notificar a todos los administradores
-    const adminMsg = `🔴 *SOLICITUD DE REEMBOLSO*\n\n` +
-      `👤 *Usuario:* ${firstName}\n` +
-      `📱 *Telegram:* ${username}\n` +
-      `🆔 *ID:* ${telegramId}\n` +
-      `📋 *Plan:* ${planName || payment.plan}\n` +
-      `💳 *Método de pago:* ${payment.method}\n` +
-      `🔖 *ID de pago:* \`${paymentId}\`\n` +
-      `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
-      `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
-      `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
-      `💰 *Destino del reembolso:* ${refundDestination}\n` +
-      (proofUrl ? `📎 *Comprobante adjunto:* ${proofUrl}\n` : '') +
-      `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
-      `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
+    const adminMsgText = `🔴 *SOLICITUD DE REEMBOLSO*\n\n` +
+  `👤 *Usuario:* ${firstName}\n` +
+  `📱 *Telegram:* ${username}\n` +
+  `🆔 *ID:* ${telegramId}\n` +
+  `📋 *Plan:* ${planName || payment.plan}\n` +
+  `💳 *Método de pago:* ${payment.method}\n` +
+  `🔖 *ID de pago:* \`${paymentId}\`\n` +
+  `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
+  `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
+  `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
+  `💰 *Destino del reembolso:* ${refundDestination || 'No especificado'}\n` +
+  `📅 *Fecha solicitud:* ${new Date().toLocaleString('es-ES')}\n\n` +
+  `Procesa esta solicitud desde el Panel Admin → Reembolsos.`;
 
-    for (const adminId of ADMIN_IDS) {
-      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch(e) {}
+for (const adminId of ADMIN_IDS) {
+  try {
+    if (proofUrl) {
+      // Detectar si es video por extensión o mime (asumimos que la URL termina en extensión)
+      const ext = (proofUrl.split('.').pop() || '').toLowerCase();
+      const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'gif'].includes(ext);
+      if (isVideo) {
+        await bot.telegram.sendVideo(adminId, proofUrl, { caption: adminMsgText, parse_mode: 'Markdown' });
+      } else {
+        await bot.telegram.sendPhoto(adminId, proofUrl, { caption: adminMsgText, parse_mode: 'Markdown' });
+      }
+    } else {
+      await bot.telegram.sendMessage(adminId, adminMsgText, { parse_mode: 'Markdown' });
     }
-
-    // Confirmar al usuario
-    try {
-      await bot.telegram.sendMessage(telegramId,
-        `✅ <b>Solicitud de reembolso recibida</b>\n\n` +
-        `<b>Plan:</b> ${planName || payment.plan}\n` +
-        `<b>Motivo:</b> ${REFUND_MOTIVOS[motivo] || motivo}\n` +
-        (proofUrl ? `\n<b>Comprobante adjunto:</b> ✅ recibido\n` : '') +
-        `\nUn administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.\n\n` +
-        `<i>Si tienes alguna duda adicional, contacta con soporte.</i>`,
-        { parse_mode: 'HTML' }
-      );
-    } catch(e) {}
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Error en refund-request:', error);
-    if (req.file?.path) fs.unlink(req.file.path, () => {});
-    res.status(500).json({ success: false, error: error.message });
+  } catch(e) {
+    console.error(`Error notificando a admin ${adminId}:`, e.message);
   }
+}
 });
 // Listar solicitudes de reembolso pendientes (panel admin)
 app.get('/api/refund-requests', async (req, res) => {
