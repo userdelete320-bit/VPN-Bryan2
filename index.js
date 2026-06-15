@@ -1003,61 +1003,84 @@ app.get('/api/check-trial-eligibility/:telegramId', async (req, res) => {
 });
 
 // ==================== SOLICITUD DE PRUEBA ====================
-app.post('/api/request-trial', async (req, res) => {
-  try {
-    const { telegramId, username, firstName, trialType = '1h', gameServer, connectionType, trialPlanType } = req.body;
 
-    // Verificar lock para evitar solicitudes duplicadas en menos de 15 segundos
-    const now = Date.now();
-    const lastRequest = pendingTrialLocks.get(telegramId);
-    if (lastRequest && (now - lastRequest) < 15000) {
-      return res.status(429).json({ error: 'Ya hay una solicitud de prueba en proceso. Espera 15 segundos.' });
-    }
-    pendingTrialLocks.set(telegramId, now);
-    
+    // ==================== SOLICITUD DE PRUEBA ====================
+app.post('/api/request-trial', async (req, res) => {
+  const { telegramId, username, firstName, trialType = '1h', gameServer, connectionType, trialPlanType } = req.body;
+
+  // Verificar lock para evitar solicitudes duplicadas en menos de 15 segundos
+  const now = Date.now();
+  const lastRequest = pendingTrialLocks.get(telegramId);
+  if (lastRequest && (now - lastRequest) < 15000) {
+    return res.status(429).json({ error: 'Ya hay una solicitud de prueba en proceso. Espera 15 segundos.' });
+  }
+  pendingTrialLocks.set(telegramId, now);
+
+  try {
+    // 1. Verificar elegibilidad
     const eligibility = await db.checkTrialEligibility(telegramId);
-    if (!eligibility.eligible) return res.status(400).json({ error: `No puedes solicitar una prueba: ${eligibility.reason}` });
+    if (!eligibility.eligible) {
+      pendingTrialLocks.delete(telegramId);
+      return res.status(400).json({ error: `No puedes solicitar una prueba: ${eligibility.reason}` });
+    }
 
     const selectedPlan = getPlanLabel(trialPlanType) || 'No especificado';
 
+    // 2. Guardar la solicitud en BD
     const updatedUser = await db.saveUser(telegramId, {
-      telegram_id: telegramId, username, first_name: firstName,
-      trial_requested: true, trial_requested_at: new Date().toISOString(),
+      telegram_id: telegramId,
+      username,
+      first_name: firstName,
+      trial_requested: true,
+      trial_requested_at: new Date().toISOString(),
       trial_plan_type: trialPlanType || 'basico',
       trial_game_server: gameServer || '',
       trial_connection_type: connectionType || '',
       is_active: true
     });
 
+    // 3. Notificar a los administradores
     const adminMessage = `🎯 *NUEVA SOLICITUD DE PRUEBA*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username ? `@${username}` : 'Sin usuario'}\n🆔 *ID:* ${telegramId}\n🎮 *Juego/Servidor:* ${gameServer || 'No especificado'}\n📡 *Conexión:* ${connectionType || 'No especificado'}\n📋 *Plan a probar:* ${selectedPlan}\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
-    for (const adminId of ADMIN_IDS) { try { await bot.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' }); } catch (e) {} }
-    // Al final, eliminar el lock (tanto si falla como si tiene éxito)
-    pendingTrialLocks.delete(telegramId);
-  } catch (error) {
-    pendingTrialLocks.delete(req.body.telegramId);
-    
-    let sentSuccessfully = false, sendError = null;
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' }); } catch (e) {}
+    }
+
+    // 4. Intentar enviar la configuración automáticamente
+    let autoSent = false;
+    let sendError = null;
     try {
       const canSend = await canSendMessageToUser(telegramId);
-      if (!canSend.canSend) throw new Error(`Usuario no disponible: ${canSend.reason}`);
-      await sendTrialConfigToUser(telegramId, 'system');
-      sentSuccessfully = true;
-    } catch (error) { sendError = error; console.error(`❌ Error en envío automático a ${telegramId}:`, error.message); }
+      if (canSend.canSend) {
+        await sendTrialConfigToUser(telegramId, 'system');
+        autoSent = true;
+      } else {
+        sendError = new Error(`Usuario no disponible: ${canSend.reason}`);
+      }
+    } catch (err) {
+      sendError = err;
+      console.error(`❌ Error en envío automático a ${telegramId}:`, err.message);
+    }
 
-    if (sentSuccessfully) {
+    // 5. Responder al usuario según resultado
+    if (autoSent) {
       await bot.telegram.sendMessage(telegramId,
         `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu prueba gratuita ya está aquí!</b>\n\nAcabo de enviarte el archivo de configuración para el plan <b>${selectedPlan}</b>.\nRevísalo en este mismo chat y actívalo en WireGuard.\n\n<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Plan probado:</b> ${selectedPlan}\n¡Disfruta de baja latencia! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
-        { parse_mode: 'HTML' });
+        { parse_mode: 'HTML' }
+      );
       res.json({ success: true, message: 'Prueba gratuita enviada automáticamente.', trialPlanType, user: updatedUser, autoSent: true });
     } else {
       await bot.telegram.sendMessage(telegramId,
         `<tg-emoji emoji-id="6019175208240289774">✅</tg-emoji> <b>Solicitud de prueba recibida</b>\n\nTu solicitud para el plan <b>${selectedPlan}</b> ha sido registrada. Un administrador te enviará la configuración en breve.\n\n¡Gracias por probar VPN Cuba!`,
-        { parse_mode: 'HTML' });
+        { parse_mode: 'HTML' }
+      );
       res.json({ success: true, message: 'Solicitud registrada. Recibirás la configuración en breve.', trialPlanType, user: updatedUser, autoSent: false, error: sendError?.message });
     }
   } catch (error) {
     console.error('❌ Error en solicitud de prueba:', error);
     res.status(500).json({ error: 'Error procesando solicitud: ' + error.message });
+  } finally {
+    // Eliminar el lock siempre, incluso si hay error
+    pendingTrialLocks.delete(telegramId);
   }
 });
 
