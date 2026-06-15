@@ -1329,7 +1329,7 @@ function goToStep(n) {
 function goBack() { if(currentStep > 1) goToStep(currentStep - 1); }
 
 function switchTab(id) {
-  const ids = ['bpa', 'movil', 'usdt', 'stars', 'metropolitan'];
+  const ids = ['bpa', 'metropolitan', 'movil', 'usdt', 'stars'];
   document.querySelectorAll('.method-tab').forEach((t, i) => {
     t.classList.toggle('active', ids[i] === id);
   });
