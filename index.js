@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { Telegraf } = require('telegraf');
+// Tiempo de inicio del bot (para uptime)
+const START_TIME = Date.now();
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
@@ -1843,6 +1845,11 @@ app.post('/api/refund-requests/:id/respond', upload.single('refundProof'), async
 });
 
 // ==================== BOT DE TELEGRAM ====================
+// Middleware para registrar la última actividad del bot
+bot.use(async (ctx, next) => {
+  global.lastBotActivity = Date.now();
+  return next();
+});
 
 // Middleware: bloquear usuarios baneados
 bot.use(async (ctx, next) => {
@@ -2060,6 +2067,65 @@ bot.command('unban', async (ctx) => {
     try { await bot.telegram.sendMessage(targetId, `✅ <b>Tu ban ha sido levantado.</b>\n\nYa puedes usar VPN Cuba con normalidad.`, { parse_mode: 'HTML' }); } catch (e) {}
     await ctx.reply(`✅ Usuario <b>${user.first_name || targetId}</b> desbaneado.`, { parse_mode: 'HTML' });
   } catch (error) { await ctx.reply('❌ Error al desbanear: ' + error.message); }
+});
+
+bot.command('botstatus', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const esAdmin = isAdmin(userId);
+
+  if (!esAdmin) {
+    // Mensaje simple para usuarios normales
+    await ctx.reply(
+      `✅ <b>VPN CUBA Bot</b> está funcionando correctamente.\n\n` +
+      `Si experimentas problemas, contacta con nuestro soporte usando el botón "SOPORTE".`,
+      { parse_mode: 'HTML' }
+    );
+    return;
+  }
+
+  // ---------- A partir de aquí, solo para administradores ----------
+  // 1. Calcular uptime
+  const uptimeMs = Date.now() - START_TIME;
+  const uptimeSeg = Math.floor(uptimeMs / 1000);
+  const uptimeStr = `${Math.floor(uptimeSeg / 86400)}d ${Math.floor((uptimeSeg % 86400) / 3600)}h ${Math.floor((uptimeSeg % 3600) / 60)}m ${uptimeSeg % 60}s`;
+
+  // 2. Verificar conexión a Supabase y obtener estadísticas
+  let supabaseStatus = '❌ Sin conexión';
+  let totalUsers = 0;
+  let vipUsers = 0;
+  try {
+    const { count: total, error: errTotal } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+    if (!errTotal) totalUsers = total;
+
+    const { count: vip, error: errVip } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('vip', true);
+    if (!errVip) vipUsers = vip;
+
+    supabaseStatus = '✅ Conectado';
+  } catch (e) {
+    supabaseStatus = `⚠️ Error: ${e.message}`;
+  }
+
+  // 3. (Opcional) Última actividad global
+  const lastActivity = global.lastBotActivity
+    ? new Date(global.lastBotActivity).toLocaleString()
+    : 'No registrada';
+
+  // Construir mensaje para admin (sin webhook)
+  const mensajeAdmin =
+    `🤖 *ESTADO DEL BOT VPN CUBA*\n\n` +
+    `⏱️ *Uptime:* ${uptimeStr}\n` +
+    `🟢 *Supabase:* ${supabaseStatus}\n` +
+    `👥 *Usuarios totales:* ${totalUsers}\n` +
+    `👑 *Usuarios VIP:* ${vipUsers}\n` +
+    `🕒 *Última actividad:* ${lastActivity}\n\n` +
+    `_Versión: 2.0 | Servidor: ${process.env.WEBAPP_URL || 'localhost'}_`;
+
+  await ctx.reply(mensajeAdmin, { parse_mode: 'Markdown' });
 });
 
 bot.on('text', async (ctx) => {
