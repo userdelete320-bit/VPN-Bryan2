@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { Telegraf } = require('telegraf');
+// Control de solicitudes de prueba en curso (evita duplicados)
+const pendingTrialLocks = new Map(); // userId -> timestamp
 // Tiempo de inicio del bot (para uptime)
 const START_TIME = Date.now();
 const crypto = require('crypto');
@@ -486,7 +488,6 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
 
     const gameServer = user.trial_game_server || 'No especificado';
     const connectionType = user.trial_connection_type || 'No especificado';
-    // Determinar qué pool usar según el plan que pidió el usuario
     const trialPlanType = user.trial_plan_type || 'basico';
     const planLabel = getPlanLabel(trialPlanType);
 
@@ -514,7 +515,11 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       const dir = TRIAL_DIRS[trialPlanType] || TRIAL_DIRS['basico'];
       for (const ext of ['.conf', '.zip', '.rar']) {
         const testPath = path.join(dir, 'trial_current' + ext);
-        if (fs.existsSync(testPath)) { filePath = testPath; fileName = path.basename(testPath); break; }
+        if (fs.existsSync(testPath)) {
+          filePath = testPath;
+          fileName = `config_${trialPlanType}${ext}`; // nombre genérico legible
+          break;
+        }
       }
     }
 
@@ -534,7 +539,9 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
             const tempPath = path.join(dir, `trial_dl_${Date.now()}${ext}`);
             fs.writeFileSync(tempPath, Buffer.from(arrayBuf));
-            filePath = tempPath; fileName = chosen.original_name || path.basename(tempPath); fileId = chosen.id;
+            filePath = tempPath;
+            fileName = chosen.original_name || path.basename(tempPath);
+            fileId = chosen.id;
             console.log(`✅ Archivo descargado (${trialPlanType}): ${fileName}`);
           }
         }
@@ -547,68 +554,98 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       throw new Error(`No hay archivo de prueba disponible para el plan ${planLabel}. Sube uno en el panel de admin → Pool de Pruebas.`);
     }
 
-    const MAX_RETRIES = 3;
-    let lastError = null;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        await bot.telegram.sendDocument(
-          telegramId,
-          { source: filePath, filename: fileName },
-          {
-            caption: `<tg-emoji emoji-id="5875465628285931233">🎁</tg-emoji> <b>¡Tu prueba gratuita de VPN Cuba está lista!</b>\n\n` +
-                     `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${fileName}\n` +
-                     `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan probado:</b> ${planLabel}\n\n` +
-                     `<tg-emoji emoji-id="6021744990252702234">🎮</tg-emoji> <b>Juego/Servidor:</b> ${gameServer}\n` +
-                     `<tg-emoji emoji-id="6021744990252702234">📡</tg-emoji> <b>Conexión:</b> ${connectionType}\n\n` +
-                     `<b>Instrucciones de instalación:</b>\n` +
-                     `1. Descarga este archivo\n` +
-                     `2. Importa el archivo .conf en tu cliente WireGuard\n` +
-                     `3. Activa la conexión\n` +
-                     `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
-                     `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
-                     `<b>Importante:</b> Esta configuración expirará en 1 hora.`,
-            parse_mode: 'HTML'
-          }
-        );
-        await db.markTrialAsSent(telegramId, adminId);
-        console.log(`✅ Prueba ${planLabel} enviada a ${telegramId}: ${fileName} (intento ${attempt})`);
-
-        if (deleteAfterSend && fileId) {
-          try {
-            if (filePath && fs.existsSync(filePath)) { fs.unlinkSync(filePath); console.log(`🗑️ Archivo eliminado: ${filePath}`); }
-            await db.deleteTrialFileByPlan(trialPlanType, fileId);
-            console.log(`🗑️ Registro #${fileId} del pool ${trialPlanType} eliminado`);
-          } catch (delErr) { console.warn(`⚠️ No se pudo eliminar archivo #${fileId}:`, delErr.message); }
+    // ========== ENVÍO ÚNICO SIN REINTENTOS ==========
+    try {
+      await bot.telegram.sendDocument(
+        telegramId,
+        { source: filePath, filename: fileName },
+        {
+          caption: `<tg-emoji emoji-id="5875465628285931233">🎁</tg-emoji> <b>¡Tu prueba gratuita de VPN Cuba está lista!</b>\n\n` +
+                   `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${fileName}\n` +
+                   `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan probado:</b> ${planLabel}\n\n` +
+                   `<tg-emoji emoji-id="6021744990252702234">🎮</tg-emoji> <b>Juego/Servidor:</b> ${gameServer}\n` +
+                   `<tg-emoji emoji-id="6021744990252702234">📡</tg-emoji> <b>Conexión:</b> ${connectionType}\n\n` +
+                   `<b>Instrucciones de instalación:</b>\n` +
+                   `1. Descarga este archivo\n` +
+                   `2. Importa el archivo .conf en tu cliente WireGuard\n` +
+                   `3. Activa la conexión\n` +
+                   `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
+                   `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
+                   `<b>Importante:</b> Esta configuración expirará en 1 hora.`,
+          parse_mode: 'HTML'
         }
-        return true;
-      } catch (sendError) {
-        lastError = sendError;
-        const errorMsg = sendError.description || sendError.message || '';
-        console.warn(`⚠️ Intento ${attempt}/${MAX_RETRIES} fallido para ${telegramId}: ${errorMsg}`);
-        if (errorMsg.includes('chat not found') || errorMsg.includes('bot was blocked') ||
-            errorMsg.includes('user is deactivated') || errorMsg.includes('kicked') ||
-            sendError.response?.error_code === 403 || sendError.response?.error_code === 400) break;
-        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, attempt * 1500));
+      );
+      // Solo marcamos como enviado si realmente se envió
+      await db.markTrialAsSent(telegramId, adminId);
+      console.log(`✅ Prueba ${planLabel} enviada a ${telegramId}: ${fileName}`);
+
+      // Eliminar el archivo y el registro si se solicitó
+      if (deleteAfterSend && fileId) {
+        try {
+          if (filePath && fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`🗑️ Archivo eliminado: ${filePath}`);
+          }
+          await db.deleteTrialFileByPlan(trialPlanType, fileId);
+          console.log(`🗑️ Registro #${fileId} del pool ${trialPlanType} eliminado`);
+        } catch (delErr) {
+          console.warn(`⚠️ No se pudo eliminar archivo #${fileId}:`, delErr.message);
+        }
       }
+      return true;
+    } catch (sendError) {
+      // Error al enviar: NO se marca como enviado, se relanza para que quede pendiente
+      const errorMsg = sendError.description || sendError.message || '';
+      console.error(`❌ Error enviando prueba a ${telegramId}: ${errorMsg}`);
+      throw sendError;
     }
-    throw lastError || new Error('Error desconocido al enviar prueba');
   } catch (error) {
     console.error(`❌ Error en sendTrialConfigToUser para ${telegramId}:`, error.message);
     throw error;
   }
-}
+        }
 
 async function sendTrialToValidUsers(adminId) {
   try {
     console.log('🎯 Enviando pruebas a usuarios pendientes...');
     const pendingTrials = await db.getPendingTrials();
-    if (!pendingTrials || pendingTrials.length === 0) { console.log('📭 No hay pruebas pendientes'); return { success: true, message: 'No hay pruebas pendientes' }; }
-    let sentCount = 0, failedCount = 0, unavailableCount = 0;
+    if (!pendingTrials || pendingTrials.length === 0) {
+      console.log('📭 No hay pruebas pendientes');
+      return { success: true, message: 'No hay pruebas pendientes' };
+    }
+
+    let sentCount = 0;
+    let failedCount = 0;
+    let unavailableCount = 0;
+    const processedUsers = new Set(); // Evita duplicados en la misma ejecución
+
     for (let i = 0; i < pendingTrials.length; i++) {
       const user = pendingTrials[i];
+      const userId = user.telegram_id;
+
+      if (processedUsers.has(userId)) {
+        console.log(`⏭️ Usuario ${userId} ya fue procesado en esta ronda, omitiendo.`);
+        continue;
+      }
+
+      // Refrescar estado desde BD
+      let freshUser;
       try {
-        if (!user.telegram_id) { failedCount++; continue; }
-        await sendTrialConfigToUser(user.telegram_id, adminId, true);
+        freshUser = await db.getUser(userId);
+      } catch (err) {
+        console.warn(`⚠️ No se pudo obtener usuario actualizado ${userId}:`, err.message);
+        freshUser = user;
+      }
+
+      if (!freshUser || !freshUser.trial_requested || freshUser.trial_received) {
+        console.log(`⏭️ Usuario ${userId} ya no está pendiente, omitiendo.`);
+        continue;
+      }
+
+      processedUsers.add(userId);
+
+      try {
+        await sendTrialConfigToUser(userId, adminId, true);
         sentCount++;
         await new Promise(resolve => setTimeout(resolve, 80));
       } catch (error) {
@@ -618,11 +655,14 @@ async function sendTrialToValidUsers(adminId) {
                             errMsg.includes('user is deactivated') || errMsg.includes('kicked');
         if (isPermanent) {
           unavailableCount++;
-          try { await db.updateUser(user.telegram_id, { is_active: false, last_error: errMsg, updated_at: new Date().toISOString() }); } catch (e) {}
+          try {
+            await db.updateUser(userId, { is_active: false, last_error: errMsg, updated_at: new Date().toISOString() });
+          } catch (e) {}
         }
-        console.error(`❌ Error procesando prueba para ${user.telegram_id}:`, errMsg);
+        console.error(`❌ Error enviando prueba a ${userId}:`, errMsg);
       }
     }
+
     console.log(`✅ Envío completado: ${sentCount} enviadas, ${failedCount} fallidas, ${unavailableCount} no disponibles`);
     return { success: true, sent: sentCount, failed: failedCount, unavailable: unavailableCount, total: pendingTrials.length };
   } catch (error) {
@@ -630,7 +670,6 @@ async function sendTrialToValidUsers(adminId) {
     return { success: false, error: error.message };
   }
 }
-
 async function getAllUsersForBroadcast(target) {
   try {
     if (target !== 'all' && target !== 'active') {
@@ -968,6 +1007,14 @@ app.post('/api/request-trial', async (req, res) => {
   try {
     const { telegramId, username, firstName, trialType = '1h', gameServer, connectionType, trialPlanType } = req.body;
 
+    // Verificar lock para evitar solicitudes duplicadas en menos de 15 segundos
+    const now = Date.now();
+    const lastRequest = pendingTrialLocks.get(telegramId);
+    if (lastRequest && (now - lastRequest) < 15000) {
+      return res.status(429).json({ error: 'Ya hay una solicitud de prueba en proceso. Espera 15 segundos.' });
+    }
+    pendingTrialLocks.set(telegramId, now);
+    
     const eligibility = await db.checkTrialEligibility(telegramId);
     if (!eligibility.eligible) return res.status(400).json({ error: `No puedes solicitar una prueba: ${eligibility.reason}` });
 
@@ -984,7 +1031,11 @@ app.post('/api/request-trial', async (req, res) => {
 
     const adminMessage = `🎯 *NUEVA SOLICITUD DE PRUEBA*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username ? `@${username}` : 'Sin usuario'}\n🆔 *ID:* ${telegramId}\n🎮 *Juego/Servidor:* ${gameServer || 'No especificado'}\n📡 *Conexión:* ${connectionType || 'No especificado'}\n📋 *Plan a probar:* ${selectedPlan}\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`;
     for (const adminId of ADMIN_IDS) { try { await bot.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' }); } catch (e) {} }
-
+    // Al final, eliminar el lock (tanto si falla como si tiene éxito)
+    pendingTrialLocks.delete(telegramId);
+  } catch (error) {
+    pendingTrialLocks.delete(req.body.telegramId);
+    
     let sentSuccessfully = false, sendError = null;
     try {
       const canSend = await canSendMessageToUser(telegramId);
