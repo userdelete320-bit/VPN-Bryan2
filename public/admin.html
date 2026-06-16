@@ -1389,19 +1389,21 @@ function handleBroadcastMediaChange(event) {
 }
 
 async function sendBroadcast() {
-  // Validar que el admin esté identificado
-  if (!currentUserId) {
-    showNotification('❌ No se ha identificado al administrador. Recarga la página.', 'error');
-    return;
+  // Obtener adminId desde variable global o desde URL
+  let adminId = currentUserId;
+  if (!adminId) {
+    const urlParams = new URLSearchParams(window.location.search);
+    adminId = urlParams.get('userId');
+    if (!adminId) {
+      showNotification('❌ No se pudo identificar al administrador. Recarga la página.', 'error');
+      return;
+    }
+    currentUserId = adminId;
   }
   
   const message = document.getElementById('broadcastMessage').value.trim();
   const target = document.getElementById('broadcastTarget').value;
-  if (!message && !broadcastAttachment) { 
-    showNotification('❌ Escribe un mensaje o adjunta un archivo', 'error'); 
-    return; 
-  }
-  
+  if (!message && !broadcastAttachment) { showNotification('❌ Escribe un mensaje o adjunta un archivo', 'error'); return; }
   if (!confirm(`¿Enviar broadcast a "${target}"${broadcastAttachment ? ' con adjunto' : ''}?`)) return;
   
   const btn = document.getElementById('broadcastButton'); 
@@ -1414,16 +1416,14 @@ async function sendBroadcast() {
       const fd = new FormData();
       fd.append('message', message);
       fd.append('target', target);
-      fd.append('adminId', currentUserId); // currentUserId ya es string
+      fd.append('adminId', adminId);
       fd.append('mediaFile', broadcastAttachment, broadcastAttachment.name);
-      fd.append('mediaType', broadcastAttachment.type || '');
-      fd.append('mediaName', broadcastAttachment.name || '');
       res = await fetch('/api/broadcast/send', { method: 'POST', body: fd });
     } else {
       res = await fetch('/api/broadcast/send', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ message, target, adminId: currentUserId }) 
+        body: JSON.stringify({ message, target, adminId })
       });
     }
     const data = await res.json();
@@ -1441,7 +1441,7 @@ async function sendBroadcast() {
   }
   btn.disabled = false; 
   btn.innerHTML = '<i class="fas fa-paper-plane"></i> <span>Enviar broadcast</span>';
-  }
+}
   
 
 function startBroadcastPolling() {
