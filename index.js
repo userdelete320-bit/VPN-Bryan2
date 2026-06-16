@@ -1156,13 +1156,16 @@ app.get('/api/storage-status', async (req, res) => {
 });
 
 app.post('/api/broadcast/send', async (req, res) => {
+app.post('/api/broadcast/send', async (req, res) => {
   try {
-    const { message, target, adminId } = req.body;
+    let { message, target, adminId } = req.body;
     
-    // Validaciones estrictas
-    if (!adminId || typeof adminId !== 'string') {
-      return res.status(400).json({ error: 'ID de administrador no proporcionado o inválido' });
+    // Convertir adminId a string si viene como número o undefined
+    if (!adminId) {
+      return res.status(400).json({ error: 'ID de administrador no proporcionado' });
     }
+    adminId = String(adminId);
+    
     if (!isAdmin(adminId)) {
       return res.status(403).json({ error: 'No autorizado' });
     }
@@ -1185,12 +1188,7 @@ app.post('/api/broadcast/send', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'Broadcast creado', 
-      broadcast: { 
-        id: broadcast.id, 
-        target, 
-        total_users: users.length, 
-        status: 'pending' 
-      }, 
+      broadcast: { id: broadcast.id, target, total_users: users.length, status: 'pending' }, 
       totalUsers: users.length 
     });
   } catch (error) {
@@ -1198,7 +1196,6 @@ app.post('/api/broadcast/send', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 async function sendBroadcastToUsers(broadcastId, message, users, adminId) {
   try {
     if (!users?.length) { await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 }); return; }
