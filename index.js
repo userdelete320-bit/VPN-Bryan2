@@ -1158,17 +1158,45 @@ app.get('/api/storage-status', async (req, res) => {
 app.post('/api/broadcast/send', async (req, res) => {
   try {
     const { message, target, adminId } = req.body;
-    if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
-    if (!message?.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
+    
+    // Validaciones estrictas
+    if (!adminId || typeof adminId !== 'string') {
+      return res.status(400).json({ error: 'ID de administrador no proporcionado o inválido' });
+    }
+    if (!isAdmin(adminId)) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
+    }
+    
     const validTargets = ['all', 'vip', 'non_vip', 'trial_pending', 'trial_received', 'active', 'with_referrals', 'usdt_payers'];
-    if (!validTargets.includes(target)) return res.status(400).json({ error: 'Target de broadcast inválido' });
+    if (!validTargets.includes(target)) {
+      return res.status(400).json({ error: 'Target de broadcast inválido' });
+    }
+    
     const broadcast = await db.createBroadcast(message, target, adminId);
     if (!broadcast?.id) throw new Error('No se pudo crear el broadcast');
+    
     const users = await getAllUsersForBroadcast(target);
     await db.updateBroadcastStatus(broadcast.id, 'pending', { total_users: users.length });
     setImmediate(() => { sendBroadcastToUsers(broadcast.id, message, users, adminId); });
-    res.json({ success: true, message: 'Broadcast creado', broadcast: { id: broadcast.id, target, total_users: users.length, status: 'pending' }, totalUsers: users.length });
-  } catch (error) { res.status(500).json({ error: 'Error creando broadcast: ' + error.message }); }
+    
+    res.json({ 
+      success: true, 
+      message: 'Broadcast creado', 
+      broadcast: { 
+        id: broadcast.id, 
+        target, 
+        total_users: users.length, 
+        status: 'pending' 
+      }, 
+      totalUsers: users.length 
+    });
+  } catch (error) {
+    console.error('❌ Error en broadcast:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 async function sendBroadcastToUsers(broadcastId, message, users, adminId) {
