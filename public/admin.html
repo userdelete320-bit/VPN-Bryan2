@@ -583,7 +583,7 @@ async function checkAdminAccess() {
     const res = await fetch(`/api/check-admin/${userId}`);
     const data = await res.json();
     if (!data.isAdmin) { showNotification('❌ No eres administrador', 'error'); setTimeout(() => window.location.href = '/plans.html?userId=' + userId, 2000); return; }
-    isAdminUser = true; currentUserId = userId;
+    isAdminUser = true; currentUserId = userId.toString();
     document.getElementById('adminIdDisplay').textContent = '// ID: ' + userId;
     loadStats(); loadPlanFiles();
   } catch(e) { showNotification('❌ Error verificando admin', 'error'); }
@@ -1389,24 +1389,42 @@ function handleBroadcastMediaChange(event) {
 }
 
 async function sendBroadcast() {
+  // Validar que el admin esté identificado
+  if (!currentUserId) {
+    showNotification('❌ No se ha identificado al administrador. Recarga la página.', 'error');
+    return;
+  }
+  
   const message = document.getElementById('broadcastMessage').value.trim();
   const target = document.getElementById('broadcastTarget').value;
-  if (!message && !broadcastAttachment) { showNotification('❌ Escribe un mensaje o adjunta un archivo', 'error'); return; }
+  if (!message && !broadcastAttachment) { 
+    showNotification('❌ Escribe un mensaje o adjunta un archivo', 'error'); 
+    return; 
+  }
+  
   if (!confirm(`¿Enviar broadcast a "${target}"${broadcastAttachment ? ' con adjunto' : ''}?`)) return;
-  const btn = document.getElementById('broadcastButton'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+  
+  const btn = document.getElementById('broadcastButton'); 
+  btn.disabled = true; 
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+  
   try {
     let res;
     if (broadcastAttachment) {
       const fd = new FormData();
       fd.append('message', message);
       fd.append('target', target);
-      fd.append('adminId', currentUserId);
+      fd.append('adminId', currentUserId); // currentUserId ya es string
       fd.append('mediaFile', broadcastAttachment, broadcastAttachment.name);
       fd.append('mediaType', broadcastAttachment.type || '');
       fd.append('mediaName', broadcastAttachment.name || '');
       res = await fetch('/api/broadcast/send', { method: 'POST', body: fd });
     } else {
-      res = await fetch('/api/broadcast/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, target, adminId: currentUserId }) });
+      res = await fetch('/api/broadcast/send', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ message, target, adminId: currentUserId }) 
+      });
     }
     const data = await res.json();
     if (res.ok && data.success) {
@@ -1414,13 +1432,17 @@ async function sendBroadcast() {
       document.getElementById('broadcastMessage').value = '';
       clearBroadcastAttachment();
       loadBroadcasts();
-      startBroadcastPolling(); // iniciar polling
+      startBroadcastPolling();
     } else {
       showNotification(`❌ ${data.error||'Error al crear broadcast'}`, 'error');
     }
-  } catch(e) { showNotification('Error de red', 'error'); }
-  btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> <span>Enviar broadcast</span>';
-}
+  } catch(e) { 
+    showNotification('Error de red', 'error'); 
+  }
+  btn.disabled = false; 
+  btn.innerHTML = '<i class="fas fa-paper-plane"></i> <span>Enviar broadcast</span>';
+  }
+  
 
 function startBroadcastPolling() {
   if (broadcastPollingInterval) clearInterval(broadcastPollingInterval);
