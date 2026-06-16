@@ -481,7 +481,7 @@ async function initializeStorageBuckets() {
 }
 
 // ==================== ENVIAR PRUEBA (POOL POR PLAN) ====================
-async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true) {
+ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true) {
   try {
     const user = await db.getUser(telegramId);
     if (!user) throw new Error(`Usuario ${telegramId} no encontrado`);
@@ -517,7 +517,7 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
         const testPath = path.join(dir, 'trial_current' + ext);
         if (fs.existsSync(testPath)) {
           filePath = testPath;
-          fileName = `config_${trialPlanType}${ext}`; // nombre genérico legible
+          fileName = `config_${trialPlanType}${ext}`;
           break;
         }
       }
@@ -554,56 +554,50 @@ async function sendTrialConfigToUser(telegramId, adminId, deleteAfterSend = true
       throw new Error(`No hay archivo de prueba disponible para el plan ${planLabel}. Sube uno en el panel de admin → Pool de Pruebas.`);
     }
 
-    // ========== ENVÍO ÚNICO SIN REINTENTOS ==========
-    try {
-      await bot.telegram.sendDocument(
-        telegramId,
-        { source: filePath, filename: fileName },
-        {
-          caption: `<tg-emoji emoji-id="5875465628285931233">🎁</tg-emoji> <b>¡Tu prueba gratuita de VPN Cuba está lista!</b>\n\n` +
-                   `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${fileName}\n` +
-                   `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan probado:</b> ${planLabel}\n\n` +
-                   `<tg-emoji emoji-id="6021744990252702234">🎮</tg-emoji> <b>Juego/Servidor:</b> ${gameServer}\n` +
-                   `<tg-emoji emoji-id="6021744990252702234">📡</tg-emoji> <b>Conexión:</b> ${connectionType}\n\n` +
-                   `<b>Instrucciones de instalación:</b>\n` +
-                   `1. Descarga este archivo\n` +
-                   `2. Importa el archivo .conf en tu cliente WireGuard\n` +
-                   `3. Activa la conexión\n` +
-                   `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
-                   `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
-                   `<b>Importante:</b> Esta configuración expirará en 1 hora.`,
-          parse_mode: 'HTML'
-        }
-      );
-      // Solo marcamos como enviado si realmente se envió
-      await db.markTrialAsSent(telegramId, adminId);
-      console.log(`✅ Prueba ${planLabel} enviada a ${telegramId}: ${fileName}`);
-
-      // Eliminar el archivo y el registro si se solicitó
-      if (deleteAfterSend && fileId) {
-        try {
-          if (filePath && fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log(`🗑️ Archivo eliminado: ${filePath}`);
-          }
-          await db.deleteTrialFileByPlan(trialPlanType, fileId);
-          console.log(`🗑️ Registro #${fileId} del pool ${trialPlanType} eliminado`);
-        } catch (delErr) {
-          console.warn(`⚠️ No se pudo eliminar archivo #${fileId}:`, delErr.message);
-        }
+    // Envío único sin reintentos
+    await bot.telegram.sendDocument(
+      telegramId,
+      { source: filePath, filename: fileName },
+      {
+        caption: `<tg-emoji emoji-id="5875465628285931233">🎁</tg-emoji> <b>¡Tu prueba gratuita de VPN Cuba está lista!</b>\n\n` +
+                 `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${fileName}\n` +
+                 `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan probado:</b> ${planLabel}\n\n` +
+                 `<tg-emoji emoji-id="6021744990252702234">🎮</tg-emoji> <b>Juego/Servidor:</b> ${gameServer}\n` +
+                 `<tg-emoji emoji-id="6021744990252702234">📡</tg-emoji> <b>Conexión:</b> ${connectionType}\n\n` +
+                 `<b>Instrucciones de instalación:</b>\n` +
+                 `1. Descarga este archivo\n` +
+                 `2. Importa el archivo .conf en tu cliente WireGuard\n` +
+                 `3. Activa la conexión\n` +
+                 `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
+                 `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
+                 `<b>Importante:</b> Esta configuración expirará en 1 hora.`,
+        parse_mode: 'HTML'
       }
-      return true;
-    } catch (sendError) {
-      // Error al enviar: NO se marca como enviado, se relanza para que quede pendiente
-      const errorMsg = sendError.description || sendError.message || '';
-      console.error(`❌ Error enviando prueba a ${telegramId}: ${errorMsg}`);
-      throw sendError;
+    );
+
+    await db.markTrialAsSent(telegramId, adminId);
+    console.log(`✅ Prueba ${planLabel} enviada a ${telegramId}: ${fileName}`);
+
+    if (deleteAfterSend && fileId) {
+      try {
+        if (filePath && fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`🗑️ Archivo eliminado: ${filePath}`);
+        }
+        await db.deleteTrialFileByPlan(trialPlanType, fileId);
+        console.log(`🗑️ Registro #${fileId} del pool ${trialPlanType} eliminado`);
+      } catch (delErr) {
+        console.warn(`⚠️ No se pudo eliminar archivo #${fileId}:`, delErr.message);
+      }
     }
+    return true;
   } catch (error) {
     console.error(`❌ Error en sendTrialConfigToUser para ${telegramId}:`, error.message);
     throw error;
   }
-        
+      }
+      
+      
 
 async function sendTrialToValidUsers(adminId) {
   try {
