@@ -1156,7 +1156,6 @@ app.get('/api/storage-status', async (req, res) => {
 });
 
 app.post('/api/broadcast/send', async (req, res) => {
-app.post('/api/broadcast/send', async (req, res) => {
   try {
     let { message, target, adminId } = req.body;
     
@@ -1196,6 +1195,7 @@ app.post('/api/broadcast/send', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 async function sendBroadcastToUsers(broadcastId, message, users, adminId) {
   try {
     if (!users?.length) { await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 }); return; }
