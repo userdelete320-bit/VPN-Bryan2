@@ -111,9 +111,26 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const ADMIN_IDS = process.env.ADMIN_TELEGRAM_IDS ?
+const SUPER_ADMIN_ID = '6373481979'; // Jefe de todos los admins, no se puede quitar
+
+let ADMIN_IDS = process.env.ADMIN_TELEGRAM_IDS ?
     process.env.ADMIN_TELEGRAM_IDS.split(',').map(id => id.trim()) :
     ['6373481979', '5376388604', '6974850309', '7846534518', '8782244257'];
+
+// Carga la lista de admins desde Supabase (tabla bot_admins) y la fusiona con el super admin.
+async function loadAdminsFromDb() {
+    try {
+        const sb = getSbClient();
+        const { data, error } = await sb.from('bot_admins').select('telegram_id');
+        if (error) throw error;
+        const dbIds = (data || []).map(r => String(r.telegram_id));
+        const merged = Array.from(new Set([SUPER_ADMIN_ID, ...dbIds]));
+        ADMIN_IDS = merged;
+        console.log('✅ Admins cargados desde BD:', ADMIN_IDS);
+    } catch (e) {
+        console.error('❌ Error cargando admins desde BD (se usa lista por defecto):', e.message);
+    }
+}
 
 const USDT_CONFIG = {
     WALLET_ADDRESS: '0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2',
@@ -144,6 +161,10 @@ const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/JlRxfIjxlLI7aF4f9YRGJI';
 
 function isAdmin(userId) {
     return ADMIN_IDS.includes(userId.toString());
+}
+
+function isSuperAdmin(userId) {
+    return userId?.toString() === SUPER_ADMIN_ID;
 }
 
 async function canSendMessageToUser(telegramId) {
@@ -690,7 +711,81 @@ async function getAllUsersForBroadcast(target) {
 // ==================== RUTAS API ====================
 
 app.get('/api/check-admin/:telegramId', (req, res) => {
-  res.json({ isAdmin: isAdmin(req.params.telegramId) });
+  res.json({ isAdmin: isAdmin(req.params.telegramId), isSuperAdmin: isSuperAdmin(req.params.telegramId) });
+});
+
+// ── GESTIÓN DE ADMINS (solo super admin) ────────────────────────────
+
+app.get('/api/admins', async (req, res) => {
+  try {
+    const { requesterId } = req.query;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede ver esta lista.' });
+
+    const sb = getSbClient();
+    const { data, error } = await sb.from('bot_admins').select('*').order('added_at', { ascending: false });
+    if (error) throw error;
+
+    // Enriquecer con datos de usuario si existen
+    const enriched = await Promise.all((data || []).map(async (a) => {
+      const user = await db.getUser(String(a.telegram_id)).catch(() => null);
+      return { ...a, first_name: user?.first_name || null, username: user?.username || null };
+    }));
+
+    res.json({ superAdminId: SUPER_ADMIN_ID, admins: enriched });
+  } catch (error) {
+    console.error('❌ Error listando admins:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admins/add', async (req, res) => {
+  try {
+    const { requesterId, telegramId } = req.body;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede añadir admins.' });
+    if (!telegramId || !/^\d+$/.test(String(telegramId).trim())) return res.status(400).json({ error: 'ID de Telegram inválido.' });
+
+    const cleanId = String(telegramId).trim();
+    if (cleanId === SUPER_ADMIN_ID) return res.status(400).json({ error: 'Ese usuario ya es el administrador principal.' });
+
+    const sb = getSbClient();
+    const { error } = await sb.from('bot_admins').upsert([{ telegram_id: cleanId, added_at: new Date().toISOString(), added_by: String(requesterId) }], { onConflict: 'telegram_id' });
+    if (error) throw error;
+
+    await loadAdminsFromDb();
+
+    try {
+      await bot.telegram.sendMessage(cleanId, '🔧 <b>Has sido añadido como administrador de VPN Cuba.</b>\n\nYa puedes usar el comando /admin para acceder al panel.', { parse_mode: 'HTML' });
+    } catch (e) {}
+
+    res.json({ success: true, admins: ADMIN_IDS });
+  } catch (error) {
+    console.error('❌ Error añadiendo admin:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admins/remove', async (req, res) => {
+  try {
+    const { requesterId, telegramId } = req.body;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede quitar admins.' });
+    const cleanId = String(telegramId).trim();
+    if (cleanId === SUPER_ADMIN_ID) return res.status(400).json({ error: 'No puedes quitar al administrador principal.' });
+
+    const sb = getSbClient();
+    const { error } = await sb.from('bot_admins').delete().eq('telegram_id', cleanId);
+    if (error) throw error;
+
+    await loadAdminsFromDb();
+
+    try {
+      await bot.telegram.sendMessage(cleanId, 'ℹ️ Tus permisos de administrador en VPN Cuba han sido revocados.', { parse_mode: 'HTML' });
+    } catch (e) {}
+
+    res.json({ success: true, admins: ADMIN_IDS });
+  } catch (error) {
+    console.error('❌ Error quitando admin:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/accept-terms', async (req, res) => {
@@ -2284,6 +2379,7 @@ async function setWebhook() {
 
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 Servidor en http://localhost:${PORT}`);
+    await loadAdminsFromDb();
     console.log(`👑 Admins: ${ADMIN_IDS.join(', ')}`);
     console.log(`💰 USDT Wallet: ${USDT_CONFIG.WALLET_ADDRESS}`);
     await verifyStorageBuckets();
