@@ -113,7 +113,7 @@ const supabaseAdmin = createClient(
 
 const ADMIN_IDS = process.env.ADMIN_TELEGRAM_IDS ?
     process.env.ADMIN_TELEGRAM_IDS.split(',').map(id => id.trim()) :
-    ['6373481979', '5376388604', '6974850309', '5985313284', '7846534518'];
+    ['6373481979', '5376388604', '6974850309', '7846534518', '8782244257'];
 
 const USDT_CONFIG = {
     WALLET_ADDRESS: '0x9065C7d2cC04134A55F6Abf2B4118C11A8A01ff2',
@@ -229,7 +229,7 @@ function getDownloadWireguardHtml() {
 
 function getSupportHtml() {
     return `🛠 <b>Soporte VPN CUBA</b>\n\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (CEO)\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @vpncubawire (CEO)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Admin)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @JosherSnchz (Moderador)\n\n` +
            `Responde rápido y te ayudaremos.`;
@@ -1205,7 +1205,7 @@ async function sendBroadcastToUsers(broadcastId, message, users, adminId) {
       const user = users[i];
       try {
         if (!user.telegram_id) { failedCount++; continue; }
-        await bot.telegram.sendMessage(user.telegram_id, `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @rov3r777 | @ErenJeager129182 | @JosherSnchz_`, { parse_mode: 'Markdown' });
+        await bot.telegram.sendMessage(user.telegram_id, `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @ErenJeager129182 | @JosherSnchz_`, { parse_mode: 'Markdown' });
         sentCount++;
       } catch (error) {
         failedCount++;
@@ -2005,7 +2005,7 @@ bot.action('show_support', async (ctx) => {
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/5356557646', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("CEO", { url: 'https://t.me/vpncubawire', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447435992410', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
