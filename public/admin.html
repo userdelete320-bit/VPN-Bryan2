@@ -278,6 +278,7 @@ select option{background:var(--ink)}
       <div class="nav-group"><div class="nav-group-label">// Usuarios</div><div class="nav-item" data-tab="users" onclick="switchTab('users')"><i class="fas fa-users"></i> Usuarios</div><div class="nav-item" data-tab="referrals" onclick="switchTab('referrals')"><i class="fas fa-share-alt"></i> Referidos</div></div>
       <div class="nav-group"><div class="nav-group-label">// Contenido</div><div class="nav-item" data-tab="plan-files" onclick="switchTab('plan-files')"><i class="fas fa-folder"></i> Archivos Planes</div><div class="nav-item" data-tab="coupons" onclick="switchTab('coupons')"><i class="fas fa-tag"></i> Cupones</div></div>
       <div class="nav-group"><div class="nav-group-label">// Mensajes</div><div class="nav-item" data-tab="broadcast" onclick="switchTab('broadcast')"><i class="fas fa-bullhorn"></i> Broadcast</div><div class="nav-item" data-tab="games" onclick="switchTab('games')"><i class="fas fa-gamepad"></i> Juegos</div></div>
+      <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div></div>
     </div>
     <div class="sidebar-footer">Panel Admin v3.0 · VPN Cuba</div>
   </nav>
@@ -456,6 +457,20 @@ select option{background:var(--ink)}
         <div class="table-wrap" id="gamesTableWrap" style="display:none"><table><thead><tr><th>Juego/Servidor</th><th>Solicitudes</th><th>Conexiones</th><th>Última solicitud</th></tr></thead><tbody id="gamesTableBody"></tbody></table></div></div></div>
       </div>
 
+      <!-- ── GESTIÓN DE ADMINISTRADORES (solo super admin) ── -->
+      <div id="adminsPanel" class="tab-panel">
+        <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-user-shield"></i> Administradores del Bot</div><button class="btn green" onclick="loadAdmins()"><i class="fas fa-sync-alt"></i> <span>Refrescar</span></button></div>
+        <div class="card-body">
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <input type="text" id="newAdminIdInput" placeholder="ID de Telegram del nuevo admin" style="flex:1;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--txt);padding:10px;font-family:var(--f-mono);font-size:.8rem">
+            <button class="btn green" onclick="addAdmin()"><i class="fas fa-user-plus"></i> <span>Añadir</span></button>
+          </div>
+          <div class="loading" id="adminsLoading"><div class="spinner"></div> Cargando...</div>
+          <div class="no-data" id="adminsNoData" style="display:none"><i class="fas fa-user-shield"></i>No hay admins adicionales</div>
+          <div class="table-wrap" id="adminsTableWrap" style="display:none"><table><thead><tr><th>ID Telegram</th><th>Nombre</th><th>Usuario</th><th>Añadido</th><th>Acción</th></tr></thead><tbody id="adminsTableBody"></tbody></table></div>
+        </div></div>
+      </div>
+
     </div><!-- /content -->
   </main>
 </div><!-- /layout -->
@@ -542,7 +557,7 @@ select option{background:var(--ink)}
 <script>
 // ==================== SIGNAL ADMIN v3.0 (CORREGIDO) ====================
 const tg = window.Telegram?.WebApp ?? { initDataUnsafe: {} };
-let currentUserId = null, isAdminUser = false, currentTab = 'stats';
+let currentUserId = null, isAdminUser = false, isSuperAdminUser = false, currentTab = 'stats';
 let currentPaymentId = null, currentPaymentPlan = null, currentUserDetailsId = null, currentCouponCode = null;
 let allUsers = [], filteredUsers = [], currentUsersPage = 1, usersPerPage = 50, totalUsersPages = 1;
 let allReferrals = [], filteredReferrals = [], currentReferralsPage = 1, referralsPerPage = 30;
@@ -584,7 +599,9 @@ async function checkAdminAccess() {
     const data = await res.json();
     if (!data.isAdmin) { showNotification('❌ No eres administrador', 'error'); setTimeout(() => window.location.href = '/plans.html?userId=' + userId, 2000); return; }
     isAdminUser = true; currentUserId = userId.toString();
+    isSuperAdminUser = !!data.isSuperAdmin;
     document.getElementById('adminIdDisplay').textContent = '// ID: ' + userId;
+    if (isSuperAdminUser) document.getElementById('adminsNavGroup').style.display = 'block';
     loadStats(); loadPlanFiles();
   } catch(e) { showNotification('❌ Error verificando admin', 'error'); }
 }
@@ -755,6 +772,63 @@ async function confirmRefundResponse() {
   } catch(e) { showNotification('Error de conexión', 'error'); }
 }
 
+
+
+// ── ADMINISTRADORES (solo super admin) ──────────────────
+async function loadAdmins() {
+  document.getElementById('adminsLoading').style.display = 'flex';
+  document.getElementById('adminsTableWrap').style.display = 'none';
+  document.getElementById('adminsNoData').style.display = 'none';
+  try {
+    const res = await fetch(`/api/admins?requesterId=${currentUserId}`);
+    const data = await res.json();
+    document.getElementById('adminsLoading').style.display = 'none';
+    if (!res.ok) { showNotification('❌ ' + (data.error || 'Error al cargar'), 'error'); return; }
+    if (!data.admins?.length) { document.getElementById('adminsNoData').style.display = 'block'; return; }
+    const tb = document.getElementById('adminsTableBody'); tb.innerHTML = '';
+    data.admins.forEach(a => {
+      const fecha = a.added_at ? new Date(a.added_at).toLocaleString('es-ES') : '—';
+      tb.innerHTML += `<tr>
+        <td>${a.telegram_id}</td>
+        <td>${a.first_name || '—'}</td>
+        <td>${a.username ? '@'+a.username : '—'}</td>
+        <td>${fecha}</td>
+        <td><button class="btn red" onclick="removeAdmin('${a.telegram_id}')"><i class="fas fa-user-minus"></i> <span>Quitar</span></button></td>
+      </tr>`;
+    });
+    document.getElementById('adminsTableWrap').style.display = 'block';
+  } catch(e) { document.getElementById('adminsLoading').style.display = 'none'; showNotification('Error al cargar administradores', 'error'); }
+}
+
+async function addAdmin() {
+  const input = document.getElementById('newAdminIdInput');
+  const telegramId = input.value.trim();
+  if (!telegramId || !/^\d+$/.test(telegramId)) { showNotification('❌ Introduce un ID de Telegram válido (solo números)', 'error'); return; }
+  showNotification('⏳ Añadiendo admin...', 'info');
+  try {
+    const res = await fetch('/api/admins/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requesterId: currentUserId, telegramId })
+    });
+    const data = await res.json();
+    if (res.ok) { showNotification('✅ Admin añadido correctamente', 'success'); input.value = ''; loadAdmins(); }
+    else showNotification('❌ ' + (data.error || 'No se pudo añadir'), 'error');
+  } catch(e) { showNotification('Error de conexión', 'error'); }
+}
+
+async function removeAdmin(telegramId) {
+  if (!confirm(`¿Quitar permisos de administrador al usuario ${telegramId}?`)) return;
+  showNotification('⏳ Quitando admin...', 'info');
+  try {
+    const res = await fetch('/api/admins/remove', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requesterId: currentUserId, telegramId })
+    });
+    const data = await res.json();
+    if (res.ok) { showNotification('✅ Admin removido', 'success'); loadAdmins(); }
+    else showNotification('❌ ' + (data.error || 'No se pudo quitar'), 'error');
+  } catch(e) { showNotification('Error de conexión', 'error'); }
+}
 
 function viewScreenshot(paymentId, telegramId, plan, amount, date, screenshotUrl, method) {
   currentPaymentId = paymentId;
@@ -1517,7 +1591,7 @@ async function loadGamesStats() {
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────
-const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos' };
+const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores' };
 
 function switchTab(name) {
   stopBroadcastPolling(); // detener polling al cambiar de pestaña
@@ -1550,7 +1624,8 @@ function switchTab(name) {
         });
       });
     },
-    games: loadGamesStats
+    games: loadGamesStats,
+    admins: loadAdmins
   };
   if (loaders[name]) loaders[name]();
   // cerrar sidebar en móvil
