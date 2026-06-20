@@ -379,12 +379,15 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 50 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'screenshot' || file.fieldname === 'refundProof') {
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
       if (allowedTypes.includes(file.mimetype)) cb(null, true);
       else cb(new Error('Solo se permiten imágenes JPG, PNG, GIF o WebP'));
+    } else if (file.fieldname === 'mediaFile') {
+      if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) cb(null, true);
+      else cb(new Error('Solo se permiten imágenes o videos'));
     } else if (['configFile', 'trialConfigFile', 'planFile', 'file'].includes(file.fieldname)) {
       const allowedExtensions = ['.conf', '.zip', '.rar'];
       const allowedMimeTypes = [
@@ -1326,34 +1329,50 @@ app.get('/api/storage-status', async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
-app.post('/api/broadcast/send', async (req, res) => {
+app.post('/api/broadcast/send', upload.single('mediaFile'), async (req, res) => {
   try {
     let { message, target, adminId } = req.body;
     
     // Convertir adminId a string si viene como número o undefined
     if (!adminId) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
       return res.status(400).json({ error: 'ID de administrador no proporcionado' });
     }
     adminId = String(adminId);
     
     if (!isAdmin(adminId)) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
       return res.status(403).json({ error: 'No autorizado' });
     }
-    if (!message || typeof message !== 'string' || !message.trim()) {
+    if ((!message || typeof message !== 'string' || !message.trim()) && !req.file) {
       return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
     }
+    message = message || '';
     
     const validTargets = ['all', 'vip', 'non_vip', 'trial_pending', 'trial_received', 'active', 'with_referrals', 'usdt_payers'];
     if (!validTargets.includes(target)) {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
       return res.status(400).json({ error: 'Target de broadcast inválido' });
+    }
+
+    // Subir media (si la hay) y determinar su tipo para Telegram
+    let mediaUrl = null, mediaType = null;
+    if (req.file) {
+      mediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'photo';
+      try {
+        mediaUrl = await db.uploadImage(req.file.path, `broadcast_${Date.now()}`);
+        fs.unlink(req.file.path, () => {});
+      } catch (e) {
+        mediaUrl = `/uploads/${req.file.filename}`;
+      }
     }
     
     const broadcast = await db.createBroadcast(message, target, adminId);
     if (!broadcast?.id) throw new Error('No se pudo crear el broadcast');
     
     const users = await getAllUsersForBroadcast(target);
-    await db.updateBroadcastStatus(broadcast.id, 'pending', { total_users: users.length });
-    setImmediate(() => { sendBroadcastToUsers(broadcast.id, message, users, adminId); });
+    await db.updateBroadcastStatus(broadcast.id, 'pending', { total_users: users.length, media_url: mediaUrl || null, media_type: mediaType || null });
+    setImmediate(() => { sendBroadcastToUsers(broadcast.id, message, users, adminId, mediaUrl, mediaType); });
     
     res.json({ 
       success: true, 
@@ -1363,20 +1382,28 @@ app.post('/api/broadcast/send', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error en broadcast:', error);
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
     res.status(500).json({ error: error.message });
   }
 });
 
-async function sendBroadcastToUsers(broadcastId, message, users, adminId) {
+async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaUrl, mediaType) {
   try {
     if (!users?.length) { await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 }); return; }
     await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0 });
     let sentCount = 0, failedCount = 0, unavailableCount = 0;
+    const caption = message ? `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @ErenJeager129182 | @JosherSnchz_` : null;
+    const textOnly = `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @ErenJeager129182 | @JosherSnchz_`;
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       try {
         if (!user.telegram_id) { failedCount++; continue; }
-        await bot.telegram.sendMessage(user.telegram_id, `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @ErenJeager129182 | @JosherSnchz_`, { parse_mode: 'Markdown' });
+        if (mediaUrl) {
+          const sendFn = mediaType === 'video' ? bot.telegram.sendVideo : bot.telegram.sendPhoto;
+          await sendFn.call(bot.telegram, user.telegram_id, mediaUrl, caption ? { caption, parse_mode: 'Markdown' } : {});
+        } else {
+          await bot.telegram.sendMessage(user.telegram_id, textOnly, { parse_mode: 'Markdown' });
+        }
         sentCount++;
       } catch (error) {
         failedCount++;
