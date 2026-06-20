@@ -1,0 +1,2139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VPN CUBA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080a0f;
+    --bg2: #0d1018;
+    --surface: #111520;
+    --surface2: #161c2e;
+    --border: rgba(255,255,255,0.06);
+    --border-glow: rgba(168,220,255,0.2);
+
+    --neon-blue: #5bf0ff;
+    --neon-purple: #b16fff;
+    --neon-green: #39ffa0;
+    --neon-pink: #ff6eb4;
+    --neon-yellow: #ffe566;
+
+    --pastel-blue: #a8dcff;
+    --pastel-purple: #d4b8ff;
+    --pastel-mint: #b8ffd9;
+    --pastel-pink: #ffc2e2;
+    --pastel-peach: #ffd4b8;
+
+    --text: #e8edf5;
+    --text-muted: #6b7a99;
+    --text-dim: #3d4a63;
+
+    --radius: 20px;
+    --radius-sm: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  .bg-ambient {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bg-ambient::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(91,240,255,0.04) 0%, transparent 70%);
+    animation: drift1 12s ease-in-out infinite alternate;
+  }
+  .bg-ambient::after {
+    content: '';
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(ellipse, rgba(177,111,255,0.05) 0%, transparent 70%);
+    animation: drift2 15s ease-in-out infinite alternate;
+  }
+  @keyframes drift1 { 0% { transform: translate(0,0); } 100% { transform: translate(5%,8%); } }
+  @keyframes drift2 { 0% { transform: translate(0,0); } 100% { transform: translate(-5%,-8%); } }
+
+  /* ===== RAYOS LÁSER VIVOS ===== */
+  .hyperspace {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    overflow: hidden;
+  }
+  .laser {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 46px;
+    border-radius: 3px;
+    opacity: 0.7;
+    will-change: transform, opacity;
+    transform-origin: center center;
+  }
+  .laser-1 { background: linear-gradient(var(--neon-blue),   transparent);   box-shadow: 0 0 10px 1px var(--neon-blue); }
+  .laser-2 { background: linear-gradient(var(--neon-purple), transparent);   box-shadow: 0 0 12px 1px var(--neon-purple); width: 2.5px; height: 38px; }
+  .laser-3 { background: linear-gradient(var(--neon-pink),   transparent);   box-shadow: 0 0 8px 1px var(--neon-pink);   height: 52px; }
+  .laser-4 { background: linear-gradient(var(--neon-green),  transparent);   box-shadow: 0 0 14px 1px var(--neon-green); width: 1.5px; }
+  .laser-5 { background: linear-gradient(var(--neon-yellow), transparent);   box-shadow: 0 0 8px 1px var(--neon-yellow); height: 34px; }
+  .laser-6 { background: linear-gradient(var(--neon-blue),   transparent);   box-shadow: 0 0 12px 1px var(--neon-blue); height: 44px; }
+  .laser-7 { background: linear-gradient(var(--neon-pink),   transparent);   box-shadow: 0 0 10px 1px var(--neon-pink); width: 2.5px; }
+  .laser-8 { background: linear-gradient(var(--neon-purple), transparent);   box-shadow: 0 0 8px 1px var(--neon-purple); height: 40px; }
+  .laser-9  { background: linear-gradient(var(--neon-green),  transparent); box-shadow: 0 0 10px 1px var(--neon-green); width: 2px; height: 48px; }
+  .laser-10 { background: linear-gradient(var(--neon-yellow), transparent); box-shadow: 0 0 10px 1px var(--neon-yellow); width: 1.5px; height: 36px; }
+  .laser-11 { background: linear-gradient(var(--neon-blue),   transparent); box-shadow: 0 0 14px 1px var(--neon-blue); width: 2.5px; height: 50px; }
+  .laser-12 { background: linear-gradient(var(--neon-pink),   transparent); box-shadow: 0 0 8px 1px var(--neon-pink); height: 30px; }
+
+  @keyframes laserFlicker {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 0.8; }
+  }
+
+  /* Chispa en el punto de contacto */
+  .spark {
+    position: fixed;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 6;
+    will-change: transform, opacity;
+  }
+  @keyframes sparkFly {
+    0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.15); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .laser, .spark { animation: none !important; transition: none !important; }
+    .hyperspace { display: none; }
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 430px;
+    margin: 0 auto;
+    padding: 0 0 100px;
+  }
+
+  .ban-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    display: none;
+  }
+
+  .ban-screen.active {
+    display: flex;
+  }
+
+  .header {
+    padding: 40px 24px 24px;
+    position: relative;
+  }
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(91,240,255,0.08);
+    border: 1px solid rgba(91,240,255,0.2);
+    border-radius: 100px;
+    padding: 4px 12px 4px 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--neon-blue);
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+    animation: fadeSlideDown 0.6s ease both;
+  }
+  .header-badge .dot {
+    width: 6px; height: 6px;
+    background: var(--neon-green);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--neon-green);
+    animation: pulse 2s ease infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.8); } }
+
+  .header-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    animation: fadeSlideDown 0.6s 0.1s ease both;
+  }
+  .header-title span {
+    background: linear-gradient(135deg, var(--pastel-blue) 0%, var(--neon-purple) 50%, var(--pastel-pink) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header-sub {
+    margin-top: 8px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 300;
+    animation: fadeSlideDown 0.6s 0.2s ease both;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 10px;
+    padding: 0 24px;
+    margin-bottom: 32px;
+    animation: fadeSlideDown 0.6s 0.3s ease both;
+  }
+  .stat-pill {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-pill .val {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--pastel-blue);
+  }
+  .stat-pill .lbl {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    padding: 0 24px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  .new-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--neon-green), #00d080);
+    color: #000;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 2px 7px;
+    border-radius: 100px;
+    vertical-align: middle;
+    margin-left: 6px;
+    text-transform: uppercase;
+  }
+
+  .turbo-card {
+    margin: 0 24px 16px;
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    cursor: pointer;
+    animation: fadeSlideDown 0.6s 0.35s ease both;
+    transform: translateZ(0);
+  }
+  .turbo-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-blue) 50%, var(--neon-purple) 100%);
+    border-radius: 25px;
+    z-index: 0;
+    animation: borderRotate 4s linear infinite;
+  }
+  @keyframes borderRotate {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+  }
+  .turbo-inner {
+    position: relative;
+    z-index: 1;
+    background: #0b1020;
+    border-radius: 23px;
+    padding: 24px;
+    overflow: hidden;
+  }
+  .turbo-inner::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 70%;
+    height: 70%;
+    background: radial-gradient(ellipse, rgba(57,255,160,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .turbo-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(57,255,160,0.1);
+    border: 1px solid rgba(57,255,160,0.3);
+    border-radius: 100px;
+    padding: 3px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--neon-green);
+    letter-spacing: 0.1em;
+    margin-bottom: 14px;
+  }
+  .turbo-tag svg { width:10px; height:10px; }
+  .turbo-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .turbo-name em {
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-style: normal;
+  }
+  .turbo-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .turbo-price-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .turbo-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+  }
+  .turbo-price sup {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--neon-green);
+    vertical-align: super;
+  }
+  .turbo-price sub {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-muted);
+    vertical-align: baseline;
+  }
+  .turbo-cta {
+    background: linear-gradient(135deg, var(--neon-green), #00c070);
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 12px 20px;
+    border-radius: 100px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 20px rgba(57,255,160,0.3);
+  }
+  .turbo-cta:active { transform: scale(0.96); }
+  .turbo-specs {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .turbo-spec {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .turbo-spec span { color: var(--neon-green); }
+
+  .plans-scroll {
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .plan-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s;
+    animation: fadeSlideDown 0.5s ease both;
+  }
+  .plan-card:active { transform: scale(0.98); }
+
+  .plan-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  .plan-card.basic { --accent: var(--pastel-blue); --accent-glow: rgba(168,220,255,0.12); --accent-active: var(--pastel-blue); }
+  .plan-card.advanced { --accent: var(--pastel-purple); --accent-glow: rgba(212,184,255,0.12); --accent-active: var(--pastel-purple); }
+  .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); --accent-active: var(--neon-yellow); }
+  .plan-card.gaming { --accent: var(--neon-pink); --accent-glow: rgba(255,110,180,0.12); --accent-active: var(--neon-pink); }
+  .plan-card.anual { --accent: var(--pastel-peach); --accent-glow: rgba(255,212,184,0.12); --accent-active: var(--pastel-peach); }
+
+  .plan-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.6;
+  }
+
+  .plan-card-glow {
+    position: absolute;
+    top: -30%;
+    right: -20%;
+    width: 60%;
+    height: 100%;
+    background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ===== VOYAGE STYLE: carrusel vertical de tarjetas apiladas ===== */
+  .voyage-stack {
+    position: relative;
+    padding: 0 24px;
+    margin-top: 56px;
+    margin-bottom: 36px;
+    height: 560px;
+    touch-action: none;
+  }
+  .voyage-stack .plan-card {
+    position: absolute;
+    top: 28px;
+    left: 24px;
+    right: 24px;
+    width: auto;
+    margin: 0;
+    padding: 26px 24px;
+    animation: none;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.45s ease,
+                filter 0.45s ease;
+    will-change: transform, opacity;
+  }
+  .voyage-stack .plan-card.v-active {
+    z-index: 5;
+    box-shadow: 0 20px 50px -12px var(--accent-glow), 0 0 0 1px var(--accent);
+    filter: none;
+    pointer-events: auto;
+  }
+  .voyage-stack .plan-card.v-active .plan-card-glow { opacity: 1; }
+  .voyage-stack .plan-card:not(.v-active) {
+    pointer-events: auto;
+    filter: saturate(0.7) brightness(0.75);
+  }
+  .voyage-stack .plan-card:not(.v-active) .plan-card-glow { opacity: 0; }
+
+  .voyage-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin: 6px 0 26px;
+  }
+  .voyage-nav-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .voyage-nav-btn:active { transform: scale(0.9); }
+  .voyage-nav-btn svg { width: 16px; height: 16px; }
+  .voyage-dots { display: flex; gap: 6px; }
+  .voyage-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s, width 0.3s, border-radius 0.3s;
+  }
+  .voyage-dot.active {
+    width: 18px;
+    border-radius: 3px;
+    background: var(--accent-active, var(--neon-blue));
+  }
+
+  .plan-row1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .plan-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .plan-price-block { text-align: right; }
+  .plan-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .plan-price-period {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .plan-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 3px;
+  }
+  .plan-tagline {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    line-height: 1.4;
+  }
+
+  .plan-features {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .plan-feature {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .plan-feature .check {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--accent);
+    font-size: 9px;
+  }
+
+  .plan-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .plan-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .plan-btn:active { background: rgba(255,255,255,0.1); }
+
+  .plan-popular {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .plan-popular .dot {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 4px var(--accent);
+  }
+
+  .plan-card.vip {
+    border-color: rgba(255,229,102,0.2);
+    background: linear-gradient(135deg, #111520, #141208);
+  }
+  .plan-card.gaming {
+    border-color: rgba(255,110,180,0.15);
+  }
+
+  .compare-section {
+    margin: 0 24px 32px;
+    animation: fadeSlideDown 0.5s 0.5s ease both;
+  }
+  .compare-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .compare-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .compare-header {
+    display: grid;
+    grid-template-columns: 1fr repeat(3, 70px);
+    gap: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .compare-header div {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+  .compare-header div:first-child { text-align: left; }
+  .compare-row {
+    display: grid;
+    grid-template-columns: 1fr repeat(3, 70px);
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    transition: background 0.15s;
+  }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-row:hover { background: rgba(255,255,255,0.02); }
+  .compare-row div {
+    text-align: center;
+    font-size: 13px;
+  }
+  .compare-row div:first-child {
+    text-align: left;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .chk { color: var(--neon-green); font-size: 14px; }
+  .nope { color: var(--text-dim); font-size: 14px; }
+  .val-sm { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--pastel-blue); }
+
+  .faq-section {
+    margin: 0 24px 32px;
+  }
+  .faq-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .faq-q {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text);
+    user-select: none;
+  }
+  .faq-q .arr {
+    color: var(--text-dim);
+    transition: transform 0.25s;
+    font-size: 16px;
+  }
+  .faq-item.open .faq-q .arr { transform: rotate(45deg); color: var(--pastel-blue); }
+  .faq-a {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    padding: 0 16px;
+  }
+  .faq-item.open .faq-a {
+    max-height: 200px;
+    padding: 0 16px 14px;
+  }
+
+  .trust-strip {
+    margin: 0 24px 28px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    animation: fadeSlideDown 0.5s 0.6s ease both;
+  }
+  .trust-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .trust-item .icon { font-size: 22px; margin-bottom: 6px; }
+  .trust-item .label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 430px;
+    background: rgba(8,10,15,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    padding: 12px 32px 20px;
+    display: flex;
+    justify-content: space-around;
+    z-index: 100;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+  }
+  .nav-item.active { opacity: 1; }
+  .nav-item svg { width: 22px; height: 22px; }
+  .nav-item .nav-lbl {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+  .nav-item.active .nav-lbl { color: var(--pastel-blue); }
+  .nav-item.active svg { color: var(--neon-blue); filter: drop-shadow(0 0 4px var(--neon-blue)); }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 500;
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal-sheet {
+    background: #0f1420;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 28px 28px 0 0;
+    padding: 0 24px 40px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  }
+  .modal-overlay.open .modal-sheet {
+    transform: translateY(0);
+  }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 100px;
+    margin: 14px auto 24px;
+  }
+  .modal-plan-icon { font-size: 36px; margin-bottom: 12px; }
+  .modal-plan-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .modal-plan-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .modal-features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .modal-feat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+  }
+  .modal-feat .mf-icon { font-size: 18px; margin-bottom: 6px; }
+  .modal-feat .mf-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+  }
+  .modal-feat .mf-val {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Estilo mejorado para los botones de prueba */
+  .trial-choice {
+    width:100%;
+    text-align:left;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text);
+    border-radius: 16px;
+    padding: 14px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(57,255,160,0.2);
+    user-select: none;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .trial-choice:active {
+    background: rgba(57,255,160,0.08);
+    border-color: rgba(57,255,160,0.3);
+  }
+  .trial-choice .mf-icon { font-size: 20px; }
+  .trial-choice .mf-label { font-size: 12px; font-weight: 700; }
+  .trial-choice .mf-val { font-size: 10px; color: var(--text-muted); }
+
+  .modal-cta {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .modal-cta:active { transform: scale(0.98); }
+  .modal-close-area {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 50px;
+    cursor: pointer;
+  }
+
+  @keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+.whatsapp-float {
+  animation: float 2s ease-in-out infinite;
+}
+
+  .plans-scroll .plan-card:nth-child(1) { animation-delay: 0.4s; }
+  .plans-scroll .plan-card:nth-child(2) { animation-delay: 0.45s; }
+  .plans-scroll .plan-card:nth-child(3) { animation-delay: 0.5s; }
+  .plans-scroll .plan-card:nth-child(4) { animation-delay: 0.55s; }
+  .plans-scroll .plan-card:nth-child(5) { animation-delay: 0.6s; }
+
+  .ticker-wrap {
+    background: rgba(91,240,255,0.05);
+    border-top: 1px solid rgba(91,240,255,0.1);
+    border-bottom: 1px solid rgba(91,240,255,0.1);
+    padding: 8px 0;
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+  .ticker {
+    display: flex;
+    gap: 40px;
+    white-space: nowrap;
+    animation: ticker 20s linear infinite;
+    width: max-content;
+  }
+  .ticker-item {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ticker-item span { color: var(--neon-blue); }
+  @keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* BARRA DE ANUNCIO (admin) */
+  .announce-bar {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    width: 100%;
+    background: linear-gradient(90deg, rgba(255,107,107,0.15), rgba(255,209,102,0.12));
+    border-bottom: 1px solid rgba(255,209,102,0.3);
+    overflow: hidden;
+    height: 30px;
+    display: none;
+    align-items: center;
+  }
+  .announce-bar.active { display: flex; }
+  .announce-track {
+    display: flex;
+    white-space: nowrap;
+    animation: announceScroll 30s linear infinite;
+    width: max-content;
+  }
+  .announce-item {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #ffd166;
+    padding: 0 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  @keyframes announceScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+</style>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+</head>
+<body>
+
+<div class="bg-ambient"></div>
+
+<div class="hyperspace" id="hyperspace">
+  <div class="laser laser-1"></div>
+  <div class="laser laser-2"></div>
+  <div class="laser laser-3"></div>
+  <div class="laser laser-4"></div>
+  <div class="laser laser-5"></div>
+  <div class="laser laser-6"></div>
+  <div class="laser laser-7"></div>
+  <div class="laser laser-8"></div>
+  <div class="laser laser-9"></div>
+  <div class="laser laser-10"></div>
+  <div class="laser laser-11"></div>
+  <div class="laser laser-12"></div>
+</div>
+
+<!-- BARRA DE ANUNCIO (controlada desde el panel admin) -->
+<div class="announce-bar" id="announceBar">
+  <div class="announce-track" id="announceTrack"></div>
+</div>
+
+<!-- Pantalla de baneo -->
+<div class="ban-screen" id="banScreen">
+  <div style="font-size:48px; margin-bottom:16px;">🚫</div>
+  <div style="font-family:'Syne',sans-serif; font-size:24px; font-weight:800; color:#fff; margin-bottom:12px;">Acceso bloqueado</div>
+  <div style="color:var(--text-muted); font-size:14px; max-width:280px;">Has sido baneado y no puedes usar el servicio. Si crees que es un error, contacta con soporte.</div>
+</div>
+
+<div class="app" id="mainApp">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-badge">
+      <span class="dot"></span>
+      30 000+ USUARIOS ACTIVOS
+    </div>
+    <h1 class="header-title">Elige tu<br><span>conexión.</span></h1>
+    <p class="header-sub">Planes diseñados para Cuba. Sin límites reales.</p>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-pill">
+      <div class="val">99.8%</div>
+      <div class="lbl">UPTIME</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val">&lt;25ms</div>
+      <div class="lbl">LATENCIA</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val">WG</div>
+      <div class="lbl">PROTOCOL</div>
+    </div>
+  </div>
+
+  <!-- TICKER -->
+  <div class="ticker-wrap">
+    <div class="ticker">
+      <div class="ticker-item">🟢 PRUEBA <span>ONLINE</span></div>
+      <div class="ticker-item">⚡ WireGuard UDP:80</div>
+      <div class="ticker-item">🔒 AES-256 CIFRADO</div>
+      <div class="ticker-item">🇨🇺 IP RESIDENCIAL CU</div>
+      <div class="ticker-item">🎮 GAMING PRIORITY</div>
+      <div class="ticker-item">📡 MTU 1280 OPTIMIZADO</div>
+      <div class="ticker-item">🟢 PRUEBA <span>ONLINE</span></div>
+      <div class="ticker-item">⚡ WireGuard UDP:80</div>
+      <div class="ticker-item">🔒 AES-256 CIFRADO</div>
+      <div class="ticker-item">🇨🇺 IP RESIDENCIAL CU</div>
+      <div class="ticker-item">🎮 GAMING PRIORITY</div>
+      <div class="ticker-item">📡 MTU 1280 OPTIMIZADO</div>
+    </div>
+  </div>
+
+  <!-- TURBO CARD -->
+  <div class="section-label">// PRUEBA DISPONIBLE</div>
+  <div class="turbo-card" onclick="openModal('turbo')">
+    <div class="turbo-inner">
+      <div class="turbo-tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        PRUEBA · HOY
+      </div>
+      <div class="turbo-name"><em>Prueba</em> de Plan</div>
+      <div class="turbo-desc">Elige el plan que quieres probar y te envío la config de prueba automáticamente.</div>
+      <div class="turbo-price-row">
+        <div>
+          <div class="turbo-price"><sup>$</sup>XX<sub>/mes</sub></div>
+        </div>
+        <button class="turbo-cta">
+          Solicitar prueba
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="turbo-specs">
+        <div class="turbo-spec">🧪 <span>PLAN</span> A ELEGIR</div>
+        <div class="turbo-spec">🏦 <span>VIP</span> INCLUIDO</div>
+        <div class="turbo-spec">🎮 <span>GAMING</span> INCLUIDO</div>
+        <div class="turbo-spec">♾️ <span>ANUAL</span> INCLUIDO</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANES REGULARES -->
+  <div class="section-label" style="margin-top:24px">// PLANES DISPONIBLES</div>
+  <div class="voyage-stack" id="voyageStack">
+
+    <!-- BÁSICO -->
+    <div class="plan-card basic" data-plan="basic" onclick="voyageCardClick('basic')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🌐</div>
+        <div class="plan-price-block">
+          <div class="plan-price" id="cardPrice-basic">900 CUP</div>
+          <div class="plan-price-period">/mes</div>
+        </div>
+      </div>
+      <div class="plan-name">Básico</div>
+      <div class="plan-tagline">Navega y streamea USA. Perfecto para el día a día.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Streaming USA (Netflix, Hulu, Prime)</div>
+        <div class="plan-feature"><span class="check">✓</span> Velocidad hasta 2 Mbps</div>
+        <div class="plan-feature"><span class="check">✓</span> WireGuard encriptado</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Más popular</div>
+      </div>
+    </div>
+
+    <!-- AVANZADO -->
+    <div class="plan-card advanced" data-plan="advanced" onclick="voyageCardClick('advanced')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🚀</div>
+        <div class="plan-price-block">
+          <div class="plan-price" id="cardPrice-advanced">1800 CUP</div>
+          <div class="plan-price-period">2 meses</div>
+        </div>
+      </div>
+      <div class="plan-name">Avanzado</div>
+      <div class="plan-tagline">2 meses del plan Básico. La opción inteligente.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Todo del plan Básico</div>
+        <div class="plan-feature"><span class="check">✓</span> 2 meses continuos</div>
+        <div class="plan-feature"><span class="check">✓</span> Ahorro garantizado</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Mejor precio</div>
+      </div>
+    </div>
+
+    <!-- VIP -->
+    <div class="plan-card vip" data-plan="vip" onclick="voyageCardClick('vip')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🏦</div>
+        <div class="plan-price-block">
+          <div class="plan-price" id="cardPrice-vip">1200 CUP</div>
+          <div class="plan-price-period">/mes</div>
+        </div>
+      </div>
+      <div class="plan-name">VIP Cuba <span class="new-badge">ÚNICO</span></div>
+      <div class="plan-tagline">IP Residencial Cubana para Enzona y Transfermóvil.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> IP residencial 🇨🇺 real</div>
+        <div class="plan-feature"><span class="check">✓</span> Compatible Enzona</div>
+        <div class="plan-feature"><span class="check">✓</span> Compatible Transfermóvil</div>
+        <div class="plan-feature"><span class="check">✓</span> Acceso banca online Cuba</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Exclusivo</div>
+      </div>
+    </div>
+
+    <!-- GAMING -->
+    <div class="plan-card gaming" data-plan="gaming" onclick="voyageCardClick('gaming')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🎮</div>
+        <div class="plan-price-block">
+          <div class="plan-price" id="cardPrice-gaming">1500 CUP</div>
+          <div class="plan-price-period">/mes</div>
+        </div>
+      </div>
+      <div class="plan-name">Gaming</div>
+      <div class="plan-tagline">QoS prioritario. Latencia mínima para MLBB, CoD, Free Fire.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Tráfico gaming prioritario</div>
+        <div class="plan-feature"><span class="check">✓</span> Latencia &lt;25ms optimizada</div>
+        <div class="plan-feature"><span class="check">✓</span> Sin packet loss</div>
+        <div class="plan-feature"><span class="check">✓</span> MLBB · CoD · Free Fire</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Pro players</div>
+      </div>
+    </div>
+
+    <!-- ANUAL -->
+    <div class="plan-card anual" data-plan="anual" onclick="voyageCardClick('anual')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">♾️</div>
+        <div class="plan-price-block">
+          <div class="plan-price" id="cardPrice-anual">15000 CUP</div>
+          <div class="plan-price-period">/año</div>
+        </div>
+      </div>
+      <div class="plan-name">Anual Total</div>
+      <div class="plan-tagline">Acceso completo 12 meses. Todo desbloqueado.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Acceso a TODOS los planes</div>
+        <div class="plan-feature"><span class="check">✓</span> 12 meses continuos</div>
+        <div class="plan-feature"><span class="check">✓</span> Máximo ahorro del año</div>
+        <div class="plan-feature"><span class="check">✓</span> Soporte prioritario</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Máximo ahorro</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="voyage-nav">
+    <div class="voyage-nav-btn" onclick="voyagePrev()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+    </div>
+    <div class="voyage-dots" id="voyageDots"></div>
+    <div class="voyage-nav-btn" onclick="voyageNext()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+  </div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+  <div class="modal-sheet" id="modalSheet">
+    <div class="modal-handle"></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+const plans = {
+  turbo: {
+    icon: '🧪',
+    name: 'Prueba',
+    color: '#39ffa0',
+    shadowColor: 'rgba(57,255,160,0.3)',
+    desc: 'Elige qué plan quieres probar. Puedes pedir 1 prueba de cada plan.',
+    features: [
+      { icon: '🌐', label: 'BÁSICO', val: 'Disponible' },
+      { icon: '🚀', label: 'AVANZADO', val: 'Disponible' },
+      { icon: '🏦', label: 'VIP CUBA', val: 'Disponible' },
+      { icon: '🎮', label: 'GAMING', val: 'Disponible' },
+      { icon: '♾️', label: 'ANUAL', val: 'Disponible' },
+      { icon: '🧪', label: 'ENVÍO', val: 'Automático' },
+    ],
+    cta: 'Elegir tipo de prueba',
+  },
+  basic: {
+    icon: '🌐',
+    name: 'Plan Básico',
+    color: '#a8dcff',
+    shadowColor: 'rgba(168,220,255,0.3)',
+    price: { cup: 900, mobile: 400, usdt: 1.5 },
+    stars: 150,
+    ton: 2.0,
+    desc: 'La puerta de entrada a internet sin censura. Ideal para streaming y navegación cotidiana con conexión estable.',
+    features: [
+      { icon: '📺', label: 'STREAMING', val: 'USA · Netflix · Hulu' },
+      { icon: '⚡', label: 'VELOCIDAD', val: '2 Mbps' },
+      { icon: '📡', label: 'PROTOCOLO', val: 'WireGuard' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '📱', label: 'DISPOSITIVOS', val: '1 activo' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+    ],
+    cta: 'Elegir Básico',
+  },
+  advanced: {
+    icon: '🚀',
+    name: 'Plan Avanzado',
+    color: '#d4b8ff',
+    shadowColor: 'rgba(212,184,255,0.3)',
+    price: { cup: 1800, mobile: 900, usdt: 2.8 },
+    stars: 270,
+    ton: 3.0,
+    desc: '2 meses completos del plan Básico. La elección inteligente para quienes planean. Más tiempo, mejor precio.',
+    features: [
+      { icon: '📅', label: 'DURACIÓN', val: '2 meses' },
+      { icon: '📺', label: 'STREAMING', val: 'USA incluido' },
+      { icon: '⚡', label: 'VELOCIDAD', val: '2 Mbps' },
+      { icon: '💰', label: 'AHORRO', val: 'vs. mensual' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+    ],
+    cta: 'Elegir Avanzado',
+  },
+  vip: {
+    icon: '🏦',
+    name: 'VIP Cuba',
+    color: '#ffe566',
+    shadowColor: 'rgba(255,229,102,0.3)',
+    price: { cup: 1200, mobile: 500, usdt: 1.9 },
+    stars: 180,
+    ton: 2.2,
+    desc: 'El único plan con IP Residencial Cubana real. Accede a Enzona, Transfermóvil y banca online desde cualquier lugar.',
+    features: [
+      { icon: '🇨🇺', label: 'IP ORIGEN', val: 'Residencial CU' },
+      { icon: '🏦', label: 'ENZONA', val: 'Compatible' },
+      { icon: '📲', label: 'TRANSFERMÓVIL', val: 'Compatible' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '⚡', label: 'VELOCIDAD', val: '5 Mbps' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Prioritario' },
+    ],
+    cta: 'Elegir VIP',
+  },
+  gaming: {
+    icon: '🎮',
+    name: 'Gaming',
+    color: '#ff6eb4',
+    shadowColor: 'rgba(255,110,180,0.3)',
+    price: { cup: 1500, mobile: 700, usdt: 2.3 },
+    stars: 210,
+    ton: 2.5,
+    desc: 'Diseñado para gamers cubanos. QoS prioritario para paquetes de juego, latencia mínima garantizada.',
+    features: [
+      { icon: '⚡', label: 'LATENCIA', val: '<25ms' },
+      { icon: '🎯', label: 'QoS', val: 'Tráfico prioritario' },
+      { icon: '🎮', label: 'JUEGOS', val: 'MLBB · CoD · FF' },
+      { icon: '📦', label: 'PACKET LOSS', val: '~0%' },
+      { icon: '🔒', label: 'CIFRADO', val: 'AES-256' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Telegram' },
+    ],
+    cta: 'Elegir Gaming',
+  },
+  anual: {
+    icon: '♾️',
+    name: 'Plan Anual',
+    color: '#ffd4b8',
+    shadowColor: 'rgba(255,212,184,0.3)',
+    price: { cup: 15000, mobile: 10000, usdt: 25 },
+    stars: 2100,
+    ton: 26.0,
+    desc: '12 meses de acceso total. Todos los planes, todas las funciones. El mayor ahorro posible. La libertad completa.',
+    features: [
+      { icon: '📅', label: 'DURACIÓN', val: '12 meses' },
+      { icon: '🌐', label: 'ACCESO', val: 'TODOS los planes' },
+      { icon: '🏦', label: 'VIP', val: 'Incluido' },
+      { icon: '🎮', label: 'GAMING', val: 'Incluido' },
+      { icon: '⚡', label: 'TURBO', val: 'Incluido' },
+      { icon: '🆘', label: 'SOPORTE', val: 'VIP 24/7' },
+    ],
+    cta: 'Ir Anual',
+  },
+};
+const PLAN_API_KEYS = {
+  basic: 'basico',
+  advanced: 'avanzado',
+  vip: 'cuba_vip',
+  gaming: 'premium',
+  anual: 'anual'
+};
+
+const PLAN_CUP = {
+  basic: 900,
+  advanced: 1800,
+  vip: 1200,
+  gaming: 1500,
+  anual: 15000
+};
+
+const PLAN_MOBILE = {
+  basic: 400,
+  advanced: 900,
+  vip: 500,
+  gaming: 700,
+  anual: 10000
+};
+
+const PLAN_USDT = {
+  basic: 1.5,
+  advanced: 2.8,
+  vip: 1.9,
+  gaming: 2.3,
+  anual: 25
+};
+
+// Sobrescribe los precios hardcodeados con los que el super admin haya configurado en el panel.
+async function applyDynamicPrices() {
+  try {
+    const res = await fetch('/api/plan-prices');
+    if (!res.ok) return;
+    const dynamicPrices = await res.json(); // { basico: {cup,mobile,usdt,stars,ton}, avanzado: {...}, ... }
+
+    for (const uiKey of Object.keys(PLAN_API_KEYS)) {
+      if (uiKey === 'trial') continue;
+      const apiKey = PLAN_API_KEYS[uiKey];
+      const dp = dynamicPrices[apiKey];
+      if (!dp) continue;
+
+      if (plans[uiKey]) {
+        plans[uiKey].price = { cup: dp.cup, mobile: dp.mobile, usdt: dp.usdt };
+        plans[uiKey].stars = dp.stars;
+        plans[uiKey].ton = dp.ton;
+      }
+      PLAN_CUP[uiKey] = dp.cup;
+      PLAN_MOBILE[uiKey] = dp.mobile;
+      PLAN_USDT[uiKey] = dp.usdt;
+
+      // Actualizar el precio visible en la tarjeta de la pantalla principal
+      const cardEl = document.getElementById(`cardPrice-${uiKey}`);
+      if (cardEl) cardEl.textContent = `${Number(dp.cup).toLocaleString('es-ES')} CUP`;
+    }
+  } catch (e) {
+    console.error('No se pudieron cargar precios dinámicos, se usan los valores por defecto:', e);
+  }
+}
+
+// Carga el anuncio configurado por el admin (si hay uno activo y dentro de su ventana de tiempo).
+async function loadAnnouncement() {
+  try {
+    const res = await fetch('/api/announcement');
+    if (!res.ok) return;
+    const data = await res.json();
+    const bar = document.getElementById('announceBar');
+    const track = document.getElementById('announceTrack');
+    if (!data.active || !data.text) { bar.classList.remove('active'); return; }
+
+    const itemHtml = `<div class="announce-item">📣 ${data.text}</div>`;
+    track.innerHTML = itemHtml.repeat(8); // se repite para que el scroll sea continuo
+    bar.classList.add('active');
+  } catch (e) {
+    console.error('No se pudo cargar el anuncio:', e);
+  }
+}
+
+const TRIAL_OPTIONS = [
+  { key: 'basic', label: 'Básico' },
+  { key: 'advanced', label: 'Avanzado' },
+  { key: 'vip', label: 'VIP Cuba' },
+  { key: 'gaming', label: 'Gaming' },
+  { key: 'anual', label: 'Anual' }
+];
+
+const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
+const tg = window.Telegram?.WebApp ?? null;
+const urlParams = new URLSearchParams(window.location.search);
+const currentUserId = urlParams.get('userId') || tgUser.id || '';
+const currentUsername = tgUser.username || '';
+const currentFirstName = tgUser.first_name || '';
+
+// ===== VOYAGE STYLE: carrusel vertical de tarjetas apiladas =====
+const VOYAGE_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'anual'];
+let voyageIndex = 0;
+let voyageClickGuard = false; // evita que el tap que cambia de tarjeta también abra el modal
+
+function renderVoyageStack(direction = 0) {
+  const stack = document.getElementById('voyageStack');
+  if (!stack) return;
+  const cards = VOYAGE_ORDER.map(key => stack.querySelector(`.plan-card[data-plan="${key}"]`));
+
+  cards.forEach((card, i) => {
+    if (!card) return;
+    // distancia circular más corta al índice activo (para que el ciclo se sienta natural)
+    const n = cards.length;
+    let diff = i - voyageIndex;
+    if (diff > n / 2) diff -= n;
+    if (diff < -n / 2) diff += n;
+
+    const wasActive = card.classList.contains('v-active');
+    card.classList.toggle('v-active', diff === 0);
+
+    // Empuje horizontal momentáneo: la que se va sale por un lado, la que entra viene por el otro
+    let kickX = 0;
+    if (direction !== 0) {
+      if (wasActive && diff !== 0) kickX = -direction * 70;       // la activa anterior es "empujada" hacia afuera
+      else if (diff === 0 && !wasActive) kickX = direction * 70;  // la nueva activa "entra empujando" desde el lado opuesto
+    }
+
+    if (diff === 0) {
+      card.style.transform = `translate(${kickX}px, 0px) scale(${kickX ? 0.96 : 1})`;
+      card.style.opacity = kickX ? '0.4' : '1';
+      card.style.zIndex = '6';
+    } else {
+      const dir = diff > 0 ? 1 : -1;
+      const depth = Math.min(Math.abs(diff), 3);
+      const ty = dir * (95 + depth * 70);
+      const scale = 1 - depth * 0.06;
+      card.style.transform = `translate(${kickX}px, ${ty}px) scale(${kickX ? scale * 0.96 : scale})`;
+      card.style.opacity = depth >= 3 ? '0' : String(0.55 - depth * 0.12);
+      card.style.zIndex = String(5 - depth);
+    }
+  });
+
+  // Si hubo "kick", en el siguiente frame asentamos las tarjetas en su posición final -> efecto de empuje real
+  if (direction !== 0) {
+    requestAnimationFrame(() => requestAnimationFrame(() => renderVoyageStack(0)));
+  }
+
+  // dots
+  const dotsWrap = document.getElementById('voyageDots');
+  if (dotsWrap) {
+    dotsWrap.innerHTML = VOYAGE_ORDER.map((key, i) =>
+      `<div class="voyage-dot ${i === voyageIndex ? 'active' : ''}" onclick="voyageGoTo(${i})"></div>`
+    ).join('');
+    // colorear el dot activo con el acento del plan activo
+    const activeDot = dotsWrap.querySelector('.voyage-dot.active');
+    const activeCard = cards[voyageIndex];
+    if (activeDot && activeCard) {
+      const accent = getComputedStyle(activeCard).getPropertyValue('--accent-active').trim();
+      if (accent) activeDot.style.background = accent;
+    }
+  }
+}
+
+function voyageGoTo(index) {
+  const newIndex = ((index % VOYAGE_ORDER.length) + VOYAGE_ORDER.length) % VOYAGE_ORDER.length;
+  let direction = newIndex - voyageIndex;
+  // normalizar dirección para el ciclo (ir de la última a la primera = avanzar, no retroceder)
+  const n = VOYAGE_ORDER.length;
+  if (direction > n / 2) direction -= n;
+  if (direction < -n / 2) direction += n;
+  direction = direction === 0 ? 0 : (direction > 0 ? 1 : -1);
+
+  voyageIndex = newIndex;
+  renderVoyageStack(direction);
+}
+
+function voyageNext() { voyageGoTo(voyageIndex + 1); }
+function voyagePrev() { voyageGoTo(voyageIndex - 1); }
+
+function voyageCardClick(key) {
+  if (voyageClickGuard) return;
+  const idx = VOYAGE_ORDER.indexOf(key);
+  if (idx !== voyageIndex) {
+    // si tocas una tarjeta de atrás, primero la trae al frente en vez de abrir el modal
+    voyageGoTo(idx);
+  } else {
+    openModal(key);
+  }
+}
+
+// Swipe vertical táctil
+(function initVoyageSwipe() {
+  const stack = document.getElementById('voyageStack');
+  if (!stack) return;
+  let startY = 0, startX = 0, dragging = false;
+
+  stack.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
+    dragging = true;
+  }, { passive: true });
+
+  stack.addEventListener('touchmove', (e) => {
+    if (dragging) e.preventDefault();
+  }, { passive: false });
+
+  stack.addEventListener('touchend', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    const endY = e.changedTouches[0].clientY;
+    const endX = e.changedTouches[0].clientX;
+    const diffY = startY - endY;
+    const diffX = Math.abs(startX - endX);
+    if (Math.abs(diffY) > 40 && Math.abs(diffY) > diffX) {
+      voyageClickGuard = true;
+      if (diffY > 0) voyageNext(); else voyagePrev();
+      setTimeout(() => { voyageClickGuard = false; }, 250);
+    }
+  }, { passive: true });
+})();
+
+function openModal(key) {
+  const p = plans[key];
+  const content = document.getElementById('modalContent');
+
+  if (key === 'turbo') {
+    content.innerHTML = `
+      <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
+      <div class="modal-plan-name">${p.name}</div>
+      <div class="modal-plan-desc">${p.desc}</div>
+      <div class="modal-features-grid">
+        ${TRIAL_OPTIONS.map(opt => `
+          <button class="trial-choice" onclick="requestTrial('${opt.key}')">
+            <div class="mf-icon">${opt.key === 'basic' ? '🌐' : opt.key === 'advanced' ? '🚀' : opt.key === 'vip' ? '🏦' : opt.key === 'gaming' ? '🎮' : '♾️'}</div>
+            <div class="mf-label">${opt.label}</div>
+            <div class="mf-val">Pedir prueba</div>
+          </button>
+        `).join('')}
+      </div>
+      <button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor}" onclick="closeModal()">
+        Cerrar
+      </button>
+    `;
+  } else {
+  content.innerHTML = `
+    <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
+    <div class="modal-plan-name">${p.name}</div>
+    <div class="modal-plan-desc">${p.desc}</div>
+    <div class="modal-features-grid">
+      ${p.features.map(f => `
+        <div class="modal-feat">
+          <div class="mf-icon">${f.icon}</div>
+          <div class="mf-label">${f.label}</div>
+          <div class="mf-val">${f.val}</div>
+        </div>
+      `).join('')}
+    </div>
+    <!-- Precio en Stars y TON -->
+    <div style="text-align:center; margin: 12px 0; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+      <span style="background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 100px; font-size: 13px;">
+        ⭐ ${p.stars} Stars
+      </span>
+      <span style="background: rgba(0,136,204,0.15); padding: 6px 12px; border-radius: 100px; font-size: 13px;">
+        💎 ${p.ton} TON
+      </span>
+    </div>
+    <div style="display: flex; gap: 12px; margin-top: 8px;">
+      <button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor}; flex:1;" onclick="handleCTA('${key}')">
+        ${p.cta} (CUP/USDT)
+      </button>
+      <button class="modal-cta" style="background:#5bf0ff;color:#000;box-shadow:0 0 30px rgba(91,240,255,0.3); flex:1;" onclick="payWithStars('${key}')">
+        ⭐ Pagar con Stars
+      </button>
+    </div>
+    <div style="margin-top: 8px;">
+      <button class="modal-cta" style="background:#0088cc;color:#fff;box-shadow:0 0 30px rgba(0,136,204,0.3); width:100%;" onclick="payWithTON('${key}')">
+        💎 Pagar con TON
+      </button>
+    </div>
+  `;
+}
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+function handleCTA(key) {
+  closeModal();
+  const apiKey = PLAN_API_KEYS[key] || key;
+  const priceCup = PLAN_CUP[key];
+  const priceMobile = PLAN_MOBILE[key];
+  const priceUsdt = PLAN_USDT[key];
+
+  const params = new URLSearchParams({
+    userId: currentUserId,
+    plan: apiKey,
+    price: String(priceCup),
+    mobile: String(priceMobile),
+    usdtAmount: String(priceUsdt),
+    planLabel: plans[key].name
+  });
+
+  window.location.href = `payment.html?${params.toString()}`;
+}
+
+async function requestTrial(planKey) {
+  if (!currentUserId) {
+    const modalContent = document.getElementById('modalContent');
+    if (modalContent) {
+      modalContent.innerHTML = `
+        <div style="text-align:center; padding:20px;">
+          <div style="font-size:48px; margin-bottom:16px;">🔐</div>
+          <div class="modal-plan-name">Acceso requerido</div>
+          <div class="modal-plan-desc">
+            Para solicitar una prueba necesitas abrir esta Web App desde el bot de Telegram.<br><br>
+            <b>1.</b> Ve a <a href="https://t.me/vpncubaw_bot" target="_blank">@vpncubaw_bot</a><br>
+            <b>2.</b> Toca "VER PLANES"<br><br>
+            También puedes pedirle a un administrador que te envíe un enlace directo con tu ID.
+          </div>
+          <button class="modal-cta" style="background:#5bf0ff;color:#000;" onclick="closeModal()">Cerrar</button>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  const planNames = {
+    'basico': 'Básico',
+    'avanzado': 'Avanzado',
+    'cuba_vip': 'Cuba VIP',
+    'premium': 'Premium',
+    'anual': 'Anual'
+  };
+  
+  const selectedPlanName = planNames[PLAN_API_KEYS[planKey]] || PLAN_API_KEYS[planKey];
+
+  try {
+    const res = await fetch('/api/request-trial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: String(currentUserId),
+        username: currentUsername,
+        firstName: currentFirstName,
+        trialType: '1h',
+        gameServer: planKey,
+        connectionType: 'WireGuard',
+        trialPlanType: PLAN_API_KEYS[planKey]
+      })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      // Manejar errores específicos
+      if (data.error && data.error.includes('pendiente del plan')) {
+        alert(`⚠️ Ya tienes una solicitud PENDIENTE para el plan ${selectedPlanName}.\n\nEspera a que un administrador te envíe la configuración.`);
+      } else if (data.error && (data.error.includes('Ya solicitaste') || data.error.includes('esperar'))) {
+        alert(`⚠️ ${data.error}\n\nSolo puedes solicitar el plan ${selectedPlanName} una vez cada 30 días.`);
+      } else {
+        alert(`❌ Error: ${data.error || 'No se pudo solicitar la prueba'}`);
+      }
+      return;
+    }
+    
+    alert(`✅ ¡Prueba del plan ${selectedPlanName} solicitada con éxito!\n\nRevisa tu chat de Telegram, la configuración ya ha sido enviada.`);
+    closeModal();
+  } catch (err) {
+    alert(`❌ Error: ${err.message || 'Error solicitando prueba'}`);
+  }
+}
+async function payWithStars(planKey) {
+  if (!currentUserId) {
+    alert('❌ Debes abrir esta Web App desde el bot de Telegram para pagar.');
+    return;
+  }
+
+  const apiKey = PLAN_API_KEYS[planKey];
+  if (!apiKey) {
+    alert('Plan no válido');
+    return;
+  }
+
+  try {
+  const response = await fetch('/api/initiate-stars-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      telegramId: currentUserId,
+      plan: apiKey
+    })
+  });
+
+  console.log('STATUS:', response.status);
+
+  const text = await response.text();
+
+  console.log('RESPONSE:', text);
+
+  let result;
+
+  try {
+    result = JSON.parse(text);
+  } catch (e) {
+    alert('Respuesta inválida del servidor:\n' + text);
+    return;
+  }
+
+  if (result.success) {
+    alert('✅ Factura enviada a Telegram.');
+    closeModal();
+  } else {
+    alert('❌ Error: ' + (result.error || 'No se pudo iniciar el pago.'));
+  }
+
+} catch (error) {
+  console.error('STARS ERROR:', error);
+  alert('STARS ERROR:\n' + error.message);
+  }
+    }
+
+// ── TON Connect setup ──
+let tonConnectUI = null;
+let tonPendingPayment = null; // { apiKey, amount, walletAddress, comment, label }
+
+function getTonConnectUI() {
+  if (!tonConnectUI) {
+    tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: 'https://vpn-bryan.onrender.com/tonconnect-manifest.json'
+    });
+    // Escuchar cambios de estado de la wallet
+    tonConnectUI.onStatusChange(wallet => {
+      if (wallet && tonPendingPayment) {
+        sendTONTransaction();
+      }
+    });
+  }
+  return tonConnectUI;
+}
+
+async function payWithTON(planKey) {
+  if (!currentUserId) {
+    alert('❌ Debes abrir esta Web App desde el bot de Telegram para pagar.');
+    return;
+  }
+  const apiKey = PLAN_API_KEYS[planKey];
+  if (!apiKey) { alert('Plan no válido'); return; }
+
+  try {
+    const response = await fetch('/api/initiate-ton-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: currentUserId, plan: apiKey })
+    });
+    const data = await response.json();
+    if (!data.success) { alert('❌ Error: ' + (data.error || 'No se pudo iniciar el pago.')); return; }
+
+    const { walletAddress, amount, comment, label } = data;
+    tonPendingPayment = { apiKey, amount, walletAddress, comment, label };
+
+    const modalContent = document.getElementById('modalContent');
+    modalContent.innerHTML = `
+      <div style="text-align:center; padding:16px;">
+        <div style="font-size:48px; margin-bottom:12px;">💎</div>
+        <div class="modal-plan-name">Pagar con TON</div>
+        <div class="modal-plan-desc" style="margin:12px 0;">${label}</div>
+
+        <div style="background:rgba(0,136,204,0.1); border:1px solid rgba(0,136,204,0.3); border-radius:12px; padding:16px; margin:12px 0;">
+          <div style="font-size:12px; color:#aaa; margin-bottom:4px;">CANTIDAD</div>
+          <div style="font-size:26px; font-weight:700; color:#5bf0ff;">💎 ${amount} TON</div>
+        </div>
+
+        <div id="ton-connect-status" style="margin:12px 0; font-size:13px; color:#aaa;">
+          Conecta tu wallet para continuar
+        </div>
+
+        <button id="ton-connect-btn" class="modal-cta" style="background:#0088cc;color:#fff;width:100%;margin-bottom:8px;" onclick="connectTONWallet()">
+          🔗 Conectar Wallet
+        </button>
+        <button class="modal-cta" style="background:rgba(255,255,255,0.1);color:#fff;width:100%;" onclick="closeModal()">
+          Cancelar
+        </button>
+      </div>
+    `;
+
+    // Si ya hay wallet conectada, ir directo a enviar
+    const ui = getTonConnectUI();
+    if (ui.connected) {
+      updateTONConnectStatus('✅ Wallet conectada. Enviando transacción...');
+      await sendTONTransaction();
+    }
+
+  } catch (error) {
+    console.error('Error iniciando pago TON:', error);
+    alert('Error al conectar con el servidor.');
+  }
+}
+
+async function connectTONWallet() {
+  try {
+    const ui = getTonConnectUI();
+    if (ui.connected) {
+      await sendTONTransaction();
+    } else {
+      await ui.openModal();
+    }
+  } catch (error) {
+    console.error('Error conectando wallet:', error);
+    alert('Error al abrir el selector de wallets.');
+  }
+}
+
+function updateTONConnectStatus(msg) {
+  const el = document.getElementById('ton-connect-status');
+  if (el) el.textContent = msg;
+  const btn = document.getElementById('ton-connect-btn');
+  if (btn) { btn.textContent = msg; btn.disabled = true; }
+}
+
+async function sendTONTransaction() {
+  if (!tonPendingPayment) return;
+
+  const { apiKey, amount, walletAddress, comment } = tonPendingPayment;
+
+  updateTONConnectStatus('⏳ Esperando confirmación en tu wallet...');
+
+  try {
+    const ui = getTonConnectUI();
+
+    const amountNano = Math.floor(amount * 1e9).toString();
+
+    console.log('TON TX', {
+      walletAddress,
+      amountNano,
+      comment
+    });
+
+    const result = await ui.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
+      messages: [{
+        address: walletAddress,
+        amount: amountNano
+      }]
+    });
+
+    console.log('TON RESULT', result);
+
+    updateTONConnectStatus('🔍 Verificando pago...');
+    await verifyTONPayment(apiKey, comment);
+
+  } catch (error) {
+
+    console.error('TON ERROR COMPLETO:', error);
+
+    alert(
+      'TON ERROR:\n' +
+      (error?.message || JSON.stringify(error))
+    );
+
+    tonPendingPayment = null;
+  }
+}
+async function verifyTONPayment(apiKey, comment) {
+  try {
+    // Esperar unos segundos para que la tx se propague
+    await new Promise(r => setTimeout(r, 5000));
+
+    const response = await fetch('/api/verify-ton-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: currentUserId, plan: apiKey, comment })
+    });
+    const result = await response.json();
+
+    if (result.verified) {
+      alert('✅ ¡Pago verificado! Tu plan ha sido activado. Revisa Telegram.');
+      tonPendingPayment = null;
+      closeModal();
+    } else {
+      // Reintentar hasta 3 veces con 5s de espera
+      const modalContent = document.getElementById('modalContent');
+      if (modalContent) {
+        modalContent.innerHTML = `
+          <div style="text-align:center; padding:24px;">
+            <div style="font-size:48px; margin-bottom:12px;">⏳</div>
+            <div class="modal-plan-name">Verificando pago</div>
+            <div class="modal-plan-desc" style="margin:12px 0;">La transacción puede tardar unos segundos en confirmarse.</div>
+            <button class="modal-cta" style="background:#0088cc;color:#fff;width:100%;margin-bottom:8px;" onclick="verifyTONPayment('${apiKey}','${comment}')">
+              🔄 Verificar de nuevo
+            </button>
+            <button class="modal-cta" style="background:rgba(255,255,255,0.1);color:#fff;width:100%;" onclick="closeModal()">
+              Cerrar
+            </button>
+          </div>
+        `;
+      }
+    }
+  } catch (error) {
+    alert('Error al verificar. Inténtalo de nuevo.');
+  }
+}
+
+function toggleFaq(el) {
+  const wasOpen = el.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+  if (!wasOpen) el.classList.add('open');
+}
+
+function scrollTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===== RAYOS LÁSER VIVOS: flotan libres, son atraídos al punto de toque, sueltan chispas =====
+(function initHyperspace() {
+  const lasers = Array.from(document.querySelectorAll('.laser'));
+  const container = document.getElementById('hyperspace');
+  if (!lasers.length || !container) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) return;
+
+  const vw = () => window.innerWidth;
+  const vh = () => window.innerHeight;
+
+  // Estado de cada rayo: posición actual, ángulo de deriva libre, velocidad
+  const state = lasers.map(() => ({
+    x: Math.random() * vw(),
+    y: Math.random() * vh(),
+    angle: Math.random() * Math.PI * 2,
+    speed: 0.55 + Math.random() * 0.5, // deriva más viva
+  }));
+
+  let pointer = null; // { x, y } mientras el usuario toca/arrastra
+  let lastSparkTime = 0;
+
+  function spawnSpark(x, y, colorVar) {
+    const spark = document.createElement('div');
+    spark.className = 'spark';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * 55;
+    spark.style.setProperty('--sx', `${Math.cos(angle) * dist}px`);
+    spark.style.setProperty('--sy', `${Math.sin(angle) * dist}px`);
+    spark.style.left = `${x}px`;
+    spark.style.top = `${y}px`;
+    spark.style.background = `var(${colorVar})`;
+    spark.style.boxShadow = `0 0 12px 3px var(${colorVar})`;
+    spark.style.animation = `sparkFly ${0.4 + Math.random() * 0.3}s ease-out forwards`;
+    container.appendChild(spark);
+    setTimeout(() => spark.remove(), 800);
+  }
+
+  const colorVars = ['--neon-blue', '--neon-purple', '--neon-pink', '--neon-green', '--neon-yellow', '--neon-blue', '--neon-pink', '--neon-purple', '--neon-green', '--neon-yellow', '--neon-blue', '--neon-pink'];
+
+  function tick() {
+    const W = vw(), H = vh();
+    const now = performance.now();
+
+    state.forEach((s, i) => {
+      const laser = lasers[i];
+
+      if (pointer) {
+        // Atracción suave hacia el punto de contacto
+        const dx = pointer.x - s.x;
+        const dy = pointer.y - s.y;
+        const dist = Math.max(Math.hypot(dx, dy), 1);
+        const pull = Math.min(8, dist * 0.06);
+        s.x += (dx / dist) * pull;
+        s.y += (dy / dist) * pull;
+
+        // Orientar el rayo hacia el punto de contacto (parece "vivo")
+        const angleToPointer = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+        laser.style.transform = `translate(${s.x}px, ${s.y}px) rotate(${angleToPointer}deg) scaleY(${1 + Math.min(dist / 300, 0.6)})`;
+        laser.style.opacity = '0.95';
+
+        // Chispas alrededor del punto de contacto, en un área más amplia y con mayor frecuencia
+        if (dist < 140 && now - lastSparkTime > 35) {
+          spawnSpark(pointer.x, pointer.y, colorVars[i]);
+          spawnSpark(pointer.x, pointer.y, colorVars[i]);
+          lastSparkTime = now;
+        }
+      } else {
+        // Deriva libre y lenta por toda la pantalla
+        s.x += Math.cos(s.angle) * s.speed;
+        s.y += Math.sin(s.angle) * s.speed;
+        s.angle += (Math.random() - 0.5) * 0.04; // cambio de rumbo orgánico
+
+        // Rebote suave en los bordes
+        if (s.x < 0) { s.x = 0; s.angle = Math.PI - s.angle; }
+        if (s.x > W) { s.x = W; s.angle = Math.PI - s.angle; }
+        if (s.y < 0) { s.y = 0; s.angle = -s.angle; }
+        if (s.y > H) { s.y = H; s.angle = -s.angle; }
+
+        const driftAngleDeg = s.angle * (180 / Math.PI) + 90;
+        laser.style.transform = `translate(${s.x}px, ${s.y}px) rotate(${driftAngleDeg}deg) scaleY(1)`;
+        laser.style.opacity = '0.78';
+      }
+    });
+
+    requestAnimationFrame(tick);
+  }
+
+  function setPointerFromEvent(e) {
+    const touch = e.touches?.[0];
+    pointer = { x: touch ? touch.clientX : e.clientX, y: touch ? touch.clientY : e.clientY };
+  }
+
+  window.addEventListener('touchstart', setPointerFromEvent, { passive: true });
+  window.addEventListener('touchmove', setPointerFromEvent, { passive: true });
+  window.addEventListener('touchend', () => { pointer = null; }, { passive: true });
+  window.addEventListener('touchcancel', () => { pointer = null; }, { passive: true });
+
+  requestAnimationFrame(tick);
+})();
+
+window.addEventListener('load', () => {
+  applyDynamicPrices();
+  loadAnnouncement();
+  renderVoyageStack();
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor('#080a0f');
+    tg.setBackgroundColor('#080a0f');
+  }
+
+  if (currentUserId) {
+    fetch(`/api/user-info/${encodeURIComponent(currentUserId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.banned) {
+          document.getElementById('banScreen')?.classList.add('active');
+          const mainApp = document.getElementById('mainApp');
+          if (mainApp) mainApp.style.display = 'none';
+        }
+      })
+      .catch(() => {});
+  }
+});
+</script>
+  <!-- Botón flotante de WhatsApp -->
+<div style="position: fixed; bottom: 90px; right: 20px; z-index: 1000;">
+  <a class="whatsapp-float" href="https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t" target="_blank" rel="noopener noreferrer" style="display: block; background: #25D366; border-radius: 50%; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform 0.2s; text-decoration: none;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
+      <path d="M12.032 2.004c-5.514 0-9.996 4.48-9.996 9.992 0 1.764.457 3.424 1.258 4.86L2 22.004l5.258-1.303c1.38.755 2.965 1.152 4.63 1.152 5.514 0 9.996-4.48 9.996-9.992 0-5.51-4.482-9.99-9.996-9.99zm0 18.396c-1.47 0-2.906-.394-4.145-1.086l-.296-.175-3.112.773.83-3.04-.19-.307c-.77-1.27-1.174-2.68-1.174-4.143 0-4.35 3.54-7.89 7.89-7.89 4.35 0 7.89 3.54 7.89 7.89 0 4.35-3.54 7.89-7.89 7.89zm4.317-5.707c-.235-.117-1.392-.687-1.608-.764-.215-.078-.372-.117-.53.117-.156.235-.605.764-.742.92-.138.157-.276.176-.51.058-.236-.117-.996-.367-1.896-1.17-.7-.625-1.173-1.396-1.31-1.632-.137-.235-.015-.363.104-.48.107-.104.235-.273.352-.41.117-.136.156-.235.235-.392.078-.156.04-.294-.02-.41-.058-.118-.53-1.277-.726-1.75-.19-.46-.383-.398-.53-.398-.137 0-.293-.02-.45-.02-.157 0-.41.058-.626.293-.215.235-.822.803-.822 1.96 0 1.156.842 2.273.96 2.43.117.156 1.658 2.53 4.017 3.55.562.243 1 .386 1.342.495.563.177 1.075.152 1.48.092.452-.068 1.392-.57 1.588-1.12.196-.55.196-1.022.137-1.12-.058-.098-.215-.156-.45-.273z"/>
+    </svg>
+  </a>
+</div>
+</body>
+</html>
