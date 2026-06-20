@@ -1518,7 +1518,7 @@ function renderVoyageStack(direction = 0) {
       const ty = dir * (95 + depth * 70);
       const scale = 1 - depth * 0.06;
       card.style.transform = `translate(${kickX}px, ${ty}px) scale(${kickX ? scale * 0.96 : scale})`;
-      card.style.opacity = depth >= 3 ? '0' : String(0.75 - depth * 0.8);
+      card.style.opacity = depth >= 3 ? '0' : String(0.75 - depth * 0.08);
       card.style.zIndex = String(5 - depth);
     }
   });
