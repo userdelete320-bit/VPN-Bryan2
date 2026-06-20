@@ -855,6 +855,42 @@
     100% { transform: translateX(-50%); }
   }
 
+  /* BARRA DE ANUNCIO (admin) */
+  .announce-bar {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    width: 100%;
+    background: linear-gradient(90deg, rgba(255,107,107,0.15), rgba(255,209,102,0.12));
+    border-bottom: 1px solid rgba(255,209,102,0.3);
+    overflow: hidden;
+    height: 30px;
+    display: none;
+    align-items: center;
+  }
+  .announce-bar.active { display: flex; }
+  .announce-track {
+    display: flex;
+    white-space: nowrap;
+    animation: announceScroll 18s linear infinite;
+    width: max-content;
+  }
+  .announce-item {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #ffd166;
+    padding: 0 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  @keyframes announceScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -864,6 +900,11 @@
 <body>
 
 <div class="bg-ambient"></div>
+
+<!-- BARRA DE ANUNCIO (controlada desde el panel admin) -->
+<div class="announce-bar" id="announceBar">
+  <div class="announce-track" id="announceTrack"></div>
+</div>
 
 <!-- Pantalla de baneo -->
 <div class="ban-screen" id="banScreen">
@@ -1248,6 +1289,24 @@ async function applyDynamicPrices() {
     }
   } catch (e) {
     console.error('No se pudieron cargar precios dinámicos, se usan los valores por defecto:', e);
+  }
+}
+
+// Carga el anuncio configurado por el admin (si hay uno activo y dentro de su ventana de tiempo).
+async function loadAnnouncement() {
+  try {
+    const res = await fetch('/api/announcement');
+    if (!res.ok) return;
+    const data = await res.json();
+    const bar = document.getElementById('announceBar');
+    const track = document.getElementById('announceTrack');
+    if (!data.active || !data.text) { bar.classList.remove('active'); return; }
+
+    const itemHtml = `<div class="announce-item">📣 ${data.text}</div>`;
+    track.innerHTML = itemHtml.repeat(8); // se repite para que el scroll sea continuo
+    bar.classList.add('active');
+  } catch (e) {
+    console.error('No se pudo cargar el anuncio:', e);
   }
 }
 
@@ -1666,6 +1725,7 @@ function scrollTop() {
 
 window.addEventListener('load', () => {
   applyDynamicPrices();
+  loadAnnouncement();
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();

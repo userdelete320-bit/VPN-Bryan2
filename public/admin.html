@@ -278,7 +278,7 @@ select option{background:var(--ink)}
       <div class="nav-group"><div class="nav-group-label">// Usuarios</div><div class="nav-item" data-tab="users" onclick="switchTab('users')"><i class="fas fa-users"></i> Usuarios</div><div class="nav-item" data-tab="referrals" onclick="switchTab('referrals')"><i class="fas fa-share-alt"></i> Referidos</div></div>
       <div class="nav-group"><div class="nav-group-label">// Contenido</div><div class="nav-item" data-tab="plan-files" onclick="switchTab('plan-files')"><i class="fas fa-folder"></i> Archivos Planes</div><div class="nav-item" data-tab="coupons" onclick="switchTab('coupons')"><i class="fas fa-tag"></i> Cupones</div></div>
       <div class="nav-group"><div class="nav-group-label">// Mensajes</div><div class="nav-item" data-tab="broadcast" onclick="switchTab('broadcast')"><i class="fas fa-bullhorn"></i> Broadcast</div><div class="nav-item" data-tab="games" onclick="switchTab('games')"><i class="fas fa-gamepad"></i> Juegos</div></div>
-      <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div><div class="nav-item" data-tab="prices" onclick="switchTab('prices')"><i class="fas fa-dollar-sign"></i> Precios</div></div>
+      <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div><div class="nav-item" data-tab="prices" onclick="switchTab('prices')"><i class="fas fa-dollar-sign"></i> Precios</div><div class="nav-item" data-tab="announcement" onclick="switchTab('announcement')"><i class="fas fa-bullhorn"></i> Anuncio</div></div>
     </div>
     <div class="sidebar-footer">Panel Admin v3.0 · VPN Cuba</div>
   </nav>
@@ -479,6 +479,29 @@ select option{background:var(--ink)}
           <div id="pricesFormWrap" style="display:none">
             <div id="pricesGrid" style="display:flex;flex-direction:column;gap:14px"></div>
             <button class="btn green" style="margin-top:18px;width:100%" onclick="savePrices()"><i class="fas fa-save"></i> <span>Guardar todos los precios</span></button>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- ── ANUNCIO TIPO TICKER (solo super admin) ── -->
+      <div id="announcementPanel" class="tab-panel">
+        <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-bullhorn"></i> Anuncio en la Web de Planes</div><button class="btn green" onclick="loadAnnouncementAdmin()"><i class="fas fa-sync-alt"></i> <span>Refrescar</span></button></div>
+        <div class="card-body">
+          <div class="loading" id="announcementLoading"><div class="spinner"></div> Cargando...</div>
+          <div id="announcementFormWrap" style="display:none">
+            <div id="announcementStatusBadge" style="margin-bottom:14px;font-family:var(--f-mono);font-size:.7rem;padding:8px 12px;border-radius:8px;display:inline-block"></div>
+            <div class="form-group" style="margin-bottom:12px">
+              <div class="form-label">Texto del anuncio</div>
+              <textarea id="announcementText" rows="3" placeholder="// ej: 🔥 Promo especial: 20% OFF en plan Anual solo hoy..."></textarea>
+            </div>
+            <div class="form-group" style="margin-bottom:16px">
+              <div class="form-label">Duración (horas desde que se active)</div>
+              <input type="number" id="announcementDuration" min="1" step="1" value="24" style="width:160px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--txt);padding:10px;font-family:var(--f-mono);font-size:.8rem">
+            </div>
+            <div style="display:flex;gap:10px">
+              <button class="btn green" style="flex:1" onclick="activateAnnouncement()"><i class="fas fa-play"></i> <span>Activar anuncio</span></button>
+              <button class="btn red" style="flex:1" onclick="deactivateAnnouncement()"><i class="fas fa-stop"></i> <span>Desactivar</span></button>
+            </div>
           </div>
         </div></div>
       </div>
@@ -896,6 +919,59 @@ async function savePrices() {
     const data = await res.json();
     if (res.ok) showNotification('✅ Precios actualizados correctamente', 'success');
     else showNotification('❌ ' + (data.error || 'No se pudo guardar'), 'error');
+  } catch(e) { showNotification('Error de conexión', 'error'); }
+}
+
+// ── ANUNCIO TIPO TICKER (solo super admin) ──────────────────
+async function loadAnnouncementAdmin() {
+  document.getElementById('announcementLoading').style.display = 'flex';
+  document.getElementById('announcementFormWrap').style.display = 'none';
+  try {
+    const res = await fetch('/api/announcement');
+    const data = await res.json();
+    document.getElementById('announcementLoading').style.display = 'none';
+
+    const badge = document.getElementById('announcementStatusBadge');
+    if (data.active) {
+      const endsLabel = data.ends_at ? new Date(data.ends_at).toLocaleString('es-ES') : 'Sin límite';
+      badge.style.background = 'rgba(57,255,160,0.12)'; badge.style.color = 'var(--green)';
+      badge.innerHTML = `<i class="fas fa-circle"></i> ACTIVO · Termina: ${endsLabel}`;
+      document.getElementById('announcementText').value = data.text || '';
+    } else {
+      badge.style.background = 'rgba(255,255,255,0.06)'; badge.style.color = 'var(--txt-2)';
+      badge.innerHTML = `<i class="fas fa-circle"></i> INACTIVO`;
+    }
+    document.getElementById('announcementFormWrap').style.display = 'block';
+  } catch(e) { document.getElementById('announcementLoading').style.display = 'none'; showNotification('Error al cargar anuncio', 'error'); }
+}
+
+async function activateAnnouncement() {
+  const text = document.getElementById('announcementText').value.trim();
+  const durationHours = document.getElementById('announcementDuration').value;
+  if (!text) { showNotification('❌ Escribe el texto del anuncio', 'error'); return; }
+  showNotification('⏳ Activando anuncio...', 'info');
+  try {
+    const res = await fetch('/api/announcement/update', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requesterId: currentUserId, text, active: true, durationHours })
+    });
+    const data = await res.json();
+    if (res.ok) { showNotification('✅ Anuncio activado', 'success'); loadAnnouncementAdmin(); }
+    else showNotification('❌ ' + (data.error || 'No se pudo activar'), 'error');
+  } catch(e) { showNotification('Error de conexión', 'error'); }
+}
+
+async function deactivateAnnouncement() {
+  if (!confirm('¿Desactivar el anuncio? Dejará de mostrarse en la web de planes.')) return;
+  showNotification('⏳ Desactivando...', 'info');
+  try {
+    const res = await fetch('/api/announcement/update', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requesterId: currentUserId, active: false })
+    });
+    const data = await res.json();
+    if (res.ok) { showNotification('✅ Anuncio desactivado', 'success'); loadAnnouncementAdmin(); }
+    else showNotification('❌ ' + (data.error || 'No se pudo desactivar'), 'error');
   } catch(e) { showNotification('Error de conexión', 'error'); }
 }
 
@@ -1660,7 +1736,7 @@ async function loadGamesStats() {
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────
-const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes' };
+const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes', announcement:'// Anuncio Web' };
 
 function switchTab(name) {
   stopBroadcastPolling(); // detener polling al cambiar de pestaña
@@ -1695,7 +1771,8 @@ function switchTab(name) {
     },
     games: loadGamesStats,
     admins: loadAdmins,
-    prices: loadPrices
+    prices: loadPrices,
+    announcement: loadAnnouncementAdmin
   };
   if (loaders[name]) loaders[name]();
   // cerrar sidebar en móvil
