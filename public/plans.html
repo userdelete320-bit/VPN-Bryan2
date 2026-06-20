@@ -372,6 +372,26 @@
     transition: transform 0.2s, border-color 0.2s;
     animation: fadeSlideDown 0.5s ease both;
   }
+
+  /*NUEVA ANIMACIÓN*/
+  .turbo-card,
+.plan-card {
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.18s linear, box-shadow 0.25s ease;
+}
+
+.float-soft {
+  animation: floatSoft 5.5s ease-in-out infinite;
+}
+
+@keyframes floatSoft {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-4px); }
+  100% { transform: translateY(0px); }
+  }
+
+  
   .plan-card:active { transform: scale(0.98); }
 
   .plan-card::before {
@@ -1313,6 +1333,48 @@ async function loadAnnouncement() {
     console.error('No se pudo cargar el anuncio:', e);
   }
 }
+
+  //Animación Dinámica
+  function updateParallax() {
+  const cards = document.querySelectorAll('.turbo-card, .plan-card');
+  const center = window.innerHeight / 2;
+
+  cards.forEach(card => {
+    const rect = card.getBoundingClientRect();
+    const cardCenter = rect.top + rect.height / 2;
+    const distance = (cardCenter - center) / center;
+
+    const translateY = distance * 18;
+    const rotate = distance * -2.2;
+    const scale = 1 - Math.min(Math.abs(distance) * 0.035, 0.035);
+
+    card.style.transform = `translate3d(0, ${translateY}px, 0) rotate(${rotate}deg) scale(${scale})`;
+
+    if (Math.abs(distance) < 0.35) {
+      card.classList.add('float-soft');
+    } else {
+      card.classList.remove('float-soft');
+    }
+  });
+}
+
+let ticking = false;
+
+function onScroll() {
+  if (!ticking) {
+    window.requestAnimationFrame(() => {
+      updateParallax();
+      ticking = false;
+    });
+    ticking = true;
+  }
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+window.addEventListener('resize', updateParallax);
+window.addEventListener('load', updateParallax);
+
+updateParallax();
 
 const TRIAL_OPTIONS = [
   { key: 'basic', label: 'Básico' },
