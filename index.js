@@ -140,20 +140,56 @@ const USDT_CONFIG = {
     MIN_CONFIRMATIONS: 3
 };
 
-const USDT_PRICES = {
-    'basico': '0.7',
-    'avanzado': '1.4',
-    'cuba_vip': '2.0',
-    'premium': '1.1',
-    'anual': '30'
+// Precios por defecto (fallback si la BD aún no tiene datos)
+const DEFAULT_PLAN_PRICES = {
+    basico:   { cup: 900,   mobile: 400,   usdt: 0.7,  stars: 150,  ton: 2.0 },
+    avanzado: { cup: 1800,  mobile: 900,   usdt: 1.4,  stars: 270,  ton: 3.0 },
+    cuba_vip: { cup: 1200,  mobile: 500,   usdt: 2.0,  stars: 180,  ton: 2.2 },
+    premium:  { cup: 1500,  mobile: 700,   usdt: 1.1,  stars: 210,  ton: 2.5 },
+    anual:    { cup: 15000, mobile: 10000, usdt: 30,   stars: 2100, ton: 26.0 }
 };
-const STARS_PRICES = {
-    'basico': 150,
-    'avanzado': 270,
-    'cuba_vip': 180,
-    'premium': 210, // Corresponde al plan gaming
-    'anual': 2100
-};
+
+let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
+
+// Objetos derivados que el resto del código ya usa (se actualizan junto con PLAN_PRICES)
+let USDT_PRICES = {};
+let STARS_PRICES = {};
+let TON_PRICES = {};
+
+function rebuildDerivedPriceObjects() {
+    USDT_PRICES = {}; STARS_PRICES = {}; TON_PRICES = {};
+    for (const plan of Object.keys(PLAN_PRICES)) {
+        USDT_PRICES[plan] = String(PLAN_PRICES[plan].usdt);
+        STARS_PRICES[plan] = Number(PLAN_PRICES[plan].stars);
+        TON_PRICES[plan] = Number(PLAN_PRICES[plan].ton);
+    }
+}
+rebuildDerivedPriceObjects();
+
+// Carga los precios actuales desde Supabase (tabla plan_prices) y reconstruye los derivados.
+async function loadPlanPricesFromDb() {
+    try {
+        const sb = getSbClient();
+        const { data, error } = await sb.from('plan_prices').select('*');
+        if (error) throw error;
+        if (data && data.length) {
+            const merged = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
+            for (const row of data) {
+                if (merged[row.plan]) {
+                    merged[row.plan] = {
+                        cup: Number(row.cup), mobile: Number(row.mobile),
+                        usdt: Number(row.usdt), stars: Number(row.stars), ton: Number(row.ton)
+                    };
+                }
+            }
+            PLAN_PRICES = merged;
+            rebuildDerivedPriceObjects();
+        }
+        console.log('✅ Precios de planes cargados desde BD');
+    } catch (e) {
+        console.error('❌ Error cargando precios desde BD (se usan valores por defecto):', e.message);
+    }
+}
   
 
 const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t';
@@ -764,26 +800,42 @@ app.post('/api/admins/add', async (req, res) => {
   }
 });
 
-app.post('/api/admins/remove', async (req, res) => {
-  try {
-    const { requesterId, telegramId } = req.body;
-    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede quitar admins.' });
-    const cleanId = String(telegramId).trim();
-    if (cleanId === SUPER_ADMIN_ID) return res.status(400).json({ error: 'No puedes quitar al administrador principal.' });
+// ── PRECIOS DE PLANES (lectura pública, edición solo super admin) ──
 
+app.get('/api/plan-prices', (req, res) => {
+  res.json(PLAN_PRICES);
+});
+
+app.post('/api/plan-prices/update', async (req, res) => {
+  try {
+    const { requesterId, prices } = req.body;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede modificar precios.' });
+    if (!prices || typeof prices !== 'object') return res.status(400).json({ error: 'Formato de precios inválido.' });
+
+    const validPlans = Object.keys(DEFAULT_PLAN_PRICES);
     const sb = getSbClient();
-    const { error } = await sb.from('bot_admins').delete().eq('telegram_id', cleanId);
+    const rows = [];
+
+    for (const plan of validPlans) {
+      if (!prices[plan]) continue;
+      const p = prices[plan];
+      const cup = Number(p.cup), mobile = Number(p.mobile), usdt = Number(p.usdt), stars = Number(p.stars), ton = Number(p.ton);
+      if ([cup, mobile, usdt, stars, ton].some(v => isNaN(v) || v < 0)) {
+        return res.status(400).json({ error: `Valores inválidos para el plan ${plan}.` });
+      }
+      rows.push({ plan, cup, mobile, usdt, stars, ton, updated_at: new Date().toISOString(), updated_by: String(requesterId) });
+    }
+
+    if (!rows.length) return res.status(400).json({ error: 'No se enviaron precios válidos.' });
+
+    const { error } = await sb.from('plan_prices').upsert(rows, { onConflict: 'plan' });
     if (error) throw error;
 
-    await loadAdminsFromDb();
+    await loadPlanPricesFromDb();
 
-    try {
-      await bot.telegram.sendMessage(cleanId, 'ℹ️ Tus permisos de administrador en VPN Cuba han sido revocados.', { parse_mode: 'HTML' });
-    } catch (e) {}
-
-    res.json({ success: true, admins: ADMIN_IDS });
+    res.json({ success: true, prices: PLAN_PRICES });
   } catch (error) {
-    console.error('❌ Error quitando admin:', error);
+    console.error('❌ Error actualizando precios:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1443,14 +1495,6 @@ const TON_CONFIG = {
   WALLET_ADDRESS: 'UQAY_qlJ1uxM-UP2zWjLn4jbFf6nQWL4N3JDWfNIyTPy5rZO',
   MANIFEST_URL:   'https://vpn-bryan.onrender.com/tonconnect-manifest.json',
   TONCENTER_API:  'https://toncenter.com/api/v2',
-};
-
-const TON_PRICES = {
-  basico:   2.0,
-  avanzado: 3.0,
-  cuba_vip: 2.2,
-  premium:  2.5,
-  anual:    26.0
 };
 
 const TON_PLAN_LABELS = {
@@ -2380,6 +2424,7 @@ async function setWebhook() {
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 Servidor en http://localhost:${PORT}`);
     await loadAdminsFromDb();
+    await loadPlanPricesFromDb();
     console.log(`👑 Admins: ${ADMIN_IDS.join(', ')}`);
     console.log(`💰 USDT Wallet: ${USDT_CONFIG.WALLET_ADDRESS}`);
     await verifyStorageBuckets();
