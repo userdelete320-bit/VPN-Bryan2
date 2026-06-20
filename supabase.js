@@ -21,13 +21,23 @@ const dbClient = supabaseAdmin;
 
 const db = {
   // ========== STORAGE ==========
-  async uploadImage(filePath, telegramId) {
+  async uploadImage(filePath, telegramId, originalFileName) {
     try {
       const fileBuffer = await fs.readFile(filePath);
-      const fileName = `screenshot_${telegramId}_${Date.now()}.jpg`;
+
+      // Detectar extensión y content-type reales en vez de forzar siempre .jpg/image-jpeg
+      const ext = (originalFileName ? path.extname(originalFileName) : path.extname(filePath)).toLowerCase() || '.jpg';
+      const CONTENT_TYPES = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+        '.gif': 'image/gif', '.webp': 'image/webp',
+        '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm'
+      };
+      const contentType = CONTENT_TYPES[ext] || 'application/octet-stream';
+
+      const fileName = `screenshot_${telegramId}_${Date.now()}${ext}`;
       const { data, error } = await supabaseAdmin.storage
         .from('payments-screenshots')
-        .upload(fileName, fileBuffer, { contentType: 'image/jpeg', cacheControl: '3600', upsert: false });
+        .upload(fileName, fileBuffer, { contentType, cacheControl: '3600', upsert: false });
       if (error) throw error;
       const { data: { publicUrl } } = supabaseAdmin.storage.from('payments-screenshots').getPublicUrl(fileName);
       return publicUrl;

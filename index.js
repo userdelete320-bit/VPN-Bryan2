@@ -1417,7 +1417,7 @@ app.post('/api/broadcast/send', upload.single('mediaFile'), async (req, res) => 
     if (req.file) {
       mediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'photo';
       try {
-        mediaUrl = await db.uploadImage(req.file.path, `broadcast_${Date.now()}`);
+        mediaUrl = await db.uploadImage(req.file.path, `broadcast_${Date.now()}`, req.file.originalname);
         fs.unlink(req.file.path, () => {});
       } catch (e) {
         mediaUrl = `/uploads/${req.file.filename}`;
