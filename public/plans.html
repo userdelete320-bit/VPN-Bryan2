@@ -1224,6 +1224,33 @@ const PLAN_USDT = {
   anual: 25
 };
 
+// Sobrescribe los precios hardcodeados con los que el super admin haya configurado en el panel.
+async function applyDynamicPrices() {
+  try {
+    const res = await fetch('/api/plan-prices');
+    if (!res.ok) return;
+    const dynamicPrices = await res.json(); // { basico: {cup,mobile,usdt,stars,ton}, avanzado: {...}, ... }
+
+    for (const uiKey of Object.keys(PLAN_API_KEYS)) {
+      if (uiKey === 'trial') continue;
+      const apiKey = PLAN_API_KEYS[uiKey];
+      const dp = dynamicPrices[apiKey];
+      if (!dp) continue;
+
+      if (plans[uiKey]) {
+        plans[uiKey].price = { cup: dp.cup, mobile: dp.mobile, usdt: dp.usdt };
+        plans[uiKey].stars = dp.stars;
+        plans[uiKey].ton = dp.ton;
+      }
+      PLAN_CUP[uiKey] = dp.cup;
+      PLAN_MOBILE[uiKey] = dp.mobile;
+      PLAN_USDT[uiKey] = dp.usdt;
+    }
+  } catch (e) {
+    console.error('No se pudieron cargar precios dinámicos, se usan los valores por defecto:', e);
+  }
+}
+
 const TRIAL_OPTIONS = [
   { key: 'basic', label: 'Básico' },
   { key: 'advanced', label: 'Avanzado' },
@@ -1638,6 +1665,7 @@ function scrollTop() {
 }
 
 window.addEventListener('load', () => {
+  applyDynamicPrices();
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();

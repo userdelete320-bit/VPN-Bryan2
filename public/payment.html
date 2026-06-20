@@ -1567,9 +1567,28 @@ function payWithStars() {
 // Asegúrate de enlazar la actualización de texto en la función que cambia de pestaña o plan:
 // Ejemplo: document.getElementById('stars-amount-display').innerText = planDetails[currentPlan].stars + ' ⭐';
   
-// ===== INICIALIZACIÓN =====
-(function init() {
+// Sobrescribe PLAN_BASE con los precios configurados por el super admin en el panel.
+async function applyDynamicPricesPayment() {
   try {
+    const res = await fetch('/api/plan-prices');
+    if (!res.ok) return;
+    const dynamicPrices = await res.json(); // { basico: {cup,mobile,usdt,stars,ton}, ... }
+    for (const uiKey of Object.keys(PLAN_KEYS)) {
+      if (uiKey === 'trial' || uiKey === 'turbo') continue;
+      const apiKey = PLAN_KEYS[uiKey];
+      const dp = dynamicPrices[apiKey];
+      if (!dp || !PLAN_BASE[uiKey]) continue;
+      PLAN_BASE[uiKey] = { cup: dp.cup, mobile: dp.mobile, usdt: dp.usdt, stars: dp.stars, ton: dp.ton };
+    }
+  } catch (e) {
+    console.error('No se pudieron cargar precios dinámicos, se usan los valores por defecto:', e);
+  }
+}
+
+// ===== INICIALIZACIÓN =====
+(async function init() {
+  try {
+    await applyDynamicPricesPayment();
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
