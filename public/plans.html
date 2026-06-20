@@ -470,7 +470,7 @@
   .voyage-stack {
     position: relative;
     padding: 0 24px;
-    margin-top: 56px;
+    margin-top: 96px;
     margin-bottom: 36px;
     height: 560px;
     touch-action: none;
@@ -499,7 +499,7 @@
   .voyage-stack .plan-card.v-active .plan-card-glow { opacity: 1; }
   .voyage-stack .plan-card:not(.v-active) {
     pointer-events: auto;
-    filter: saturate(0.7) brightness(0.75);
+    filter: saturate(0.7) brightness(0.9);
   }
   .voyage-stack .plan-card:not(.v-active) .plan-card-glow { opacity: 0; }
 
@@ -1518,7 +1518,7 @@ function renderVoyageStack(direction = 0) {
       const ty = dir * (95 + depth * 70);
       const scale = 1 - depth * 0.06;
       card.style.transform = `translate(${kickX}px, ${ty}px) scale(${kickX ? scale * 0.96 : scale})`;
-      card.style.opacity = depth >= 3 ? '0' : String(0.55 - depth * 0.12);
+      card.style.opacity = depth >= 3 ? '0' : String(0.75 - depth * 0.8);
       card.style.zIndex = String(5 - depth);
     }
   });
