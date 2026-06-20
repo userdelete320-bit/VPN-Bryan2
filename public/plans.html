@@ -440,11 +440,11 @@
     pointer-events: none;
   }
 
-  .plan-card.basic { --accent: var(--pastel-blue); --accent-glow: rgba(168,220,255,0.12); }
-  .plan-card.advanced { --accent: var(--pastel-purple); --accent-glow: rgba(212,184,255,0.12); }
-  .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); }
-  .plan-card.gaming { --accent: var(--neon-pink); --accent-glow: rgba(255,110,180,0.12); }
-  .plan-card.anual { --accent: var(--pastel-peach); --accent-glow: rgba(255,212,184,0.12); }
+  .plan-card.basic { --accent: var(--pastel-blue); --accent-glow: rgba(168,220,255,0.12); --accent-active: var(--pastel-blue); }
+  .plan-card.advanced { --accent: var(--pastel-purple); --accent-glow: rgba(212,184,255,0.12); --accent-active: var(--pastel-purple); }
+  .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); --accent-active: var(--neon-yellow); }
+  .plan-card.gaming { --accent: var(--neon-pink); --accent-glow: rgba(255,110,180,0.12); --accent-active: var(--neon-pink); }
+  .plan-card.anual { --accent: var(--pastel-peach); --accent-glow: rgba(255,212,184,0.12); --accent-active: var(--pastel-peach); }
 
   .plan-card::after {
     content: '';
@@ -464,6 +464,73 @@
     height: 100%;
     background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
     pointer-events: none;
+  }
+
+  /* ===== VOYAGE STYLE: carrusel vertical de tarjetas apiladas ===== */
+  .voyage-stack {
+    position: relative;
+    padding: 0 24px;
+    margin-bottom: 28px;
+    height: 410px;
+    touch-action: pan-y;
+  }
+  .voyage-stack .plan-card {
+    position: absolute;
+    top: 0;
+    left: 24px;
+    right: 24px;
+    width: auto;
+    margin: 0;
+    animation: none;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.45s ease,
+                filter 0.45s ease;
+    will-change: transform, opacity;
+  }
+  .voyage-stack .plan-card.v-active {
+    z-index: 5;
+    box-shadow: 0 20px 50px -12px var(--accent-glow), 0 0 0 1px var(--accent);
+    filter: none;
+    pointer-events: auto;
+  }
+  .voyage-stack .plan-card.v-active .plan-card-glow { opacity: 1; }
+  .voyage-stack .plan-card:not(.v-active) {
+    pointer-events: none;
+    filter: saturate(0.7) brightness(0.75);
+  }
+  .voyage-stack .plan-card:not(.v-active) .plan-card-glow { opacity: 0; }
+
+  .voyage-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin: 6px 0 26px;
+  }
+  .voyage-nav-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .voyage-nav-btn:active { transform: scale(0.9); }
+  .voyage-nav-btn svg { width: 16px; height: 16px; }
+  .voyage-dots { display: flex; gap: 6px; }
+  .voyage-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s, width 0.3s, border-radius 0.3s;
+  }
+  .voyage-dot.active {
+    width: 18px;
+    border-radius: 3px;
+    background: var(--accent-active, var(--neon-blue));
   }
 
   .plan-row1 {
@@ -1061,10 +1128,10 @@
 
   <!-- PLANES REGULARES -->
   <div class="section-label" style="margin-top:24px">// PLANES DISPONIBLES</div>
-  <div class="plans-scroll">
+  <div class="voyage-stack" id="voyageStack">
 
     <!-- BÁSICO -->
-    <div class="plan-card basic" onclick="openModal('basic')">
+    <div class="plan-card basic" data-plan="basic" onclick="voyageCardClick('basic')">
       <div class="plan-card-glow"></div>
       <div class="plan-row1">
         <div class="plan-icon">🌐</div>
@@ -1087,7 +1154,7 @@
     </div>
 
     <!-- AVANZADO -->
-    <div class="plan-card advanced" onclick="openModal('advanced')">
+    <div class="plan-card advanced" data-plan="advanced" onclick="voyageCardClick('advanced')">
       <div class="plan-card-glow"></div>
       <div class="plan-row1">
         <div class="plan-icon">🚀</div>
@@ -1110,7 +1177,7 @@
     </div>
 
     <!-- VIP -->
-    <div class="plan-card vip" onclick="openModal('vip')">
+    <div class="plan-card vip" data-plan="vip" onclick="voyageCardClick('vip')">
       <div class="plan-card-glow"></div>
       <div class="plan-row1">
         <div class="plan-icon">🏦</div>
@@ -1134,7 +1201,7 @@
     </div>
 
     <!-- GAMING -->
-    <div class="plan-card gaming" onclick="openModal('gaming')">
+    <div class="plan-card gaming" data-plan="gaming" onclick="voyageCardClick('gaming')">
       <div class="plan-card-glow"></div>
       <div class="plan-row1">
         <div class="plan-icon">🎮</div>
@@ -1158,7 +1225,7 @@
     </div>
 
     <!-- ANUAL -->
-    <div class="plan-card anual" onclick="openModal('anual')">
+    <div class="plan-card anual" data-plan="anual" onclick="voyageCardClick('anual')">
       <div class="plan-card-glow"></div>
       <div class="plan-row1">
         <div class="plan-icon">♾️</div>
@@ -1181,6 +1248,16 @@
       </div>
     </div>
 
+  </div>
+
+  <div class="voyage-nav">
+    <div class="voyage-nav-btn" onclick="voyagePrev()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+    </div>
+    <div class="voyage-dots" id="voyageDots"></div>
+    <div class="voyage-nav-btn" onclick="voyageNext()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
   </div>
 
 <!-- MODAL -->
@@ -1400,6 +1477,103 @@ const urlParams = new URLSearchParams(window.location.search);
 const currentUserId = urlParams.get('userId') || tgUser.id || '';
 const currentUsername = tgUser.username || '';
 const currentFirstName = tgUser.first_name || '';
+
+// ===== VOYAGE STYLE: carrusel vertical de tarjetas apiladas =====
+const VOYAGE_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'anual'];
+let voyageIndex = 0;
+let voyageClickGuard = false; // evita que el tap que cambia de tarjeta también abra el modal
+
+function renderVoyageStack() {
+  const stack = document.getElementById('voyageStack');
+  if (!stack) return;
+  const cards = VOYAGE_ORDER.map(key => stack.querySelector(`.plan-card[data-plan="${key}"]`));
+
+  cards.forEach((card, i) => {
+    if (!card) return;
+    // distancia circular más corta al índice activo (para que el ciclo se sienta natural)
+    const n = cards.length;
+    let diff = i - voyageIndex;
+    if (diff > n / 2) diff -= n;
+    if (diff < -n / 2) diff += n;
+
+    card.classList.toggle('v-active', diff === 0);
+
+    if (diff === 0) {
+      card.style.transform = `translateY(0px) scale(1)`;
+      card.style.opacity = '1';
+      card.style.zIndex = '5';
+    } else {
+      const dir = diff > 0 ? 1 : -1;
+      const depth = Math.min(Math.abs(diff), 3);
+      const ty = dir * (28 + depth * 26);
+      const scale = 1 - depth * 0.06;
+      card.style.transform = `translateY(${ty}px) scale(${scale})`;
+      card.style.opacity = depth >= 3 ? '0' : String(0.55 - depth * 0.12);
+      card.style.zIndex = String(5 - depth);
+    }
+  });
+
+  // dots
+  const dotsWrap = document.getElementById('voyageDots');
+  if (dotsWrap) {
+    dotsWrap.innerHTML = VOYAGE_ORDER.map((key, i) =>
+      `<div class="voyage-dot ${i === voyageIndex ? 'active' : ''}" onclick="voyageGoTo(${i})"></div>`
+    ).join('');
+    // colorear el dot activo con el acento del plan activo
+    const activeDot = dotsWrap.querySelector('.voyage-dot.active');
+    const activeCard = cards[voyageIndex];
+    if (activeDot && activeCard) {
+      const accent = getComputedStyle(activeCard).getPropertyValue('--accent-active').trim();
+      if (accent) activeDot.style.background = accent;
+    }
+  }
+}
+
+function voyageGoTo(index) {
+  voyageIndex = ((index % VOYAGE_ORDER.length) + VOYAGE_ORDER.length) % VOYAGE_ORDER.length;
+  renderVoyageStack();
+}
+
+function voyageNext() { voyageGoTo(voyageIndex + 1); }
+function voyagePrev() { voyageGoTo(voyageIndex - 1); }
+
+function voyageCardClick(key) {
+  if (voyageClickGuard) return;
+  const idx = VOYAGE_ORDER.indexOf(key);
+  if (idx !== voyageIndex) {
+    // si tocas una tarjeta de atrás, primero la trae al frente en vez de abrir el modal
+    voyageGoTo(idx);
+  } else {
+    openModal(key);
+  }
+}
+
+// Swipe vertical táctil
+(function initVoyageSwipe() {
+  const stack = document.getElementById('voyageStack');
+  if (!stack) return;
+  let startY = 0, startX = 0, dragging = false;
+
+  stack.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
+    dragging = true;
+  }, { passive: true });
+
+  stack.addEventListener('touchend', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    const endY = e.changedTouches[0].clientY;
+    const endX = e.changedTouches[0].clientX;
+    const diffY = startY - endY;
+    const diffX = Math.abs(startX - endX);
+    if (Math.abs(diffY) > 40 && Math.abs(diffY) > diffX) {
+      voyageClickGuard = true;
+      if (diffY > 0) voyageNext(); else voyagePrev();
+      setTimeout(() => { voyageClickGuard = false; }, 250);
+    }
+  }, { passive: true });
+})();
 
 function openModal(key) {
   const p = plans[key];
@@ -1903,6 +2077,7 @@ function scrollTop() {
 window.addEventListener('load', () => {
   applyDynamicPrices();
   loadAnnouncement();
+  renderVoyageStack();
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
