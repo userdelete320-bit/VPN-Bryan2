@@ -997,7 +997,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🌐</div>
         <div class="plan-price-block">
-          <div class="plan-price">900 CUP</div>
+          <div class="plan-price" id="cardPrice-basic">900 CUP</div>
           <div class="plan-price-period">/mes</div>
         </div>
       </div>
@@ -1020,7 +1020,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🚀</div>
         <div class="plan-price-block">
-          <div class="plan-price">1800 CUP</div>
+          <div class="plan-price" id="cardPrice-advanced">1800 CUP</div>
           <div class="plan-price-period">2 meses</div>
         </div>
       </div>
@@ -1043,7 +1043,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🏦</div>
         <div class="plan-price-block">
-          <div class="plan-price">1200 CUP</div>
+          <div class="plan-price" id="cardPrice-vip">1200 CUP</div>
           <div class="plan-price-period">/mes</div>
         </div>
       </div>
@@ -1067,7 +1067,7 @@
       <div class="plan-row1">
         <div class="plan-icon">🎮</div>
         <div class="plan-price-block">
-          <div class="plan-price">1500 CUP</div>
+          <div class="plan-price" id="cardPrice-gaming">1500 CUP</div>
           <div class="plan-price-period">/mes</div>
         </div>
       </div>
@@ -1091,7 +1091,7 @@
       <div class="plan-row1">
         <div class="plan-icon">♾️</div>
         <div class="plan-price-block">
-          <div class="plan-price">15000 CUP</div>
+          <div class="plan-price" id="cardPrice-anual">15000 CUP</div>
           <div class="plan-price-period">/año</div>
         </div>
       </div>
@@ -1286,6 +1286,10 @@ async function applyDynamicPrices() {
       PLAN_CUP[uiKey] = dp.cup;
       PLAN_MOBILE[uiKey] = dp.mobile;
       PLAN_USDT[uiKey] = dp.usdt;
+
+      // Actualizar el precio visible en la tarjeta de la pantalla principal
+      const cardEl = document.getElementById(`cardPrice-${uiKey}`);
+      if (cardEl) cardEl.textContent = `${Number(dp.cup).toLocaleString('es-ES')} CUP`;
     }
   } catch (e) {
     console.error('No se pudieron cargar precios dinámicos, se usan los valores por defecto:', e);
