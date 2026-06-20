@@ -800,6 +800,30 @@ app.post('/api/admins/add', async (req, res) => {
   }
 });
 
+app.post('/api/admins/remove', async (req, res) => {
+  try {
+    const { requesterId, telegramId } = req.body;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede quitar admins.' });
+    const cleanId = String(telegramId).trim();
+    if (cleanId === SUPER_ADMIN_ID) return res.status(400).json({ error: 'No puedes quitar al administrador principal.' });
+
+    const sb = getSbClient();
+    const { error } = await sb.from('bot_admins').delete().eq('telegram_id', cleanId);
+    if (error) throw error;
+
+    await loadAdminsFromDb();
+
+    try {
+      await bot.telegram.sendMessage(cleanId, 'ℹ️ Tus permisos de administrador en VPN Cuba han sido revocados.', { parse_mode: 'HTML' });
+    } catch (e) {}
+
+    res.json({ success: true, admins: ADMIN_IDS });
+  } catch (error) {
+    console.error('❌ Error quitando admin:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ── PRECIOS DE PLANES (lectura pública, edición solo super admin) ──
 
 app.get('/api/plan-prices', (req, res) => {
