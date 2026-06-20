@@ -470,17 +470,19 @@
   .voyage-stack {
     position: relative;
     padding: 0 24px;
-    margin-bottom: 28px;
-    height: 410px;
+    margin-top: 34px;
+    margin-bottom: 36px;
+    height: 480px;
     touch-action: none;
   }
   .voyage-stack .plan-card {
     position: absolute;
-    top: 0;
+    top: 28px;
     left: 24px;
     right: 24px;
     width: auto;
     margin: 0;
+    padding: 26px 24px;
     animation: none;
     transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
                 opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1483,7 +1485,7 @@ const VOYAGE_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'anual'];
 let voyageIndex = 0;
 let voyageClickGuard = false; // evita que el tap que cambia de tarjeta también abra el modal
 
-function renderVoyageStack() {
+function renderVoyageStack(direction = 0) {
   const stack = document.getElementById('voyageStack');
   if (!stack) return;
   const cards = VOYAGE_ORDER.map(key => stack.querySelector(`.plan-card[data-plan="${key}"]`));
@@ -1496,22 +1498,35 @@ function renderVoyageStack() {
     if (diff > n / 2) diff -= n;
     if (diff < -n / 2) diff += n;
 
+    const wasActive = card.classList.contains('v-active');
     card.classList.toggle('v-active', diff === 0);
 
+    // Empuje horizontal momentáneo: la que se va sale por un lado, la que entra viene por el otro
+    let kickX = 0;
+    if (direction !== 0) {
+      if (wasActive && diff !== 0) kickX = -direction * 70;       // la activa anterior es "empujada" hacia afuera
+      else if (diff === 0 && !wasActive) kickX = direction * 70;  // la nueva activa "entra empujando" desde el lado opuesto
+    }
+
     if (diff === 0) {
-      card.style.transform = `translateY(0px) scale(1)`;
-      card.style.opacity = '1';
-      card.style.zIndex = '5';
+      card.style.transform = `translate(${kickX}px, 0px) scale(${kickX ? 0.96 : 1})`;
+      card.style.opacity = kickX ? '0.4' : '1';
+      card.style.zIndex = '6';
     } else {
       const dir = diff > 0 ? 1 : -1;
       const depth = Math.min(Math.abs(diff), 3);
       const ty = dir * (40 + depth * 38);
       const scale = 1 - depth * 0.06;
-      card.style.transform = `translateY(${ty}px) scale(${scale})`;
+      card.style.transform = `translate(${kickX}px, ${ty}px) scale(${kickX ? scale * 0.96 : scale})`;
       card.style.opacity = depth >= 3 ? '0' : String(0.55 - depth * 0.12);
       card.style.zIndex = String(5 - depth);
     }
   });
+
+  // Si hubo "kick", en el siguiente frame asentamos las tarjetas en su posición final -> efecto de empuje real
+  if (direction !== 0) {
+    requestAnimationFrame(() => requestAnimationFrame(() => renderVoyageStack(0)));
+  }
 
   // dots
   const dotsWrap = document.getElementById('voyageDots');
@@ -1530,8 +1545,16 @@ function renderVoyageStack() {
 }
 
 function voyageGoTo(index) {
-  voyageIndex = ((index % VOYAGE_ORDER.length) + VOYAGE_ORDER.length) % VOYAGE_ORDER.length;
-  renderVoyageStack();
+  const newIndex = ((index % VOYAGE_ORDER.length) + VOYAGE_ORDER.length) % VOYAGE_ORDER.length;
+  let direction = newIndex - voyageIndex;
+  // normalizar dirección para el ciclo (ir de la última a la primera = avanzar, no retroceder)
+  const n = VOYAGE_ORDER.length;
+  if (direction > n / 2) direction -= n;
+  if (direction < -n / 2) direction += n;
+  direction = direction === 0 ? 0 : (direction > 0 ? 1 : -1);
+
+  voyageIndex = newIndex;
+  renderVoyageStack(direction);
 }
 
 function voyageNext() { voyageGoTo(voyageIndex + 1); }
