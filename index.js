@@ -827,6 +827,63 @@ app.post('/api/admins/remove', async (req, res) => {
   }
 });
 
+// ── ANUNCIO TIPO TICKER (lectura pública, edición solo super admin) ──
+
+app.get('/api/announcement', async (req, res) => {
+  try {
+    const sb = getSbClient();
+    const { data, error } = await sb.from('announcements').select('*').eq('id', 1).maybeSingle();
+    if (error) throw error;
+
+    if (!data || !data.active) return res.json({ active: false });
+
+    const now = new Date();
+    const startsAt = data.starts_at ? new Date(data.starts_at) : null;
+    const endsAt = data.ends_at ? new Date(data.ends_at) : null;
+    const isWithinWindow = (!startsAt || now >= startsAt) && (!endsAt || now <= endsAt);
+
+    if (!isWithinWindow) return res.json({ active: false });
+
+    res.json({ active: true, text: data.text, ends_at: data.ends_at });
+  } catch (error) {
+    console.error('❌ Error obteniendo anuncio:', error);
+    res.json({ active: false });
+  }
+});
+
+app.post('/api/announcement/update', async (req, res) => {
+  try {
+    const { requesterId, text, active, durationHours } = req.body;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede editar el anuncio.' });
+    if (active && (!text || !text.trim())) return res.status(400).json({ error: 'El texto del anuncio no puede estar vacío.' });
+
+    const now = new Date();
+    let endsAt = null;
+    if (active && durationHours) {
+      const hours = Number(durationHours);
+      if (isNaN(hours) || hours <= 0) return res.status(400).json({ error: 'Duración inválida.' });
+      endsAt = new Date(now.getTime() + hours * 3600000).toISOString();
+    }
+
+    const sb = getSbClient();
+    const { error } = await sb.from('announcements').upsert([{
+      id: 1,
+      text: text || '',
+      active: !!active,
+      starts_at: now.toISOString(),
+      ends_at: endsAt,
+      updated_at: now.toISOString(),
+      updated_by: String(requesterId)
+    }], { onConflict: 'id' });
+    if (error) throw error;
+
+    res.json({ success: true, ends_at: endsAt });
+  } catch (error) {
+    console.error('❌ Error actualizando anuncio:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ── PRECIOS DE PLANES (lectura pública, edición solo super admin) ──
 
 app.get('/api/plan-prices', (req, res) => {
