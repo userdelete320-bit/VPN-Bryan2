@@ -114,6 +114,10 @@
   .laser-6 { background: linear-gradient(var(--neon-blue),   transparent);   box-shadow: 0 0 12px 1px var(--neon-blue); height: 44px; }
   .laser-7 { background: linear-gradient(var(--neon-pink),   transparent);   box-shadow: 0 0 10px 1px var(--neon-pink); width: 2.5px; }
   .laser-8 { background: linear-gradient(var(--neon-purple), transparent);   box-shadow: 0 0 8px 1px var(--neon-purple); height: 40px; }
+  .laser-9  { background: linear-gradient(var(--neon-green),  transparent); box-shadow: 0 0 10px 1px var(--neon-green); width: 2px; height: 48px; }
+  .laser-10 { background: linear-gradient(var(--neon-yellow), transparent); box-shadow: 0 0 10px 1px var(--neon-yellow); width: 1.5px; height: 36px; }
+  .laser-11 { background: linear-gradient(var(--neon-blue),   transparent); box-shadow: 0 0 14px 1px var(--neon-blue); width: 2.5px; height: 50px; }
+  .laser-12 { background: linear-gradient(var(--neon-pink),   transparent); box-shadow: 0 0 8px 1px var(--neon-pink); height: 30px; }
 
   @keyframes laserFlicker {
     0%, 100% { opacity: 0.45; }
@@ -123,8 +127,8 @@
   /* Chispa en el punto de contacto */
   .spark {
     position: fixed;
-    width: 4px;
-    height: 4px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     pointer-events: none;
     z-index: 6;
@@ -132,7 +136,7 @@
   }
   @keyframes sparkFly {
     0%   { opacity: 1; transform: translate(0, 0) scale(1); }
-    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.2); }
+    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.15); }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -963,6 +967,10 @@
   <div class="laser laser-6"></div>
   <div class="laser laser-7"></div>
   <div class="laser laser-8"></div>
+  <div class="laser laser-9"></div>
+  <div class="laser laser-10"></div>
+  <div class="laser laser-11"></div>
+  <div class="laser laser-12"></div>
 </div>
 
 <!-- BARRA DE ANUNCIO (controlada desde el panel admin) -->
@@ -1807,7 +1815,7 @@ function scrollTop() {
     x: Math.random() * vw(),
     y: Math.random() * vh(),
     angle: Math.random() * Math.PI * 2,
-    speed: 0.15 + Math.random() * 0.2, // deriva lenta
+    speed: 0.55 + Math.random() * 0.5, // deriva más viva
   }));
 
   let pointer = null; // { x, y } mientras el usuario toca/arrastra
@@ -1817,19 +1825,19 @@ function scrollTop() {
     const spark = document.createElement('div');
     spark.className = 'spark';
     const angle = Math.random() * Math.PI * 2;
-    const dist = 14 + Math.random() * 22;
+    const dist = 30 + Math.random() * 55;
     spark.style.setProperty('--sx', `${Math.cos(angle) * dist}px`);
     spark.style.setProperty('--sy', `${Math.sin(angle) * dist}px`);
     spark.style.left = `${x}px`;
     spark.style.top = `${y}px`;
     spark.style.background = `var(${colorVar})`;
-    spark.style.boxShadow = `0 0 6px 1px var(${colorVar})`;
+    spark.style.boxShadow = `0 0 12px 3px var(${colorVar})`;
     spark.style.animation = `sparkFly ${0.4 + Math.random() * 0.3}s ease-out forwards`;
     container.appendChild(spark);
     setTimeout(() => spark.remove(), 800);
   }
 
-  const colorVars = ['--neon-blue', '--neon-purple', '--neon-pink', '--neon-green', '--neon-yellow', '--neon-blue', '--neon-pink', '--neon-purple'];
+  const colorVars = ['--neon-blue', '--neon-purple', '--neon-pink', '--neon-green', '--neon-yellow', '--neon-blue', '--neon-pink', '--neon-purple', '--neon-green', '--neon-yellow', '--neon-blue', '--neon-pink'];
 
   function tick() {
     const W = vw(), H = vh();
@@ -1852,8 +1860,9 @@ function scrollTop() {
         laser.style.transform = `translate(${s.x}px, ${s.y}px) rotate(${angleToPointer}deg) scaleY(${1 + Math.min(dist / 300, 0.6)})`;
         laser.style.opacity = '0.95';
 
-        // Chispas cerca del punto de contacto, limitadas en frecuencia
-        if (dist < 70 && now - lastSparkTime > 60) {
+        // Chispas alrededor del punto de contacto, en un área más amplia y con mayor frecuencia
+        if (dist < 140 && now - lastSparkTime > 35) {
+          spawnSpark(pointer.x, pointer.y, colorVars[i]);
           spawnSpark(pointer.x, pointer.y, colorVars[i]);
           lastSparkTime = now;
         }
@@ -1871,7 +1880,7 @@ function scrollTop() {
 
         const driftAngleDeg = s.angle * (180 / Math.PI) + 90;
         laser.style.transform = `translate(${s.x}px, ${s.y}px) rotate(${driftAngleDeg}deg) scaleY(1)`;
-        laser.style.opacity = '0.6';
+        laser.style.opacity = '0.78';
       }
     });
 
