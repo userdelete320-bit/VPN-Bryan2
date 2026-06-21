@@ -1030,28 +1030,35 @@
     scroll-snap-stop: always;
   }
 
-  .snap-section.is-leaving-down { animation: sectionLeaveDown 0.46s cubic-bezier(.55,0,.85,.35) both; }
-  .snap-section.is-leaving-up   { animation: sectionLeaveUp 0.46s cubic-bezier(.55,0,.85,.35) both; }
-  .snap-section.is-entering-down { animation: sectionEnterDown 0.5s cubic-bezier(.16,1,.3,1) both; }
-  .snap-section.is-entering-up   { animation: sectionEnterUp 0.5s cubic-bezier(.16,1,.3,1) both; }
+  .snap-section.is-leaving-down,
+  .snap-section.is-leaving-up,
+  .snap-section.is-entering-down,
+  .snap-section.is-entering-up {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+  }
+  .snap-section.is-leaving-down { animation: sectionLeaveDown 0.34s cubic-bezier(.55,0,.85,.35) both; }
+  .snap-section.is-leaving-up   { animation: sectionLeaveUp 0.34s cubic-bezier(.55,0,.85,.35) both; }
+  .snap-section.is-entering-down { animation: sectionEnterDown 0.38s cubic-bezier(.16,1,.3,1) both; }
+  .snap-section.is-entering-up   { animation: sectionEnterUp 0.38s cubic-bezier(.16,1,.3,1) both; }
 
+  /* Solo transform + opacity: las únicas propiedades que el navegador puede animar
+     en la GPU sin tener que repintar el contenido en cada fotograma. */
   @keyframes sectionLeaveDown {
-    0%   { transform: translateY(0) scale(1); filter: blur(0) brightness(1); opacity: 1; }
-    100% { transform: translateY(-6%) scale(0.93); filter: blur(6px) brightness(1.3); opacity: 0.35; }
+    0%   { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-4%) scale(0.96); opacity: 0.5; }
   }
   @keyframes sectionLeaveUp {
-    0%   { transform: translateY(0) scale(1); filter: blur(0) brightness(1); opacity: 1; }
-    100% { transform: translateY(6%) scale(0.93); filter: blur(6px) brightness(1.3); opacity: 0.35; }
+    0%   { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(4%) scale(0.96); opacity: 0.5; }
   }
   @keyframes sectionEnterDown {
-    0%   { transform: translateY(7%) scale(0.94) skewY(1.2deg); filter: blur(8px) brightness(1.6); opacity: 0; }
-    55%  { filter: blur(0) brightness(1.15); opacity: 1; }
-    100% { transform: translateY(0) scale(1) skewY(0deg); filter: blur(0) brightness(1); opacity: 1; }
+    0%   { transform: translateY(5%) scale(0.96); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
   }
   @keyframes sectionEnterUp {
-    0%   { transform: translateY(-7%) scale(0.94) skewY(-1.2deg); filter: blur(8px) brightness(1.6); opacity: 0; }
-    55%  { filter: blur(0) brightness(1.15); opacity: 1; }
-    100% { transform: translateY(0) scale(1) skewY(0deg); filter: blur(0) brightness(1); opacity: 1; }
+    0%   { transform: translateY(-5%) scale(0.96); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
   }
 
   /* Cuchillas de neón que cruzan la pantalla en el instante del "push" */
@@ -1068,30 +1075,28 @@
     position: absolute;
     left: -20%;
     width: 140%;
-    height: 36%;
-    transform: translateY(-120%) skewY(-7deg);
+    height: 30%;
+    transform: translateY(-120%);
     opacity: 0;
+    will-change: transform, opacity;
   }
-  .push-blade-1 { top: -10%; background: linear-gradient(90deg, transparent, rgba(91,240,255,0.55), transparent); box-shadow: 0 0 40px 6px rgba(91,240,255,0.35); }
-  .push-blade-2 { top: 32%;  background: linear-gradient(90deg, transparent, rgba(177,111,255,0.55), transparent); box-shadow: 0 0 40px 6px rgba(177,111,255,0.35); }
-  .push-blade-3 { top: 74%;  background: linear-gradient(90deg, transparent, rgba(255,110,180,0.55), transparent); box-shadow: 0 0 40px 6px rgba(255,110,180,0.35); }
+  .push-blade-1 { top: 4%;  background: linear-gradient(90deg, transparent, rgba(91,240,255,0.5), transparent); box-shadow: 0 0 18px 2px rgba(91,240,255,0.25); }
+  .push-blade-2 { top: 70%; background: linear-gradient(90deg, transparent, rgba(177,111,255,0.5), transparent); box-shadow: 0 0 18px 2px rgba(177,111,255,0.25); }
 
-  .push-fx.sweep-down .push-blade-1 { animation: bladeSweepDown 0.46s 0ms    cubic-bezier(.65,0,.35,1) both; }
-  .push-fx.sweep-down .push-blade-2 { animation: bladeSweepDown 0.46s 60ms   cubic-bezier(.65,0,.35,1) both; }
-  .push-fx.sweep-down .push-blade-3 { animation: bladeSweepDown 0.46s 120ms  cubic-bezier(.65,0,.35,1) both; }
-  .push-fx.sweep-up .push-blade-1   { animation: bladeSweepUp 0.46s 0ms     cubic-bezier(.65,0,.35,1) both; }
-  .push-fx.sweep-up .push-blade-2   { animation: bladeSweepUp 0.46s 60ms    cubic-bezier(.65,0,.35,1) both; }
-  .push-fx.sweep-up .push-blade-3   { animation: bladeSweepUp 0.46s 120ms   cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-down .push-blade-1 { animation: bladeSweepDown 0.34s 0ms   cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-down .push-blade-2 { animation: bladeSweepDown 0.34s 50ms  cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-up .push-blade-1   { animation: bladeSweepUp 0.34s 0ms    cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-up .push-blade-2   { animation: bladeSweepUp 0.34s 50ms   cubic-bezier(.65,0,.35,1) both; }
 
   @keyframes bladeSweepDown {
-    0%   { transform: translateY(-120%) skewY(-7deg); opacity: 0; }
-    18%  { opacity: 1; }
-    100% { transform: translateY(220%) skewY(-7deg); opacity: 0; }
+    0%   { transform: translateY(-120%); opacity: 0; }
+    20%  { opacity: 1; }
+    100% { transform: translateY(220%); opacity: 0; }
   }
   @keyframes bladeSweepUp {
-    0%   { transform: translateY(220%) skewY(-7deg); opacity: 0; }
-    18%  { opacity: 1; }
-    100% { transform: translateY(-120%) skewY(-7deg); opacity: 0; }
+    0%   { transform: translateY(220%); opacity: 0; }
+    20%  { opacity: 1; }
+    100% { transform: translateY(-120%); opacity: 0; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1130,7 +1135,6 @@
 <div class="push-fx" id="pushFx" aria-hidden="true">
   <span class="push-blade push-blade-1"></span>
   <span class="push-blade push-blade-2"></span>
-  <span class="push-blade push-blade-3"></span>
 </div>
 
 <!-- BARRA DE ANUNCIO (controlada desde el panel admin) -->
@@ -2222,7 +2226,7 @@ function scrollTop() {
     pushFx.classList.remove('sweep-down', 'sweep-up');
     void pushFx.offsetWidth;
     pushFx.classList.add('active', direction === 'down' ? 'sweep-down' : 'sweep-up');
-    setTimeout(() => { pushFx.classList.remove('active', 'sweep-down', 'sweep-up'); }, 520);
+    setTimeout(() => { pushFx.classList.remove('active', 'sweep-down', 'sweep-up'); }, 400);
   }
 
   function playDown() {
@@ -2232,7 +2236,7 @@ function scrollTop() {
     setTimeout(() => {
       sectionTrial.classList.remove('is-leaving-down');
       sectionPlans.classList.remove('is-entering-down');
-    }, 520);
+    }, 400);
   }
 
   function playUp() {
@@ -2242,7 +2246,7 @@ function scrollTop() {
     setTimeout(() => {
       sectionPlans.classList.remove('is-leaving-up');
       sectionTrial.classList.remove('is-entering-up');
-    }, 520);
+    }, 400);
   }
 
   function handleScroll() {
@@ -2262,13 +2266,13 @@ function scrollTop() {
       lockedUp = false;
       cooling = true;
       playDown();
-      setTimeout(() => { cooling = false; }, 550);
+      setTimeout(() => { cooling = false; }, 420);
     } else if (goingUp && boundaryNear && plansRect.top > vh * 0.1 && trialRect.bottom > 0 && !lockedUp) {
       lockedUp = true;
       lockedDown = false;
       cooling = true;
       playUp();
-      setTimeout(() => { cooling = false; }, 550);
+      setTimeout(() => { cooling = false; }, 420);
     }
 
     if (Math.abs(plansRect.top) > vh * 1.2) {
