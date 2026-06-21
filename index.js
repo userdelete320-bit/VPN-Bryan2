@@ -335,7 +335,7 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
         ],
         [
             createButton("DESCARGAR VPN", { callback_data: "download_wireguard" }),
-            createButton("SOPORTE", { callback_data: "show_support" })
+            createButton("SOPORTE", { callback_data: "show_support", style: 'danger' })
         ],
         [
             createButton("REFERIDOS", { callback_data: "referral_info" }),
