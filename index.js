@@ -330,7 +330,7 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
     const adminUrl = `${webappUrl}/admin.html?userId=${userId}&admin=true`;
     const inlineKeyboard = [
         [
-            createButton("VER PLANES", isGroup ? { url: plansUrl } : { web_app: { url: plansUrl } }),
+            createButton("VER PLANES", isGroup ? { url: plansUrl, style: 'success' } : { web_app: { url: plansUrl }, style: 'success' }),
             createButton("MI PERFIL", { callback_data: "check_status" })
         ],
         [
