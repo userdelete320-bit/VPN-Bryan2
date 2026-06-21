@@ -1017,6 +1017,90 @@
     100% { transform: translateX(-50%); }
   }
 
+  /* ===== TRANSICIÓN PUSH: PRUEBA -> PLANES ===== */
+  html { scroll-snap-type: y proximity; }
+  .snap-section {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .snap-section.is-leaving-down { animation: sectionLeaveDown 0.46s cubic-bezier(.55,0,.85,.35) both; }
+  .snap-section.is-leaving-up   { animation: sectionLeaveUp 0.46s cubic-bezier(.55,0,.85,.35) both; }
+  .snap-section.is-entering-down { animation: sectionEnterDown 0.5s cubic-bezier(.16,1,.3,1) both; }
+  .snap-section.is-entering-up   { animation: sectionEnterUp 0.5s cubic-bezier(.16,1,.3,1) both; }
+
+  @keyframes sectionLeaveDown {
+    0%   { transform: translateY(0) scale(1); filter: blur(0) brightness(1); opacity: 1; }
+    100% { transform: translateY(-6%) scale(0.93); filter: blur(6px) brightness(1.3); opacity: 0.35; }
+  }
+  @keyframes sectionLeaveUp {
+    0%   { transform: translateY(0) scale(1); filter: blur(0) brightness(1); opacity: 1; }
+    100% { transform: translateY(6%) scale(0.93); filter: blur(6px) brightness(1.3); opacity: 0.35; }
+  }
+  @keyframes sectionEnterDown {
+    0%   { transform: translateY(7%) scale(0.94) skewY(1.2deg); filter: blur(8px) brightness(1.6); opacity: 0; }
+    55%  { filter: blur(0) brightness(1.15); opacity: 1; }
+    100% { transform: translateY(0) scale(1) skewY(0deg); filter: blur(0) brightness(1); opacity: 1; }
+  }
+  @keyframes sectionEnterUp {
+    0%   { transform: translateY(-7%) scale(0.94) skewY(-1.2deg); filter: blur(8px) brightness(1.6); opacity: 0; }
+    55%  { filter: blur(0) brightness(1.15); opacity: 1; }
+    100% { transform: translateY(0) scale(1) skewY(0deg); filter: blur(0) brightness(1); opacity: 1; }
+  }
+
+  /* Cuchillas de neón que cruzan la pantalla en el instante del "push" */
+  .push-fx {
+    position: fixed;
+    inset: 0;
+    z-index: 9990;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0;
+  }
+  .push-fx.active { opacity: 1; }
+  .push-blade {
+    position: absolute;
+    left: -20%;
+    width: 140%;
+    height: 36%;
+    transform: translateY(-120%) skewY(-7deg);
+    opacity: 0;
+  }
+  .push-blade-1 { top: -10%; background: linear-gradient(90deg, transparent, rgba(91,240,255,0.55), transparent); box-shadow: 0 0 40px 6px rgba(91,240,255,0.35); }
+  .push-blade-2 { top: 32%;  background: linear-gradient(90deg, transparent, rgba(177,111,255,0.55), transparent); box-shadow: 0 0 40px 6px rgba(177,111,255,0.35); }
+  .push-blade-3 { top: 74%;  background: linear-gradient(90deg, transparent, rgba(255,110,180,0.55), transparent); box-shadow: 0 0 40px 6px rgba(255,110,180,0.35); }
+
+  .push-fx.sweep-down .push-blade-1 { animation: bladeSweepDown 0.46s 0ms    cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-down .push-blade-2 { animation: bladeSweepDown 0.46s 60ms   cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-down .push-blade-3 { animation: bladeSweepDown 0.46s 120ms  cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-up .push-blade-1   { animation: bladeSweepUp 0.46s 0ms     cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-up .push-blade-2   { animation: bladeSweepUp 0.46s 60ms    cubic-bezier(.65,0,.35,1) both; }
+  .push-fx.sweep-up .push-blade-3   { animation: bladeSweepUp 0.46s 120ms   cubic-bezier(.65,0,.35,1) both; }
+
+  @keyframes bladeSweepDown {
+    0%   { transform: translateY(-120%) skewY(-7deg); opacity: 0; }
+    18%  { opacity: 1; }
+    100% { transform: translateY(220%) skewY(-7deg); opacity: 0; }
+  }
+  @keyframes bladeSweepUp {
+    0%   { transform: translateY(220%) skewY(-7deg); opacity: 0; }
+    18%  { opacity: 1; }
+    100% { transform: translateY(-120%) skewY(-7deg); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-snap-type: none; }
+    .snap-section.is-leaving-down, .snap-section.is-leaving-up,
+    .snap-section.is-entering-down, .snap-section.is-entering-up { animation: none !important; }
+    .push-fx { display: none !important; }
+  }
+
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -1042,6 +1126,13 @@
   <div class="laser laser-12"></div>
 </div>
 
+<!-- TRANSICIÓN PUSH ENTRE PRUEBA Y PLANES -->
+<div class="push-fx" id="pushFx" aria-hidden="true">
+  <span class="push-blade push-blade-1"></span>
+  <span class="push-blade push-blade-2"></span>
+  <span class="push-blade push-blade-3"></span>
+</div>
+
 <!-- BARRA DE ANUNCIO (controlada desde el panel admin) -->
 <div class="announce-bar" id="announceBar">
   <div class="announce-track" id="announceTrack"></div>
@@ -1056,6 +1147,7 @@
 
 <div class="app" id="mainApp">
 
+<section class="snap-section trial-section" id="sectionTrial">
   <!-- HEADER -->
   <div class="header">
     <div class="header-badge">
@@ -1128,6 +1220,9 @@
     </div>
   </div>
 
+</section>
+
+<section class="snap-section plans-section" id="sectionPlans">
   <!-- PLANES REGULARES -->
   <div class="section-label" style="margin-top:24px">// PLANES DISPONIBLES</div>
   <div class="voyage-stack" id="voyageStack">
@@ -1261,6 +1356,8 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
     </div>
   </div>
+
+</section>
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
@@ -2099,6 +2196,92 @@ function scrollTop() {
   window.addEventListener('touchcancel', () => { pointer = null; }, { passive: true });
 
   requestAnimationFrame(tick);
+})();
+
+// ===== TRANSICIÓN PUSH: PRUEBA -> PLANES =====
+(function initSectionPush() {
+  const sectionTrial = document.getElementById('sectionTrial');
+  const sectionPlans = document.getElementById('sectionPlans');
+  const pushFx = document.getElementById('pushFx');
+  if (!sectionTrial || !sectionPlans || !pushFx) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  let lastY = window.scrollY;
+  let lockedDown = false;
+  let lockedUp = false;
+  let cooling = false;
+  let ticking = false;
+
+  function replay(el, className) {
+    el.classList.remove(className);
+    void el.offsetWidth; // fuerza reflow para poder repetir la animación
+    el.classList.add(className);
+  }
+
+  function fireFx(direction) {
+    pushFx.classList.remove('sweep-down', 'sweep-up');
+    void pushFx.offsetWidth;
+    pushFx.classList.add('active', direction === 'down' ? 'sweep-down' : 'sweep-up');
+    setTimeout(() => { pushFx.classList.remove('active', 'sweep-down', 'sweep-up'); }, 520);
+  }
+
+  function playDown() {
+    fireFx('down');
+    replay(sectionTrial, 'is-leaving-down');
+    replay(sectionPlans, 'is-entering-down');
+    setTimeout(() => {
+      sectionTrial.classList.remove('is-leaving-down');
+      sectionPlans.classList.remove('is-entering-down');
+    }, 520);
+  }
+
+  function playUp() {
+    fireFx('up');
+    replay(sectionPlans, 'is-leaving-up');
+    replay(sectionTrial, 'is-entering-up');
+    setTimeout(() => {
+      sectionPlans.classList.remove('is-leaving-up');
+      sectionTrial.classList.remove('is-entering-up');
+    }, 520);
+  }
+
+  function handleScroll() {
+    const y = window.scrollY;
+    const goingDown = y > lastY;
+    const goingUp = y < lastY;
+    lastY = y;
+    if (cooling) return;
+
+    const trialRect = sectionTrial.getBoundingClientRect();
+    const plansRect = sectionPlans.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const boundaryNear = Math.abs(plansRect.top) < vh * 0.6;
+
+    if (goingDown && boundaryNear && plansRect.top < vh * 0.45 && !lockedDown) {
+      lockedDown = true;
+      lockedUp = false;
+      cooling = true;
+      playDown();
+      setTimeout(() => { cooling = false; }, 550);
+    } else if (goingUp && boundaryNear && plansRect.top > vh * 0.1 && trialRect.bottom > 0 && !lockedUp) {
+      lockedUp = true;
+      lockedDown = false;
+      cooling = true;
+      playUp();
+      setTimeout(() => { cooling = false; }, 550);
+    }
+
+    if (Math.abs(plansRect.top) > vh * 1.2) {
+      lockedDown = false;
+      lockedUp = false;
+    }
+  }
+
+  window.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { handleScroll(); ticking = false; });
+  }, { passive: true });
 })();
 
 window.addEventListener('load', () => {
