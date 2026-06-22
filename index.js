@@ -1071,7 +1071,7 @@ app.post('/api/payments/:id/approve', async (req, res) => {
       try {
         await db.markReferralAsPaid(payment.telegram_id);
         const referrerUser = await db.getUser(user.referrer_id);
-        if (referrerUser?.referrer_id) await db.markReferralAsPaid(user.referrer_id, 2);
+        if (referrerUser?.referrer_id) await db.markReferralAsPaid(referrerUser.telegram_id, 2);
       } catch (refError) { console.error('❌ Error marcando referido:', refError.message); }
     }
 
@@ -1678,7 +1678,7 @@ app.post('/api/verify-ton-payment', async (req, res) => {
       try {
         await db.markReferralAsPaid(String(telegramId));
         const referrerUser = await db.getUser(user.referrer_id);
-        if (referrerUser?.referrer_id) await db.markReferralAsPaid(user.referrer_id, 2);
+        if (referrerUser?.referrer_id) await db.markReferralAsPaid(referrerUser.telegram_id, 2);
       } catch (e) {}
     }
 
@@ -2369,6 +2369,14 @@ bot.start(async (ctx) => {
         const userData = { telegram_id: userId.toString(), username: ctx.from.username, first_name: firstName, last_name: ctx.from.last_name, created_at: new Date().toISOString(), is_active: true };
         if (referrerId) { userData.referrer_id = referrerId; userData.referrer_username = referrerUsername; }
         await db.saveUser(userId.toString(), userData);
+        if (referrerId) {
+            try {
+                const existingUser = await db.getUser(userId.toString());
+                if (!existingUser?.referrer_id) {
+                    await db.updateUser(userId.toString(), { referrer_id: referrerId, referrer_username: referrerUsername });
+                }
+            } catch(e) { console.error('Error guardando referrer:', e); }
+        }
     } catch (error) { console.error('Error guardando usuario:', error); }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage =
