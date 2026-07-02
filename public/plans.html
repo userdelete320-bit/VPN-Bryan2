@@ -1764,7 +1764,7 @@ function openModal(key) {
       <div class="modal-features-grid">
         ${TRIAL_OPTIONS.map(opt => `
           <button class="trial-choice" onclick="requestTrial('${opt.key}')">
-            <div class="mf-icon">${opt.key === 'basic' ? '🌐' : opt.key === 'advanced' ? '🚀' : opt.key === 'vip' ? '🏦' : opt.key === 'gaming' ? '🎮' : '♾️'}</div>
+            <div class="mf-icon">${opt.key === 'basic' ? '🌐' : opt.key === 'advanced' ? '🚀' : opt.key === 'vip' ? '🏦' : opt.key === 'gaming' ? '🎮' : opt.key === 'gaming-pro' ? '🚀' : '♾️'}</div>
             <div class="mf-label">${opt.label}</div>
             <div class="mf-val">Pedir prueba</div>
           </button>
@@ -1870,6 +1870,7 @@ async function requestTrial(planKey) {
     'avanzado': 'Avanzado',
     'cuba_vip': 'Cuba VIP',
     'premium': 'Premium',
+    'gaming_pro': 'Gaming Pro',
     'anual': 'Anual'
   };
   
