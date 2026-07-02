@@ -18,14 +18,14 @@ const db = require('./supabase');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
-const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
+const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
 // ==================== STUB MÉTODOS TRIAL FILES (uno por plan) ====================
 // Cada función acepta planType para operar sobre la tabla/bucket correcto.
 // Las tablas en Supabase se llaman: trial_files_basico, trial_files_avanzado,
 // trial_files_premium, trial_files_anual
 
 function getTrialTableName(planType) {
-  const valid = ['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'];
+  const valid = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
   return valid.includes(planType) ? `trial_files_${planType}` : 'trial_files_basico';
 }
 
@@ -146,6 +146,7 @@ const DEFAULT_PLAN_PRICES = {
     avanzado: { cup: 1800,  mobile: 900,   usdt: 1.4,  stars: 270,  ton: 3.0 },
     cuba_vip: { cup: 1200,  mobile: 500,   usdt: 2.0,  stars: 180,  ton: 2.2 },
     premium:  { cup: 1500,  mobile: 700,   usdt: 1.1,  stars: 210,  ton: 2.5 },
+    gaming_pro: { cup: 1700, mobile: 1300, usdt: 4.0,  stars: 300,  ton: 3.5 },
     anual:    { cup: 15000, mobile: 10000, usdt: 30,   stars: 2100, ton: 26.0 }
 };
 
@@ -425,6 +426,7 @@ function getPlanName(planType) {
     'avanzado': 'Avanzado (2 meses)',
     'cuba_vip': 'Cuba VIP (1 mes)',
     'premium': 'Gaming (1 mes)',
+    'gaming_pro': 'Gaming Pro (1 mes)',
     'anual': 'Anual (12 meses)',
     'trial': 'Prueba Gratuita'
   };
@@ -437,6 +439,7 @@ function getPlanLabel(planType) {
     'avanzado': '🌟 Avanzado',
     'cuba_vip': '🇨🇺 Cuba VIP',
     'premium': '🎮 Gaming',
+    'gaming_pro': '🎮 Gaming Pro',
     'anual': '📅 Anual'
   };
   return labels[planType] || planType;
@@ -467,6 +470,7 @@ function calcularDiasRestantes(user) {
         case 'avanzado': duracionDias = 60; break;
         case 'cuba_vip': duracionDias = 30; break;
         case 'premium': duracionDias = 30; break;
+        case 'gaming_pro': duracionDias = 30; break;
         case 'anual': duracionDias = 365; break;
         default: duracionDias = 30;
     }
@@ -514,7 +518,7 @@ async function createBucketViaAPI(bucketName, isPublic = true) {
 
 async function verifyStorageBuckets() {
   try {
-    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual'];
+    const buckets = ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-gaming-pro', 'trial-files-anual'];
     for (const bucketName of buckets) {
       try {
         const { data, error } = await supabaseAdmin.storage.from(bucketName).list();
@@ -534,6 +538,7 @@ async function initializeStorageBuckets() {
     { name: 'trial-files-basico', public: true },
     { name: 'trial-files-avanzado', public: true },
     { name: 'trial-files-premium', public: true },
+    { name: 'trial-files-gaming-pro', public: true },
     { name: 'trial-files-anual', public: true }
   ];
   for (const bucket of buckets) { await createStorageBucket(bucket.name, bucket.public); }
@@ -1378,7 +1383,7 @@ app.get('/api/image/:filename', (req, res) => {
 app.get('/api/storage-status', async (req, res) => {
   try {
     const buckets = [];
-    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-anual']) {
+    for (const name of ['payments-screenshots', 'plan-files', 'trial-files-basico', 'trial-files-avanzado', 'trial-files-premium', 'trial-files-gaming-pro', 'trial-files-anual']) {
       try { const { data } = await supabaseAdmin.storage.from(name).list(); buckets.push({ name, status: '✅ Existe', fileCount: data?.length || 0 }); }
       catch (e) { buckets.push({ name, status: '❌ Error: ' + e.message }); }
     }
@@ -1610,6 +1615,7 @@ const TON_PLAN_LABELS = {
   avanzado: 'Plan Avanzado (2 meses)',
   cuba_vip: 'Plan VIP Cuba (1 mes)',
   premium:  'Plan Gaming (1 mes)',
+  gaming_pro: 'Plan Gaming Pro (1 mes)',
   anual:    'Plan Anual (12 meses)'
 };
 
@@ -1695,7 +1701,7 @@ app.post('/api/upload-plan-file', upload.single('file'), async (req, res) => {
     const { plan, adminId } = req.body;
     if (!isAdmin(adminId)) return res.status(403).json({ error: 'No autorizado' });
     if (!req.file) return res.status(400).json({ error: 'Archivo requerido' });
-    if (!plan || !['basico', 'avanzado', 'cuba_vip', 'premium', 'anual'].includes(plan)) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Plan inválido' }); }
+    if (!plan || !['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'].includes(plan)) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Plan inválido' }); }
     const fileName = req.file.originalname.toLowerCase();
     if (!fileName.endsWith('.zip') && !fileName.endsWith('.rar') && !fileName.endsWith('.conf')) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Solo .conf, .zip o .rar' }); }
     const fileBuffer = fs.readFileSync(req.file.path);
