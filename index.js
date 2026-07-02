@@ -933,11 +933,12 @@ app.post('/api/accept-terms', async (req, res) => {
   try {
     const { telegramId, username, firstName, referrerId, referrerUsername } = req.body;
     const userData = { telegram_id: telegramId, username, first_name: firstName, accepted_terms: true, terms_date: new Date().toISOString(), is_active: true };
-    if (referrerId) {
-      userData.referrer_id = referrerId; userData.referrer_username = referrerUsername;
-      try { await db.createReferral(referrerId, telegramId, username, firstName); } catch (refError) { console.log('⚠️ Error creando referido:', refError.message); }
-    }
+    if (referrerId) { userData.referrer_id = referrerId; userData.referrer_username = referrerUsername; }
     const user = await db.saveUser(telegramId, userData);
+    if (referrerId) {
+      try { await db.createReferral(referrerId, telegramId, username, firstName); }
+      catch (refError) { console.error('❌ Error creando referido (accept-terms):', refError.message); }
+    }
     res.json({ success: true, user });
   } catch (error) { console.error('❌ Error aceptando términos:', error); res.status(500).json({ error: 'Error interno del servidor' }); }
 });
@@ -1072,13 +1073,13 @@ app.post('/api/payments/:id/approve', async (req, res) => {
     const user = await db.getUser(payment.telegram_id);
     if (!user.vip) await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
 
-    if (user.referrer_id) {
-      try {
-        await db.markReferralAsPaid(payment.telegram_id);
+    try {
+      await db.markReferralAsPaid(payment.telegram_id);
+      if (user.referrer_id) {
         const referrerUser = await db.getUser(user.referrer_id);
         if (referrerUser?.referrer_id) await db.markReferralAsPaid(referrerUser.telegram_id, 2);
-      } catch (refError) { console.error('❌ Error marcando referido:', refError.message); }
-    }
+      }
+    } catch (refError) { console.error('❌ Error marcando referido:', refError.message); }
 
     res.json({ success: true, payment });
   } catch (error) { console.error('❌ Error aprobando pago:', error); res.status(500).json({ error: 'Error aprobando pago' }); }
@@ -1680,13 +1681,13 @@ app.post('/api/verify-ton-payment', async (req, res) => {
       try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch (e) {}
     }
 
-    if (user?.referrer_id) {
-      try {
-        await db.markReferralAsPaid(String(telegramId));
+    try {
+      await db.markReferralAsPaid(String(telegramId));
+      if (user?.referrer_id) {
         const referrerUser = await db.getUser(user.referrer_id);
         if (referrerUser?.referrer_id) await db.markReferralAsPaid(referrerUser.telegram_id, 2);
-      } catch (e) {}
-    }
+      }
+    } catch (e) { console.error('❌ Error marcando referido (TON):', e.message); }
 
     res.json({ success: true, verified: true, message: '¡Pago verificado y plan activado!' });
   } catch (error) {
@@ -2369,21 +2370,16 @@ bot.start(async (ctx) => {
     if (startPayload && startPayload.startsWith('ref') && !isGroup) {
         referrerId = startPayload.replace('ref', '');
         try { const referrer = await db.getUser(referrerId); if (referrer) referrerUsername = referrer.username; } catch (e) {}
-        if (referrerId) { try { await db.createReferral(referrerId, userId.toString(), ctx.from.username, firstName); } catch (e) {} }
     }
     try {
         const userData = { telegram_id: userId.toString(), username: ctx.from.username, first_name: firstName, last_name: ctx.from.last_name, created_at: new Date().toISOString(), is_active: true };
         if (referrerId) { userData.referrer_id = referrerId; userData.referrer_username = referrerUsername; }
         await db.saveUser(userId.toString(), userData);
-        if (referrerId) {
-            try {
-                const existingUser = await db.getUser(userId.toString());
-                if (!existingUser?.referrer_id) {
-                    await db.updateUser(userId.toString(), { referrer_id: referrerId, referrer_username: referrerUsername });
-                }
-            } catch(e) { console.error('Error guardando referrer:', e); }
-        }
     } catch (error) { console.error('Error guardando usuario:', error); }
+    if (referrerId) {
+        try { await db.createReferral(referrerId, userId.toString(), ctx.from.username, firstName); }
+        catch (e) { console.error('❌ Error creando referido (start):', e.message); }
+    }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage =
 `<tg-emoji emoji-id="5339262759794123186">👋</tg-emoji> ¡Hola @${ctx.from.username || firstName}
