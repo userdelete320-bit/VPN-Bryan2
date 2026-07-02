@@ -444,6 +444,7 @@
   .plan-card.advanced { --accent: var(--pastel-purple); --accent-glow: rgba(212,184,255,0.12); --accent-active: var(--pastel-purple); }
   .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); --accent-active: var(--neon-yellow); }
   .plan-card.gaming { --accent: var(--neon-pink); --accent-glow: rgba(255,110,180,0.12); --accent-active: var(--neon-pink); }
+  .plan-card.gaming-pro { --accent: #c084fc; --accent-glow: rgba(192,132,252,0.15); --accent-active: #c084fc; }
   .plan-card.anual { --accent: var(--pastel-peach); --accent-glow: rgba(255,212,184,0.12); --accent-active: var(--pastel-peach); }
 
   .plan-card::after {
@@ -1325,6 +1326,30 @@
       </div>
     </div>
 
+    <!-- GAMING PRO -->
+    <div class="plan-card gaming-pro" data-plan="gaming-pro" onclick="voyageCardClick('gaming-pro')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">🚀</div>
+        <div class="plan-price-block">
+          <div class="plan-price" id="cardPrice-gaming-pro">1700 CUP</div>
+          <div class="plan-price-period">/mes</div>
+        </div>
+      </div>
+      <div class="plan-name">Gaming Pro</div>
+      <div class="plan-tagline">Servidor privado. 40ms menos que Gaming. Máximo rendimiento.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Servidor privado exclusivo</div>
+        <div class="plan-feature"><span class="check">✓</span> Latencia &lt;15ms ultra baja</div>
+        <div class="plan-feature"><span class="check">✓</span> 0% packet loss garantizado</div>
+        <div class="plan-feature"><span class="check">✓</span> MLBB · CoD · Free Fire</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Competitivo</div>
+      </div>
+    </div>
+
     <!-- ANUAL -->
     <div class="plan-card anual" data-plan="anual" onclick="voyageCardClick('anual')">
       <div class="plan-card-glow"></div>
@@ -1465,6 +1490,25 @@ const plans = {
     ],
     cta: 'Elegir Gaming',
   },
+  'gaming-pro': {
+    icon: '🚀',
+    name: 'Gaming Pro',
+    color: '#c084fc',
+    shadowColor: 'rgba(192,132,252,0.3)',
+    price: { cup: 1700, mobile: 1300, usdt: 4.0 },
+    stars: 300,
+    ton: 3.5,
+    desc: 'Servidor privado exclusivo. Latencia hasta 40ms menor que Gaming. El máximo rendimiento para competitivos.',
+    features: [
+      { icon: '🛡', label: 'SERVIDOR', val: 'Privado exclusivo' },
+      { icon: '⚡', label: 'LATENCIA', val: '<15ms' },
+      { icon: '🎯', label: 'QoS', val: 'Ultra prioritario' },
+      { icon: '🎮', label: 'JUEGOS', val: 'MLBB · CoD · FF' },
+      { icon: '📦', label: 'PACKET LOSS', val: '0%' },
+      { icon: '🆘', label: 'SOPORTE', val: 'VIP 24/7' },
+    ],
+    cta: 'Elegir Gaming Pro',
+  },
   anual: {
     icon: '♾️',
     name: 'Plan Anual',
@@ -1490,6 +1534,7 @@ const PLAN_API_KEYS = {
   advanced: 'avanzado',
   vip: 'cuba_vip',
   gaming: 'premium',
+  'gaming-pro': 'gaming_pro',
   anual: 'anual'
 };
 
@@ -1498,6 +1543,7 @@ const PLAN_CUP = {
   advanced: 1800,
   vip: 1200,
   gaming: 1500,
+  'gaming-pro': 1700,
   anual: 15000
 };
 
@@ -1506,6 +1552,7 @@ const PLAN_MOBILE = {
   advanced: 900,
   vip: 500,
   gaming: 700,
+  'gaming-pro': 1300,
   anual: 10000
 };
 
@@ -1514,6 +1561,7 @@ const PLAN_USDT = {
   advanced: 2.8,
   vip: 1.9,
   gaming: 2.3,
+  'gaming-pro': 4.0,
   anual: 25
 };
 
@@ -1571,6 +1619,7 @@ const TRIAL_OPTIONS = [
   { key: 'advanced', label: 'Avanzado' },
   { key: 'vip', label: 'VIP Cuba' },
   { key: 'gaming', label: 'Gaming' },
+  { key: 'gaming-pro', label: 'Gaming Pro' },
   { key: 'anual', label: 'Anual' }
 ];
 
@@ -1582,7 +1631,7 @@ const currentUsername = tgUser.username || '';
 const currentFirstName = tgUser.first_name || '';
 
 // ===== VOYAGE STYLE: carrusel vertical de tarjetas apiladas =====
-const VOYAGE_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'anual'];
+const VOYAGE_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'gaming-pro', 'anual'];
 let voyageIndex = 0;
 let voyageClickGuard = false; // evita que el tap que cambia de tarjeta también abra el modal
 

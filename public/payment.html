@@ -809,6 +809,7 @@ body::after {
     <button class="demo-chip active" onclick="selectPlan('anual')">♾️ ANUAL</button>
     <button class="demo-chip" onclick="selectPlan('vip')">🏦 VIP</button>
     <button class="demo-chip" onclick="selectPlan('gaming')">🎮 GAMING</button>
+    <button class="demo-chip" onclick="selectPlan('gaming-pro')">🚀 GAMING PRO</button>
     <button class="demo-chip" onclick="selectPlan('trial')">🧪 PRUEBA</button>
   </div>
 
@@ -1105,6 +1106,14 @@ const planData = {
     accentColor:'#ff6eb4', tagBg:'rgba(255,110,180,0.08)', tagBorder:'rgba(255,110,180,0.25)',
     heroTag2:'GAMING', refBanner:false,
   },
+  'gaming-pro': {
+    tag:'GAMING PRO · SERVIDOR PRIVADO', name:'GAMING PRO', sub:'Servidor privado · <15ms · MLBB · CoD · Free Fire',
+    price:'1,700 CUP', mobile:'1,300 CUP', usdt:'4 USDT', stars: 300, duration:'1 MES',
+    sumPlan:'Plan Gaming Pro', sumDuration:'1 mes',
+    features:[['🛡','Servidor privado'],['⚡','<15ms latencia'],['🎯','Ultra QoS'],['📦','0% loss'],['🔒','AES-256'],['🆘','VIP 24/7']],
+    accentColor:'#c084fc', tagBg:'rgba(192,132,252,0.08)', tagBorder:'rgba(192,132,252,0.25)',
+    heroTag2:'GAMING PRO', refBanner:false,
+  },
   turbo: {
     tag:'🧪 PRUEBA · ELIGE TU PLAN', name:'PRUEBA', sub:'Selecciona qué plan quieres probar',
     price:'0 CUP', mobile:'—', usdt:'0 USDT', duration:'1 HORA',
@@ -1127,7 +1136,7 @@ const currentUsername = tgUser.username || '';
 const currentFirstName = tgUser.first_name || '';
 
 const PLAN_KEYS = {
-  basic: 'basico', advanced: 'avanzado', vip: 'cuba_vip', gaming: 'premium', anual: 'anual', turbo: 'trial', trial: 'trial'
+  basic: 'basico', advanced: 'avanzado', vip: 'cuba_vip', gaming: 'premium', 'gaming-pro': 'gaming_pro', anual: 'anual', turbo: 'trial', trial: 'trial'
 };
 
 const PLAN_BASE = {
@@ -1135,6 +1144,7 @@ const PLAN_BASE = {
   advanced: { cup: 1800, mobile: 900, usdt: 2.8, stars: 270},
   vip: { cup: 1200, mobile: 500, usdt: 1.9, stars: 180 },
   gaming: { cup: 1500, mobile: 700, usdt: 2.3, stars: 210 },
+  'gaming-pro': { cup: 1700, mobile: 1300, usdt: 4.0, stars: 300 },
   anual: { cup: 15000, mobile: 10000, usdt: 25, stars: 2100},
   trial: { cup: 0, mobile: 0, usdt: 0, stars: 0 }
 };
@@ -1155,6 +1165,7 @@ function normalizePlan(key) {
   if (k === 'avanzado' || k === 'advanced') return 'advanced';
   if (k === 'cuba_vip' || k === 'vip') return 'vip';
   if (k === 'premium' || k === 'gaming') return 'gaming';
+  if (k === 'gaming_pro') return 'gaming-pro';
   if (k === 'anual') return 'anual';
   if (k === 'trial' || k === 'turbo') return 'trial';
   return 'anual';
@@ -1254,6 +1265,7 @@ function selectPlan(key) {
       (currentPlan==='basic' && txt.includes('básico')) ||
       (currentPlan==='vip' && txt.includes('vip')) ||
       (currentPlan==='gaming' && txt.includes('gaming')) ||
+      (currentPlan==='gaming-pro' && txt.includes('gaming')) ||
       (currentPlan==='trial' && txt.includes('prueba')) ||
       (currentPlan==='advanced' && txt.includes('avanzado'))
     );
