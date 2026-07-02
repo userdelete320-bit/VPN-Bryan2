@@ -194,7 +194,7 @@ async function loadPlanPricesFromDb() {
   
 
 const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t';
-const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/JlRxfIjxlLI7aF4f9YRGJI';
+const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/CgejliuH5iXENrONFkx6Ah';
 
 function isAdmin(userId) {
     return ADMIN_IDS.includes(userId.toString());
@@ -2259,7 +2259,7 @@ bot.action('show_support', async (ctx) => {
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/vpncubawire', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
