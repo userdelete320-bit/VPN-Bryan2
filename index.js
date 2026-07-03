@@ -2034,6 +2034,38 @@ const REFUND_MOTIVOS = {
 };
 
 /////REFUND REQUEST /////
+// Perfil del jugador: recibe sus preferencias al elegir un plan y notifica a los admins
+app.post('/api/player-profile', async (req, res) => {
+  try {
+    const { telegramId, plan, planName, games, connection, device, notes } = req.body;
+    if (!telegramId || !plan) return res.status(400).json({ error: 'Faltan parámetros' });
+
+    const user = await db.getUser(String(telegramId)).catch(() => null);
+    const firstName = user?.first_name || 'Usuario';
+    const username = user?.username ? `@${user.username}` : 'Sin usuario';
+
+    const adminMsg =
+      `🎮 *PERFIL DE JUGADOR*\n\n` +
+      `👤 *Usuario:* ${firstName}\n` +
+      `📱 *Telegram:* ${username}\n` +
+      `🆔 *ID:* ${telegramId}\n` +
+      `📋 *Plan elegido:* ${planName || plan}\n\n` +
+      `🕹 *Juegos:* ${games || 'No especificado'}\n` +
+      `📡 *Conexión:* ${connection || 'No especificado'}\n` +
+      `📱 *Dispositivo:* ${device || 'No especificado'}\n` +
+      (notes ? `💬 *Notas:* ${notes}\n` : '');
+
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }); } catch (e) {}
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error en player-profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/refund-request', upload.single('refundProof'), async (req, res) => {
   try {
     const { telegramId, paymentId, motivo, detalles, planName, refundDestination } = req.body;
