@@ -925,6 +925,55 @@
     gap: 8px;
   }
   .modal-cta:active { transform: scale(0.98); }
+
+  /* Modal de perfil de juego */
+  .profile-form { display: flex; flex-direction: column; gap: 14px; }
+  .profile-field label {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .profile-field input,
+  .profile-field select,
+  .profile-field textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: #e2e8f0;
+    padding: 11px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+  .profile-field textarea { resize: none; height: 72px; line-height: 1.5; }
+  .profile-field input:focus,
+  .profile-field select:focus,
+  .profile-field textarea:focus { border-color: rgba(91,240,255,0.5); }
+  .profile-field select option { background: #0f1117; }
+  .profile-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .profile-chip {
+    padding: 6px 12px;
+    border-radius: 100px;
+    font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .profile-chip.selected {
+    background: rgba(91,240,255,0.12);
+    border-color: rgba(91,240,255,0.4);
+    color: #5bf0ff;
+  }
   .modal-close-area {
     position: absolute;
     top: 0; left: 0; right: 0;
@@ -1826,21 +1875,109 @@ function closeModalOutside(e) {
 }
 
 function handleCTA(key) {
-  closeModal();
   const apiKey = PLAN_API_KEYS[key] || key;
   const priceCup = PLAN_CUP[key];
   const priceMobile = PLAN_MOBILE[key];
   const priceUsdt = PLAN_USDT[key];
+  const p = plans[key];
 
+  const modalContent = document.getElementById('modalContent');
+  if (!modalContent) {
+    window.location.href = `payment.html?${new URLSearchParams({ userId: currentUserId, plan: apiKey, price: String(priceCup), mobile: String(priceMobile), usdtAmount: String(priceUsdt), planLabel: p.name }).toString()}`;
+    return;
+  }
+
+  modalContent.innerHTML = `
+    <div style="margin-bottom:4px;font-size:28px">${p.icon}</div>
+    <div class="modal-plan-name" style="color:${p.color}">${p.name}</div>
+    <div class="modal-plan-desc" style="margin-bottom:16px">Para configurarte el mejor servidor, cuéntanos cómo lo vas a usar 🎯</div>
+
+    <div class="profile-form" id="profileForm">
+
+      <div class="profile-field">
+        <label>¿Qué juegos vas a jugar?</label>
+        <div class="profile-chips" id="gamesChips">
+          ${['MLBB','Call of Duty','Free Fire','Genshin Impact','PUBG','Clash Royale','Fortnite','Otro'].map(g =>
+            `<button class="profile-chip" onclick="toggleChip(this,'${g}')">${g}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="profile-field">
+        <label>Método de conexión</label>
+        <select id="profileConnection">
+          <option value="" disabled selected>Selecciona...</option>
+          <option value="WiFi">WiFi</option>
+          <option value="Datos móviles 4G">Datos móviles 4G</option>
+          <option value="Datos móviles 3G">Datos móviles 3G</option>
+          <option value="Ambos (WiFi y móvil)">Ambos (WiFi y móvil)</option>
+        </select>
+      </div>
+
+      <div class="profile-field">
+        <label>Dispositivo principal</label>
+        <select id="profileDevice">
+          <option value="" disabled selected>Selecciona...</option>
+          <option value="Android">Android</option>
+          <option value="iPhone / iOS">iPhone / iOS</option>
+          <option value="PC / Windows">PC / Windows</option>
+          <option value="Varios dispositivos">Varios dispositivos</option>
+        </select>
+      </div>
+
+      <div class="profile-field">
+        <label>Detalles adicionales <span style="opacity:.5;font-size:9px">(opcional)</span></label>
+        <textarea id="profileNotes" placeholder="Ej: problemas de lag al jugar, horario habitual, etc."></textarea>
+      </div>
+
+    </div>
+
+    <button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor};width:100%;margin-top:8px" onclick="submitProfile('${key}','${apiKey}','${priceCup}','${priceMobile}','${priceUsdt}')">
+      Continuar al pago →
+    </button>
+    <button class="modal-cta" style="background:rgba(255,255,255,0.07);color:#94a3b8;width:100%;margin-top:8px" onclick="closeModal()">
+      Cancelar
+    </button>
+  `;
+}
+
+function toggleChip(el, value) {
+  el.classList.toggle('selected');
+}
+
+async function submitProfile(key, apiKey, priceCup, priceMobile, priceUsdt) {
+  const selectedGames = Array.from(document.querySelectorAll('#gamesChips .profile-chip.selected')).map(c => c.textContent).join(', ') || 'No especificado';
+  const connection = document.getElementById('profileConnection')?.value || 'No especificado';
+  const device = document.getElementById('profileDevice')?.value || 'No especificado';
+  const notes = document.getElementById('profileNotes')?.value?.trim() || '';
+
+  // Enviar al backend en segundo plano (sin bloquear la redirección)
+  if (currentUserId) {
+    fetch('/api/player-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: currentUserId,
+        plan: apiKey,
+        planName: plans[key]?.name || apiKey,
+        games: selectedGames,
+        connection,
+        device,
+        notes
+      })
+    }).catch(() => {});
+  }
+
+  // Redirigir al pago
+  closeModal();
   const params = new URLSearchParams({
     userId: currentUserId,
     plan: apiKey,
     price: String(priceCup),
     mobile: String(priceMobile),
     usdtAmount: String(priceUsdt),
-    planLabel: plans[key].name
+    planLabel: plans[key]?.name || apiKey
   });
-
   window.location.href = `payment.html?${params.toString()}`;
 }
 
