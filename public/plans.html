@@ -444,7 +444,7 @@
   .plan-card.advanced { --accent: var(--pastel-purple); --accent-glow: rgba(212,184,255,0.12); --accent-active: var(--pastel-purple); }
   .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); --accent-active: var(--neon-yellow); }
   .plan-card.gaming { --accent: var(--neon-pink); --accent-glow: rgba(255,110,180,0.12); --accent-active: var(--neon-pink); }
-  .plan-card.gaming-pro { --accent: #c084fc; --accent-glow: rgba(192,132,252,0.15); --accent-active: #c084fc; }
+  .plan-card.gaming-pro { --accent: #f5c842; --accent-glow: rgba(245,200,66,0.18); --accent-active: #f5c842; }
   .plan-card.anual { --accent: var(--pastel-peach); --accent-glow: rgba(255,212,184,0.12); --accent-active: var(--pastel-peach); }
 
   .plan-card::after {
@@ -1330,23 +1330,23 @@
     <div class="plan-card gaming-pro" data-plan="gaming-pro" onclick="voyageCardClick('gaming-pro')">
       <div class="plan-card-glow"></div>
       <div class="plan-row1">
-        <div class="plan-icon">🚀</div>
+        <div class="plan-icon">👑</div>
         <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-gaming-pro">1700 CUP</div>
+          <div class="plan-price" id="cardPrice-gaming-pro">2000 CUP</div>
           <div class="plan-price-period">/mes</div>
         </div>
       </div>
       <div class="plan-name">Gaming Pro</div>
-      <div class="plan-tagline">Servidor privado. 40ms menos que Gaming. Máximo rendimiento.</div>
+      <div class="plan-tagline">Servidor privado exclusivo. Estabilidad premium para competitivos de alto nivel.</div>
       <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> Estabilidad premium garantizada</div>
         <div class="plan-feature"><span class="check">✓</span> Servidor privado exclusivo</div>
-        <div class="plan-feature"><span class="check">✓</span> Latencia &lt;15ms ultra baja</div>
-        <div class="plan-feature"><span class="check">✓</span> 0% packet loss garantizado</div>
-        <div class="plan-feature"><span class="check">✓</span> MLBB · CoD · Free Fire</div>
+        <div class="plan-feature"><span class="check">✓</span> Latencia ultrabaja &lt;15ms</div>
+        <div class="plan-feature"><span class="check">✓</span> IP de baja congestión</div>
       </div>
       <div class="plan-footer">
         <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Competitivo</div>
+        <div class="plan-popular"><span class="dot"></span> Premium</div>
       </div>
     </div>
 
@@ -1491,20 +1491,20 @@ const plans = {
     cta: 'Elegir Gaming',
   },
   'gaming-pro': {
-    icon: '🚀',
+    icon: '👑',
     name: 'Gaming Pro',
-    color: '#c084fc',
-    shadowColor: 'rgba(192,132,252,0.3)',
-    price: { cup: 1700, mobile: 1300, usdt: 4.0 },
+    color: '#f5c842',
+    shadowColor: 'rgba(245,200,66,0.3)',
+    price: { cup: 2000, mobile: 1300, usdt: 4.0 },
     stars: 300,
     ton: 3.5,
-    desc: 'Servidor privado exclusivo. Latencia hasta 40ms menor que Gaming. El máximo rendimiento para competitivos.',
+    desc: 'Servidor privado exclusivo con estabilidad premium. IP de baja congestión y latencia ultrabaja para competitivos de alto nivel.',
     features: [
+      { icon: '⭐', label: 'ESTABILIDAD', val: 'Premium' },
       { icon: '🛡', label: 'SERVIDOR', val: 'Privado exclusivo' },
-      { icon: '⚡', label: 'LATENCIA', val: '<15ms' },
-      { icon: '🎯', label: 'QoS', val: 'Ultra prioritario' },
-      { icon: '🎮', label: 'JUEGOS', val: 'MLBB · CoD · FF' },
-      { icon: '📦', label: 'PACKET LOSS', val: '0%' },
+      { icon: '⚡', label: 'LATENCIA', val: '<15ms ultrabaja' },
+      { icon: '🌐', label: 'IP', val: 'Baja congestión' },
+      { icon: '📅', label: 'DURACIÓN', val: '1 mes' },
       { icon: '🆘', label: 'SOPORTE', val: 'VIP 24/7' },
     ],
     cta: 'Elegir Gaming Pro',
@@ -1543,7 +1543,7 @@ const PLAN_CUP = {
   advanced: 1800,
   vip: 1200,
   gaming: 1500,
-  'gaming-pro': 1700,
+  'gaming-pro': 2000,
   anual: 15000
 };
 
