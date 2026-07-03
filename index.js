@@ -347,7 +347,7 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
             createButton("POLÍTICAS", { callback_data: "politicas", style: 'primary' })
         ],
         [
-            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK , style: 'danger}),   // 👈 sin emoji, solo texto
+            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK , style: 'danger'}),   // 👈 sin emoji, solo texto
             createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK , style: 'danger'})    // 👈 sin emoji, solo texto
         ],
         [createButton("FAQ", { callback_data: "faq" , style: 'success',})]
