@@ -332,7 +332,7 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
     const inlineKeyboard = [
         [
             createButton("VER PLANES", isGroup ? { url: plansUrl, style: 'primary' } : { web_app: { url: plansUrl }, style: 'primary' }),
-            createButton("MI PERFIL", { callback_data: "check_status" })
+            createButton("MI PERFIL", { callback_data: "check_status", style: 'primary'})
         ],
         [
             createButton("DESCARGAR VPN", { callback_data: "download_wireguard", style: 'danger' }),
@@ -340,17 +340,17 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
         ],
         [
             createButton("REFERIDOS", { callback_data: "referral_info", style: 'success'  }),
-            createButton("CÓMO FUNCIONA", { callback_data: "how_it_works", style: 'primary' })
+            createButton("CÓMO FUNCIONA", { callback_data: "how_it_works", style: 'success' })
         ],
         [
-            createButton("VPN CANAL", { url: "https://t.me/vpncubaw" }),
+            createButton("VPN CANAL", { url: "https://t.me/vpncubaw", style: 'primary}),
             createButton("POLÍTICAS", { callback_data: "politicas", style: 'primary' })
         ],
         [
-            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),   // 👈 sin emoji, solo texto
-            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK })    // 👈 sin emoji, solo texto
+            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK , style: 'danger}),   // 👈 sin emoji, solo texto
+            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK , style: 'danger'})    // 👈 sin emoji, solo texto
         ],
-        [createButton("FAQ", { callback_data: "faq" })]
+        [createButton("FAQ", { callback_data: "faq" , style: 'success',})]
     ];
     if (esAdmin && !isGroup) {
         inlineKeyboard.push([createButton("PANEL ADMIN", { web_app: { url: adminUrl } })]);
