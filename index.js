@@ -343,7 +343,7 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
             createButton("CÓMO FUNCIONA", { callback_data: "how_it_works", style: 'success' })
         ],
         [
-            createButton("VPN CANAL", { url: "https://t.me/vpncubaw", style: 'primary}),
+            createButton("VPN CANAL", { url: "https://t.me/vpncubaw", style: 'primary'}),
             createButton("POLÍTICAS", { callback_data: "politicas", style: 'primary' })
         ],
         [
