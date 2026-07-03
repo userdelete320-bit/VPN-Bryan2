@@ -335,16 +335,16 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
             createButton("MI PERFIL", { callback_data: "check_status" })
         ],
         [
-            createButton("DESCARGAR VPN", { callback_data: "download_wireguard" }),
+            createButton("DESCARGAR VPN", { callback_data: "download_wireguard", style: 'danger' }),
             createButton("SOPORTE", { callback_data: "show_support", style: 'danger' })
         ],
         [
-            createButton("REFERIDOS", { callback_data: "referral_info" }),
-            createButton("CÓMO FUNCIONA", { callback_data: "how_it_works" })
+            createButton("REFERIDOS", { callback_data: "referral_info", style: 'success'  }),
+            createButton("CÓMO FUNCIONA", { callback_data: "how_it_works", style: 'primary' })
         ],
         [
             createButton("VPN CANAL", { url: "https://t.me/vpncubaw" }),
-            createButton("POLÍTICAS", { callback_data: "politicas" })
+            createButton("POLÍTICAS", { callback_data: "politicas", style: 'primary' })
         ],
         [
             createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),   // 👈 sin emoji, solo texto
