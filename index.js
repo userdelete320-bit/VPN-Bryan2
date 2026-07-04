@@ -19,6 +19,31 @@ const db = require('./supabase');
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
 const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
+
+// Rutas de actualización permitidas (plan actual → planes destino)
+const UPGRADE_PATHS = {
+  basico:     ['avanzado', 'anual'],
+  avanzado:   ['anual'],
+  cuba_vip:   ['anual'],
+  premium:    ['gaming_pro', 'anual'],
+  gaming_pro: ['anual']
+};
+
+// Días hábiles transcurridos desde una fecha (excluye sábado y domingo)
+function getBusinessDaysSince(dateStr) {
+  const start = new Date(dateStr);
+  start.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  let days = 0;
+  const cur = new Date(start);
+  while (cur < now) {
+    cur.setDate(cur.getDate() + 1);
+    const d = cur.getDay();
+    if (d !== 0 && d !== 6) days++;
+  }
+  return days;
+}
 // ==================== STUB MÉTODOS TRIAL FILES (uno por plan) ====================
 // Cada función acepta planType para operar sobre la tabla/bucket correcto.
 // Las tablas en Supabase se llaman: trial_files_basico, trial_files_avanzado,
@@ -287,7 +312,7 @@ function getDownloadWireguardHtml() {
 
 function getSupportHtml() {
     return `🛠 <b>Soporte VPN CUBA</b>\n\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (CEO)\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @vpncubawire (CEO)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Admin)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @JosherSnchz (Moderador)\n\n` +
            `Responde rápido y te ayudaremos.`;
@@ -952,7 +977,7 @@ app.get('/api/check-terms/:telegramId', async (req, res) => {
 
 app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
   try {
-    const { telegramId, plan, price, notes, method, couponCode } = req.body;
+    const { telegramId, plan, price, notes, method, couponCode, upgrade_to, from_plan } = req.body;
     if (!telegramId || !plan || !price) return res.status(400).json({ error: 'Datos incompletos' });
     if (!req.file) return res.status(400).json({ error: 'Captura de pantalla requerida' });
 
@@ -966,40 +991,48 @@ app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
     const username = user?.username ? `@${user.username}` : 'Sin usuario';
     const firstName = user?.first_name || 'Usuario';
 
+    const isUpgrade = !!upgrade_to;
     let couponUsed = false, couponDiscount = 0, finalPrice = parseFloat(price), appliedCoupon = null, referralDiscountApplied = 0;
-    if (couponCode && couponCode.trim() !== '') {
-      try {
-        const coupon = await db.getCoupon(couponCode.toUpperCase());
-        if (coupon && coupon.status === 'active' && !(coupon.expiry && new Date(coupon.expiry) < new Date()) && coupon.stock > 0 && !(await db.hasUserUsedCoupon(telegramId, couponCode.toUpperCase()))) {
-          couponUsed = true; couponDiscount = coupon.discount; appliedCoupon = coupon;
-          finalPrice = finalPrice * (1 - couponDiscount / 100);
-        }
-      } catch (couponError) { console.log('⚠️ Error verificando cupón:', couponError.message); }
-    }
-    if (!couponUsed) {
-      try {
-        const refStats = await db.getReferralStats(telegramId);
-        if (refStats && refStats.discount_percentage > 0) {
-          referralDiscountApplied = Math.min(refStats.discount_percentage, 100);
-          finalPrice = finalPrice * (1 - referralDiscountApplied / 100);
-        }
-      } catch (refErr) {}
+
+    // Los upgrades pagan la diferencia exacta; sin descuentos adicionales
+    if (!isUpgrade) {
+      if (couponCode && couponCode.trim() !== '') {
+        try {
+          const coupon = await db.getCoupon(couponCode.toUpperCase());
+          if (coupon && coupon.status === 'active' && !(coupon.expiry && new Date(coupon.expiry) < new Date()) && coupon.stock > 0 && !(await db.hasUserUsedCoupon(telegramId, couponCode.toUpperCase()))) {
+            couponUsed = true; couponDiscount = coupon.discount; appliedCoupon = coupon;
+            finalPrice = finalPrice * (1 - couponDiscount / 100);
+          }
+        } catch (couponError) { console.log('⚠️ Error verificando cupón:', couponError.message); }
+      }
+      if (!couponUsed) {
+        try {
+          const refStats = await db.getReferralStats(telegramId);
+          if (refStats && refStats.discount_percentage > 0) {
+            referralDiscountApplied = Math.min(refStats.discount_percentage, 100);
+            finalPrice = finalPrice * (1 - referralDiscountApplied / 100);
+          }
+        } catch (refErr) {}
+      }
     }
 
     const payment = await db.createPayment({
       telegram_id: telegramId, plan, price: finalPrice, original_price: parseFloat(price),
       method: method || 'transfer', screenshot_url: screenshotUrl, notes: notes || '',
       status: 'pending', created_at: new Date().toISOString(),
-      coupon_used: couponUsed, coupon_code: couponUsed ? couponCode?.toUpperCase() : null, coupon_discount: couponDiscount
+      coupon_used: couponUsed, coupon_code: couponUsed ? couponCode?.toUpperCase() : null, coupon_discount: couponDiscount,
+      payment_type: isUpgrade ? 'upgrade' : 'purchase', upgrade_to: upgrade_to || null, from_plan: from_plan || null
     });
     if (!payment) throw new Error('No se pudo crear el pago en la base de datos');
 
     try {
       const methodNames = { transfer: 'BPA', metropolitan: 'Metropolitana', mitransfer: 'MITRANSFER', mobile: 'Saldo Móvil', usdt: 'USDT (BEP20)' };
-      let adminMessage = `💰 *NUEVO PAGO - ${method === 'usdt' ? 'USDT' : 'CUP'}*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${getPlanName(plan)}\n💰 *Monto:* ${price} ${method === 'usdt' ? 'USDT' : 'CUP'}\n`;
-      if (couponUsed) adminMessage += `🎫 *Cupón:* ${couponCode} (${couponDiscount}%)\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
-      else if (referralDiscountApplied > 0) adminMessage += `👥 *Descuento:* ${referralDiscountApplied}%\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
-      adminMessage += `💳 *Método:* ${methodNames[method] || method}\n⏰ *Fecha:* ${new Date().toLocaleString('es-ES')}\n📝 *Estado:* ⏳ Pendiente`;
+      let adminMessage = isUpgrade
+        ? `⬆️ *ACTUALIZACIÓN DE PLAN*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *De:* ${getPlanName(from_plan)} → ${getPlanName(upgrade_to)}\n💰 *Diferencia:* ${price} ${method === 'usdt' ? 'USDT' : 'CUP'}\n💳 *Método:* ${methodNames[method] || method}\n⏰ *Fecha:* ${new Date().toLocaleString('es-ES')}\n📝 *Estado:* ⏳ Pendiente`
+        : `💰 *NUEVO PAGO - ${method === 'usdt' ? 'USDT' : 'CUP'}*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${getPlanName(plan)}\n💰 *Monto:* ${price} ${method === 'usdt' ? 'USDT' : 'CUP'}\n`;
+      if (!isUpgrade && couponUsed) adminMessage += `🎫 *Cupón:* ${couponCode} (${couponDiscount}%)\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
+      else if (!isUpgrade && referralDiscountApplied > 0) adminMessage += `👥 *Descuento:* ${referralDiscountApplied}%\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
+      if (!isUpgrade) adminMessage += `💳 *Método:* ${methodNames[method] || method}\n⏰ *Fecha:* ${new Date().toLocaleString('es-ES')}\n📝 *Estado:* ⏳ Pendiente`;
       for (const adminId of ADMIN_IDS) {
         try { await bot.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' }); } catch (e) {}
       }
@@ -1071,7 +1104,12 @@ app.post('/api/payments/:id/approve', async (req, res) => {
     } catch (botError) { console.log('❌ No se pudo notificar al usuario:', botError.message); }
 
     const user = await db.getUser(payment.telegram_id);
-    if (!user.vip) await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
+    if (payment.payment_type === 'upgrade' && payment.upgrade_to) {
+      // Upgrade: siempre actualizar al plan destino, sea o no VIP actualmente
+      await db.makeUserVIP(payment.telegram_id, { plan: payment.upgrade_to, plan_price: payment.price, vip_since: user?.vip_since || new Date().toISOString() });
+    } else if (!user.vip) {
+      await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
+    }
 
     try {
       await db.markReferralAsPaid(payment.telegram_id);
@@ -2062,6 +2100,44 @@ app.post('/api/player-profile', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Error en player-profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Opciones de actualización de plan para un usuario
+app.get('/api/upgrade-options/:telegramId', async (req, res) => {
+  try {
+    const user = await db.getUser(req.params.telegramId);
+    if (!user || !user.vip || !user.plan || !user.vip_since)
+      return res.json({ canUpgrade: false });
+
+    const daysSince = getBusinessDaysSince(user.vip_since);
+    if (daysSince > 5) return res.json({ canUpgrade: false, reason: 'expired' });
+
+    const paths = UPGRADE_PATHS[user.plan];
+    if (!paths || paths.length === 0) return res.json({ canUpgrade: false });
+
+    const prices = await db.getPlanPrices();
+    const currentPrice = prices[user.plan]?.cup || 0;
+
+    const options = paths.map(target => ({
+      plan: target,
+      diff_cup:    Math.max(0, (prices[target]?.cup    || 0) - currentPrice),
+      diff_mobile: Math.max(0, (prices[target]?.mobile || 0) - (prices[user.plan]?.mobile || 0)),
+      diff_usdt:   Math.max(0, parseFloat(((prices[target]?.usdt || 0) - (prices[user.plan]?.usdt || 0)).toFixed(2))),
+      diff_stars:  Math.max(0, (prices[target]?.stars  || 0) - (prices[user.plan]?.stars  || 0)),
+    }));
+
+    res.json({
+      canUpgrade: true,
+      currentPlan: user.plan,
+      vipSince: user.vip_since,
+      businessDaysSince: daysSince,
+      remainingBusinessDays: 5 - daysSince,
+      options
+    });
+  } catch (error) {
+    console.error('❌ Error en upgrade-options:', error);
     res.status(500).json({ error: error.message });
   }
 });
