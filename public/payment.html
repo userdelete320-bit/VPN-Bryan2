@@ -1155,6 +1155,14 @@ let referralDiscount = 0;
 let appliedCouponPercent = 0;
 let appliedCouponCode = '';
 
+// Estado de actualización de plan
+const isUpgrade    = urlParams.get('upgrade') === 'true';
+const upgradeFrom  = urlParams.get('from_plan') || '';
+const upgradeTo    = urlParams.get('upgrade_to') || '';
+const upgradePriceCup    = parseFloat(urlParams.get('price') || '0');
+const upgradePriceMobile = parseFloat(urlParams.get('mobile') || '0');
+const upgradePriceUsdt   = parseFloat(urlParams.get('usdtAmount') || '0');
+
 function safeText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
 function formatCUP(value) { return Number(value || 0).toLocaleString('es-ES') + ' CUP'; }
 
@@ -1190,10 +1198,10 @@ function updateDiscountBanner() {
 
 function updatePricing() {
   const p = PLAN_BASE[currentPlan] || PLAN_BASE.anual;
-  const effective = computeEffectiveDiscount();
-  const priceCup = Math.max(0, Math.round(p.cup * (100 - effective) / 100));
-  const priceMobile = Math.max(0, Math.round((p.mobile || 0) * (100 - effective) / 100));
-  const priceUsdt = Math.max(0, (p.usdt * (100 - effective) / 100));
+  const effective = isUpgrade ? 0 : computeEffectiveDiscount();
+  const priceCup    = isUpgrade ? upgradePriceCup    : Math.max(0, Math.round(p.cup    * (100 - effective) / 100));
+  const priceMobile = isUpgrade ? upgradePriceMobile : Math.max(0, Math.round((p.mobile || 0) * (100 - effective) / 100));
+  const priceUsdt   = isUpgrade ? upgradePriceUsdt   : Math.max(0, (p.usdt * (100 - effective) / 100));
 
   safeText('ps-base', formatCUP(p.cup));
   safeText('ps-total', formatCUP(priceCup));
@@ -1468,6 +1476,10 @@ async function sendOrder() {
     form.append('method', method);
     form.append('couponCode', appliedCouponCode || '');
     form.append('referralDiscount', String(effective));
+    if (isUpgrade) {
+      form.append('upgrade_to', upgradeTo);
+      form.append('from_plan', upgradeFrom);
+    }
     const fileInput = document.getElementById('fileInput');
     if (!fileInput.files[0]) throw new Error('Archivo no encontrado. Vuelve a seleccionar la imagen.');
     form.append('screenshot', fileInput.files[0]);
@@ -1608,6 +1620,14 @@ async function applyDynamicPricesPayment() {
       window.Telegram.WebApp.setBackgroundColor('#06080e');
     }
     const planParam = urlParams.get('plan') || 'anual';
+
+    // Modo upgrade: ocultar cupón y descuento de referido; no son aplicables
+    if (isUpgrade) {
+      const couponRow = document.querySelector('.coupon-row');
+      const refBanner = document.getElementById('refBanner');
+      if (couponRow) couponRow.style.display = 'none';
+      if (refBanner) refBanner.style.display = 'none';
+    }
 
     if (currentUserId) {
       fetch(`/api/user-info/${encodeURIComponent(currentUserId)}`)

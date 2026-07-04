@@ -1156,6 +1156,74 @@
     .push-fx { display: none !important; }
   }
 
+  /* ===== BANNER DE ACTUALIZACIÓN DE PLAN ===== */
+  #upgradeBanner {
+    display: none;
+    margin: 16px 16px 0;
+    background: linear-gradient(135deg, rgba(245,200,66,0.1), rgba(245,200,66,0.05));
+    border: 1px solid rgba(245,200,66,0.35);
+    border-radius: 16px;
+    padding: 14px 16px;
+    position: relative;
+    z-index: 5;
+  }
+  #upgradeBanner.visible { display: block; }
+  .upg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .upg-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: #f5c842;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .upg-countdown {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .upg-options { display: flex; flex-direction: column; gap: 8px; }
+  .upg-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upg-option:active { background: rgba(245,200,66,0.08); border-color: rgba(245,200,66,0.4); }
+  .upg-option-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+  .upg-option-price { font-size: 12px; color: #f5c842; font-family: 'Space Mono', monospace; }
+
+  /* Modal de opciones de upgrade */
+  .upg-modal-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upg-modal-option:active { background: rgba(245,200,66,0.08); border-color: rgba(245,200,66,0.4); }
+  .upg-modal-name { font-size: 14px; font-weight: 700; color: #e2e8f0; }
+  .upg-modal-sub  { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .upg-modal-price { text-align: right; }
+  .upg-modal-price-val { font-size: 14px; font-weight: 700; color: #f5c842; font-family: 'Space Mono', monospace; }
+  .upg-modal-price-lbl { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -1202,6 +1270,9 @@
 <div class="app" id="mainApp">
 
 <section class="snap-section trial-section" id="sectionTrial">
+  <!-- BANNER DE ACTUALIZACIÓN DE PLAN -->
+  <div id="upgradeBanner"></div>
+
   <!-- HEADER -->
   <div class="header">
     <div class="header-badge">
@@ -2475,10 +2546,109 @@ function scrollTop() {
   }, { passive: true });
 })();
 
+// ===== SISTEMA DE ACTUALIZACIÓN DE PLAN =====
+const UPGRADE_PLAN_NAMES = {
+  basico: 'Básico', avanzado: 'Avanzado', cuba_vip: 'Cuba VIP',
+  premium: 'Gaming', gaming_pro: 'Gaming Pro', anual: 'Anual'
+};
+
+let upgradeData = null; // Guardamos la respuesta del endpoint
+
+async function checkUpgradeOptions() {
+  if (!currentUserId) return;
+  try {
+    const res = await fetch(`/api/upgrade-options/${encodeURIComponent(currentUserId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.canUpgrade || !data.options?.length) return;
+    upgradeData = data;
+    renderUpgradeBanner(data);
+  } catch (e) {}
+}
+
+function renderUpgradeBanner(data) {
+  const banner = document.getElementById('upgradeBanner');
+  if (!banner) return;
+
+  const daysLeft = data.remainingBusinessDays;
+  const daysLabel = daysLeft === 1 ? '1 día hábil' : `${daysLeft} días hábiles`;
+  const fromName = UPGRADE_PLAN_NAMES[data.currentPlan] || data.currentPlan;
+
+  banner.innerHTML = `
+    <div class="upg-header">
+      <div class="upg-title">⬆️ ACTUALIZAR PLAN</div>
+      <div class="upg-countdown">⏱ ${daysLabel} restantes</div>
+    </div>
+    <div class="upg-options">
+      ${data.options.map(opt => `
+        <div class="upg-option" onclick="openUpgradeModal()">
+          <div>
+            <div class="upg-option-name">${fromName} → ${UPGRADE_PLAN_NAMES[opt.plan] || opt.plan}</div>
+          </div>
+          <div class="upg-option-price">+${opt.diff_cup.toLocaleString('es-ES')} CUP</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  banner.classList.add('visible');
+}
+
+function openUpgradeModal() {
+  if (!upgradeData) return;
+  const fromName = UPGRADE_PLAN_NAMES[upgradeData.currentPlan] || upgradeData.currentPlan;
+  const daysLeft = upgradeData.remainingBusinessDays;
+
+  const content = `
+    <div style="margin-bottom:4px;font-size:24px">⬆️</div>
+    <div class="modal-plan-name" style="color:#f5c842">Actualizar Plan</div>
+    <div class="modal-plan-desc" style="margin-bottom:4px">Plan actual: <strong>${fromName}</strong></div>
+    <div class="modal-plan-desc" style="margin-bottom:16px;color:rgba(255,255,255,0.4);font-size:12px">⏱ ${daysLeft === 1 ? '1 día hábil' : daysLeft + ' días hábiles'} para actualizar</div>
+    ${upgradeData.options.map(opt => `
+      <div class="upg-modal-option" onclick="requestUpgrade('${opt.plan}', ${opt.diff_cup}, ${opt.diff_mobile}, ${opt.diff_usdt})">
+        <div>
+          <div class="upg-modal-name">${fromName} → ${UPGRADE_PLAN_NAMES[opt.plan] || opt.plan}</div>
+          <div class="upg-modal-sub">Solo pagas la diferencia</div>
+        </div>
+        <div class="upg-modal-price">
+          <div class="upg-modal-price-val">+${opt.diff_cup.toLocaleString('es-ES')} CUP</div>
+          <div class="upg-modal-price-lbl">${opt.diff_usdt > 0 ? '+' + opt.diff_usdt + ' USDT' : ''}</div>
+        </div>
+      </div>
+    `).join('')}
+    <button class="modal-cta" style="background:rgba(255,255,255,0.07);color:#94a3b8;width:100%;margin-top:4px" onclick="closeModal()">Cancelar</button>
+  `;
+
+  const modalContent = document.getElementById('modalContent');
+  if (modalContent) {
+    modalContent.innerHTML = content;
+    const modal = document.getElementById('modal');
+    if (modal) modal.classList.add('active');
+    document.getElementById('modalSheet')?.classList.remove('closing');
+  }
+}
+
+function requestUpgrade(targetPlan, diffCup, diffMobile, diffUsdt) {
+  if (!upgradeData) return;
+  closeModal();
+  const params = new URLSearchParams({
+    userId: currentUserId,
+    plan: targetPlan,
+    price: String(diffCup),
+    mobile: String(diffMobile),
+    usdtAmount: String(diffUsdt),
+    planLabel: `${UPGRADE_PLAN_NAMES[upgradeData.currentPlan]} → ${UPGRADE_PLAN_NAMES[targetPlan] || targetPlan}`,
+    upgrade: 'true',
+    from_plan: upgradeData.currentPlan,
+    upgrade_to: targetPlan,
+  });
+  window.location.href = `payment.html?${params.toString()}`;
+}
+
 window.addEventListener('load', () => {
   applyDynamicPrices();
   loadAnnouncement();
   renderVoyageStack();
+  checkUpgradeOptions();
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
