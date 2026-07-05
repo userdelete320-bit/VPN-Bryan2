@@ -1105,9 +1105,10 @@ app.post('/api/payments/:id/approve', async (req, res) => {
 
     const user = await db.getUser(payment.telegram_id);
     if (payment.payment_type === 'upgrade' && payment.upgrade_to) {
-      // Upgrade: siempre actualizar al plan destino, sea o no VIP actualmente
+      // Upgrade: actualizar al plan destino manteniendo vip_since original
       await db.makeUserVIP(payment.telegram_id, { plan: payment.upgrade_to, plan_price: payment.price, vip_since: user?.vip_since || new Date().toISOString() });
-    } else if (!user.vip) {
+    } else {
+      // Compra nueva o renovación: siempre actualizar, aunque ya sea VIP
       await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
     }
 
@@ -1216,7 +1217,7 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
     if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
 
     await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.originalname, config_sent_by: adminId });
-    if (user && !user.vip) await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
+    await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
     fs.unlink(req.file.path, () => {});
     res.json({ success: true, message: 'Configuración enviada manualmente', filename: req.file.filename, telegramId: chatId });
   } catch (error) {
