@@ -1333,16 +1333,20 @@ app.post('/api/request-trial', async (req, res) => {
 
     // 5. Responder al usuario según resultado
     if (autoSent) {
-      await bot.telegram.sendMessage(telegramId,
-        `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu prueba gratuita ya está aquí!</b>\n\nAcabo de enviarte el archivo de configuración para el plan <b>${selectedPlan}</b>.\nRevísalo en este mismo chat y actívalo en WireGuard.\n\n<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Plan probado:</b> ${selectedPlan}\n¡Disfruta de baja latencia! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
-        { parse_mode: 'HTML' }
-      );
+      try {
+        await bot.telegram.sendMessage(telegramId,
+          `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu prueba gratuita ya está aquí!</b>\n\nAcabo de enviarte el archivo de configuración para el plan <b>${selectedPlan}</b>.\nRevísalo en este mismo chat y actívalo en WireGuard.\n\n<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Plan probado:</b> ${selectedPlan}\n¡Disfruta de baja latencia! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (e) { console.warn(`⚠️ No se pudo notificar al usuario ${telegramId}:`, e.message); }
       res.json({ success: true, message: 'Prueba gratuita enviada automáticamente.', trialPlanType, user: updatedUser, autoSent: true });
     } else {
-      await bot.telegram.sendMessage(telegramId,
-        `<tg-emoji emoji-id="6019175208240289774">✅</tg-emoji> <b>Solicitud de prueba recibida</b>\n\nTu solicitud para el plan <b>${selectedPlan}</b> ha sido registrada. Un administrador te enviará la configuración en breve.\n\n¡Gracias por probar VPN Cuba!`,
-        { parse_mode: 'HTML' }
-      );
+      try {
+        await bot.telegram.sendMessage(telegramId,
+          `<tg-emoji emoji-id="6019175208240289774">✅</tg-emoji> <b>Solicitud de prueba recibida</b>\n\nTu solicitud para el plan <b>${selectedPlan}</b> ha sido registrada. Un administrador te enviará la configuración en breve.\n\n¡Gracias por probar VPN Cuba!`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (e) { console.warn(`⚠️ No se pudo notificar al usuario ${telegramId}:`, e.message); }
       res.json({ success: true, message: 'Solicitud registrada. Recibirás la configuración en breve.', trialPlanType, user: updatedUser, autoSent: false, error: sendError?.message });
     }
   } catch (error) {
