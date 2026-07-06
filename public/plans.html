@@ -2622,7 +2622,8 @@ function openUpgradeModal() {
   if (modalContent) {
     modalContent.innerHTML = content;
     const modal = document.getElementById('modal');
-    if (modal) modal.classList.add('active');
+    if (modal) modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
     document.getElementById('modalSheet')?.classList.remove('closing');
   }
 }
