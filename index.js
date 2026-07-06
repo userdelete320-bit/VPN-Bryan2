@@ -2122,7 +2122,7 @@ app.get('/api/upgrade-options/:telegramId', async (req, res) => {
     const paths = UPGRADE_PATHS[user.plan];
     if (!paths || paths.length === 0) return res.json({ canUpgrade: false });
 
-    const prices = await db.getPlanPrices();
+    const prices = PLAN_PRICES;
     const currentPrice = prices[user.plan]?.cup || 0;
 
     const options = paths.map(target => ({
