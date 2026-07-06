@@ -20,14 +20,12 @@ const db = require('./supabase');
 // Todos los tipos de plan con pool propio
 const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
 
-// Rutas de actualización permitidas (plan actual → planes destino)
-const UPGRADE_PATHS = {
-  basico:     ['avanzado', 'anual'],
-  avanzado:   ['anual'],
-  cuba_vip:   ['anual'],
-  premium:    ['gaming_pro', 'anual'],
-  gaming_pro: ['anual']
-};
+// Jerarquía de planes de menor a mayor — cualquier plan puede subir a los que siguen
+const PLAN_HIERARCHY = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
+const UPGRADE_PATHS = {};
+for (let i = 0; i < PLAN_HIERARCHY.length - 1; i++) {
+  UPGRADE_PATHS[PLAN_HIERARCHY[i]] = PLAN_HIERARCHY.slice(i + 1);
+}
 
 // Días hábiles transcurridos desde una fecha (excluye sábado y domingo)
 function getBusinessDaysSince(dateStr) {
@@ -2122,15 +2120,12 @@ app.get('/api/upgrade-options/:telegramId', async (req, res) => {
     const paths = UPGRADE_PATHS[user.plan];
     if (!paths || paths.length === 0) return res.json({ canUpgrade: false });
 
-    const prices = PLAN_PRICES;
-    const currentPrice = prices[user.plan]?.cup || 0;
-
     const options = paths.map(target => ({
       plan: target,
-      diff_cup:    Math.max(0, (prices[target]?.cup    || 0) - currentPrice),
-      diff_mobile: Math.max(0, (prices[target]?.mobile || 0) - (prices[user.plan]?.mobile || 0)),
-      diff_usdt:   Math.max(0, parseFloat(((prices[target]?.usdt || 0) - (prices[user.plan]?.usdt || 0)).toFixed(2))),
-      diff_stars:  Math.max(0, (prices[target]?.stars  || 0) - (prices[user.plan]?.stars  || 0)),
+      diff_cup:    500,
+      diff_mobile: 500,
+      diff_usdt:   0,
+      diff_stars:  0,
     }));
 
     res.json({
