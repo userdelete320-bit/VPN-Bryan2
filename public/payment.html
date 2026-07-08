@@ -1210,6 +1210,9 @@ function updatePricing() {
   safeText('sumUSDT', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
   safeText('usdtAmount', priceUsdt.toFixed(2).replace(/\.00$/, '') + ' USDT');
 
+  const heroPriceEl = document.getElementById('heroPrice');
+  if (heroPriceEl) heroPriceEl.textContent = formatCUP(priceCup);
+
   const starsEl = document.getElementById('starsAmount');
   if (starsEl) starsEl.textContent = (p.stars || 0) + ' ⭐';
 
@@ -1290,7 +1293,6 @@ if (heroTagEl) {
   safeText('heroSub', p.sub);
   const heroPrice = document.getElementById('heroPrice');
   if (heroPrice) {
-    heroPrice.textContent = p.price;
     heroPrice.style.color = p.accentColor;
   }
   safeText('heroDuration', p.duration);
