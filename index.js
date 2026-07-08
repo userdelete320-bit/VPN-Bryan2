@@ -1301,6 +1301,7 @@ app.post('/api/request-trial', async (req, res) => {
       first_name: firstName,
       trial_requested: true,
       trial_requested_at: new Date().toISOString(),
+      trial_received: false,
       trial_plan_type: trialPlanType || 'basico',
       trial_game_server: gameServer || '',
       trial_connection_type: connectionType || '',
