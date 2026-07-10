@@ -407,7 +407,9 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'screenshot' || file.fieldname === 'refundProof') {
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
-      if (allowedTypes.includes(file.mimetype)) cb(null, true);
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+      const fileExt = path.extname(file.originalname).toLowerCase();
+      if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExt)) cb(null, true);
       else cb(new Error('Solo se permiten imágenes JPG, PNG, GIF, WebP o HEIC (iPhone)'));
     } else if (file.fieldname === 'mediaFile') {
       if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) cb(null, true);

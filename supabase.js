@@ -30,6 +30,7 @@ const db = {
       const CONTENT_TYPES = {
         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
         '.gif': 'image/gif', '.webp': 'image/webp',
+        '.heic': 'image/heic', '.heif': 'image/heif',
         '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm'
       };
       const contentType = CONTENT_TYPES[ext] || 'application/octet-stream';
