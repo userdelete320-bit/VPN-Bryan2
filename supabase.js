@@ -966,12 +966,26 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
   async markTrialAsSent(telegramId, sentBy) {
     try {
       const userId = String(telegramId).trim();
+
+      // Leer el plan actual y el historial antes de actualizar
+      const user = await this.getUser(userId);
+      let history = [];
+      try { history = JSON.parse(user?.trials_history || '[]'); } catch(e) { history = []; }
+
+      const planType = user?.trial_plan_type || 'basico';
+      // Añadir o actualizar la entrada de este plan en el historial
+      const existingIdx = history.findIndex(e => e.plan === planType);
+      const entry = { plan: planType, sent_at: new Date().toISOString() };
+      if (existingIdx >= 0) history[existingIdx] = entry;
+      else history.push(entry);
+
       const { data, error } = await dbClient
         .from('users')
         .update({
           trial_received: true,
           trial_sent_at: new Date().toISOString(),
           trial_sent_by: sentBy,
+          trials_history: JSON.stringify(history),
           updated_at: new Date().toISOString()
         })
         .eq('telegram_id', userId)
@@ -989,24 +1003,27 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
   try {
     const user = await this.getUser(telegramId);
     if (!user) return { eligible: true, reason: 'Nuevo usuario' };
-    
+
     const targetPlan = planType || 'basico';
-    
-    // Verificar si ya solicitó ESTE plan específico
-    if (user.trial_requested && user.trial_plan_type === targetPlan) {
-      if (!user.trial_received) {
-        return { eligible: false, reason: `Ya tienes una solicitud PENDIENTE del plan ${targetPlan.toUpperCase()}` };
-      }
-      if (user.trial_received && user.trial_sent_at) {
-        const lastTrialDate = new Date(user.trial_sent_at);
-        const now = new Date();
-        const daysSinceLastTrial = Math.floor((now - lastTrialDate) / (1000 * 60 * 60 * 24));
-        if (daysSinceLastTrial < 30) {
-          return { eligible: false, reason: `Ya solicitaste el plan ${targetPlan.toUpperCase()}. Debes esperar ${30 - daysSinceLastTrial} días para volver a solicitar ESTE mismo plan.` };
-        }
+
+    // Historial de planes ya recibidos (array JSON en trials_history)
+    let history = [];
+    try { history = JSON.parse(user.trials_history || '[]'); } catch(e) { history = []; }
+
+    // Verificar si este plan ya fue recibido antes
+    const prevEntry = history.find(e => e.plan === targetPlan);
+    if (prevEntry) {
+      const daysSince = Math.floor((Date.now() - new Date(prevEntry.sent_at).getTime()) / 86400000);
+      if (daysSince < 30) {
+        return { eligible: false, reason: `Ya recibiste la prueba del plan ${targetPlan.toUpperCase()}. Debes esperar ${30 - daysSince} días.` };
       }
     }
-    
+
+    // Verificar si tiene una solicitud PENDIENTE de este plan
+    if (user.trial_requested && user.trial_plan_type === targetPlan && !user.trial_received) {
+      return { eligible: false, reason: `Ya tienes una solicitud PENDIENTE del plan ${targetPlan.toUpperCase()}` };
+    }
+
     return { eligible: true, reason: `Puedes solicitar tu prueba del plan ${targetPlan.toUpperCase()}` };
   } catch (error) {
     console.error('❌ Error en checkTrialEligibility:', error);

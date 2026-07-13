@@ -1288,7 +1288,7 @@ app.post('/api/request-trial', async (req, res) => {
 
   try {
     // 1. Verificar elegibilidad
-    const eligibility = await db.checkTrialEligibility(telegramId);
+    const eligibility = await db.checkTrialEligibility(telegramId, trialPlanType);
     if (!eligibility.eligible) {
       pendingTrialLocks.delete(telegramId);
       return res.status(400).json({ error: `No puedes solicitar una prueba: ${eligibility.reason}` });
@@ -1296,14 +1296,13 @@ app.post('/api/request-trial', async (req, res) => {
 
     const selectedPlan = getPlanLabel(trialPlanType) || 'No especificado';
 
-    // 2. Guardar la solicitud en BD
+    // 2. Guardar la solicitud en BD (sin tocar trial_received para preservar el historial)
     const updatedUser = await db.saveUser(telegramId, {
       telegram_id: telegramId,
       username,
       first_name: firstName,
       trial_requested: true,
       trial_requested_at: new Date().toISOString(),
-      trial_received: false,
       trial_plan_type: trialPlanType || 'basico',
       trial_game_server: gameServer || '',
       trial_connection_type: connectionType || '',
