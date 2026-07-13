@@ -406,10 +406,11 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'screenshot' || file.fieldname === 'refundProof') {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'application/octet-stream', ''];
       const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
       const fileExt = path.extname(file.originalname).toLowerCase();
-      if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExt)) cb(null, true);
+      // iOS WebView puede mandar mimetype vacío o application/octet-stream al convertir HEIC→JPEG
+      if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExt) || file.mimetype.startsWith('image/')) cb(null, true);
       else cb(new Error('Solo se permiten imágenes JPG, PNG, GIF, WebP o HEIC (iPhone)'));
     } else if (file.fieldname === 'mediaFile') {
       if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) cb(null, true);
@@ -1288,7 +1289,7 @@ app.post('/api/request-trial', async (req, res) => {
 
   try {
     // 1. Verificar elegibilidad
-    const eligibility = await db.checkTrialEligibility(telegramId, trialPlanType);
+    const eligibility = await db.checkTrialEligibility(telegramId);
     if (!eligibility.eligible) {
       pendingTrialLocks.delete(telegramId);
       return res.status(400).json({ error: `No puedes solicitar una prueba: ${eligibility.reason}` });
@@ -1296,13 +1297,14 @@ app.post('/api/request-trial', async (req, res) => {
 
     const selectedPlan = getPlanLabel(trialPlanType) || 'No especificado';
 
-    // 2. Guardar la solicitud en BD (sin tocar trial_received para preservar el historial)
+    // 2. Guardar la solicitud en BD
     const updatedUser = await db.saveUser(telegramId, {
       telegram_id: telegramId,
       username,
       first_name: firstName,
       trial_requested: true,
       trial_requested_at: new Date().toISOString(),
+      trial_received: false,
       trial_plan_type: trialPlanType || 'basico',
       trial_game_server: gameServer || '',
       trial_connection_type: connectionType || '',
