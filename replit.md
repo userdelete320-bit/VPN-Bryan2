@@ -35,6 +35,7 @@ public/           # Static frontend files
   admin-login.html
   plans.html      # Plans/payment web app
   payment.html
+  garantias.html  # guarantee information
   index.html      # Landing page
   how.html, faq.html, politicas.html
   css/style.css
@@ -57,9 +58,7 @@ ecosystem.config.js  # PM2 config (for reference)
 | `PORT` | Server port (set to 5000) |
 
 ## Admin Telegram IDs
-
-Hardcoded in `index.js`: `6373481979, 5376388604, 6974850309, 5985313284`  
-Can also be overridden via `ADMIN_TELEGRAM_IDS` env var.
+There is a SuperAdmin who has controll about all allowed admins. This SuperAdmin can add or erase admins manually whenever he wants. 
 
 ## Deployment
 
