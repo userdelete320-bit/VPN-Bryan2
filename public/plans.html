@@ -2571,6 +2571,13 @@ function renderUpgradeBanner(data) {
   if (!banner) return;
 
   const daysLeft = data.remainingBusinessDays;
+
+  // Si el plazo expiró, ocultar el banner y no mostrarlo
+  if (!daysLeft || daysLeft <= 0) {
+    banner.classList.remove('visible');
+    banner.innerHTML = '';
+    return;
+  }
   const daysLabel = daysLeft === 1 ? '1 día hábil' : `${daysLeft} días hábiles`;
   const fromName = UPGRADE_PLAN_NAMES[data.currentPlan] || data.currentPlan;
 
