@@ -904,7 +904,7 @@ body::after {
         <button class="method-tab" onclick="switchTab('movil')">📱 Saldo Móvil</button>
         <button class="method-tab" onclick="switchTab('usdt')">₮ USDT</button>
         <button class="method-tab" onclick="switchTab('stars')">⭐ Telegram Stars</button>
-        
+        <button class="method-tab" id="tab-paypal-btn" onclick="switchTab('paypal')">🅿 PayPal</button>
       </div>
 
       <!-- BPA -->
@@ -964,6 +964,21 @@ body::after {
         </div>
         <div class="warning-note">⚠️ <strong>IMPORTANTE:</strong> Envía <strong>SOLO a través de la red BEP-20 (Binance Smart Chain)</strong>. No uses otras redes o perderás los fondos.</div>
         <div class="method-info-note mt8"><span class="ni">ℹ</span> Incluye el hash de la transacción en el comprobante de pago.</div>
+      </div>
+
+      <!-- PAYPAL -->
+      <div class="method-panel" id="tab-paypal">
+        <div class="payment-info-box">
+          <div class="pib-label">🅿 LINK DE PAGO PAYPAL</div>
+          <div class="pib-val" style="font-size:13px">paypal.me/vpncubaw</div>
+          <button class="copy-btn" onclick="openPayPal()">ABRIR PAYPAL</button>
+        </div>
+        <div class="payment-info-box mt8">
+          <div class="pib-label">MONTO EXACTO (USD)</div>
+          <div class="pib-val" id="paypalAmount">—</div>
+        </div>
+        <div class="warning-note">⚠️ Envía el monto <strong>exacto en USD</strong>. Incluye en el concepto tu ID de Telegram: <strong id="paypalNote">—</strong></div>
+        <div class="method-info-note mt8"><span class="ni">ℹ</span> Sube una captura del comprobante de pago de PayPal.</div>
       </div>
     </div>
 
@@ -1141,13 +1156,13 @@ const PLAN_KEYS = {
 };
 
 const PLAN_BASE = {
-  basic: { cup: 900, mobile: 400, usdt: 1.5, stars: 150 },
-  advanced: { cup: 1800, mobile: 900, usdt: 2.8, stars: 270},
-  vip: { cup: 1200, mobile: 500, usdt: 1.9, stars: 180 },
-  gaming: { cup: 1500, mobile: 700, usdt: 2.3, stars: 210 },
-  'gaming-pro': { cup: 2000, mobile: 1300, usdt: 4.0, stars: 300 },
-  anual: { cup: 15000, mobile: 10000, usdt: 25, stars: 2100},
-  trial: { cup: 0, mobile: 0, usdt: 0, stars: 0 }
+  basic:       { cup: 900,   mobile: 400,   usdt: 1.5,  stars: 150,  paypal: 3  },
+  advanced:    { cup: 1800,  mobile: 900,   usdt: 2.8,  stars: 270,  paypal: 7  },
+  vip:         { cup: 1200,  mobile: 500,   usdt: 1.9,  stars: 180,  paypal: null },
+  gaming:      { cup: 1500,  mobile: 700,   usdt: 2.3,  stars: 210,  paypal: 5  },
+  'gaming-pro':{ cup: 2000,  mobile: 1300,  usdt: 4.0,  stars: 300,  paypal: 8  },
+  anual:       { cup: 15000, mobile: 10000, usdt: 25,   stars: 2100, paypal: 40 },
+  trial:       { cup: 0,     mobile: 0,     usdt: 0,    stars: 0,    paypal: null }
 };
 
 // Descuento de referido (viene del backend, ya neto)
@@ -1225,6 +1240,18 @@ function updatePricing() {
   const usdtRow = document.getElementById('sumUSDTrow');
   if (mobileRow) mobileRow.style.display = p.mobile ? 'flex' : 'none';
   if (usdtRow) usdtRow.style.display = p.usdt ? 'flex' : 'none';
+
+  // PayPal: mostrar/ocultar tab y actualizar monto
+  const paypalBtn = document.getElementById('tab-paypal-btn');
+  const paypalAmountEl = document.getElementById('paypalAmount');
+  if (p.paypal) {
+    if (paypalBtn) paypalBtn.style.display = '';
+    if (paypalAmountEl) paypalAmountEl.textContent = '$' + p.paypal + ' USD';
+  } else {
+    if (paypalBtn) paypalBtn.style.display = 'none';
+    // Si estaba activo, volver al BPA
+    if (paypalBtn?.classList.contains('active')) switchTab('bpa');
+  }
 
   const discRow = document.getElementById('ps-disc-row');
   if (effective > 0) {
@@ -1347,7 +1374,7 @@ function goToStep(n) {
 function goBack() { if(currentStep > 1) goToStep(currentStep - 1); }
 
 function switchTab(id) {
-  const ids = ['bpa', 'metropolitan', 'movil', 'usdt', 'stars'];
+  const ids = ['bpa', 'metropolitan', 'movil', 'usdt', 'stars', 'paypal'];
   document.querySelectorAll('.method-tab').forEach((t, i) => {
     t.classList.toggle('active', ids[i] === id);
   });
@@ -1471,8 +1498,10 @@ async function sendOrder() {
     form.append('price', String(finalCup));
     form.append('notes', document.getElementById('couponInput')?.value?.trim() || '');
     const activeTab = document.querySelector('.method-tab.active');
-    const method = activeTab?.textContent?.includes('USDT') ? 'usdt' :
-                   activeTab?.textContent?.includes('Saldo Móvil') ? 'mobile' : 'transfer';
+    const tabText = activeTab?.textContent || '';
+    const method = tabText.includes('USDT') ? 'usdt' :
+                   tabText.includes('Saldo Móvil') ? 'mobile' :
+                   tabText.includes('PayPal') ? 'paypal' : 'transfer';
     form.append('method', method);
     form.append('couponCode', appliedCouponCode || '');
     form.append('referralDiscount', String(effective));
@@ -1603,11 +1632,19 @@ async function applyDynamicPricesPayment() {
       const apiKey = PLAN_KEYS[uiKey];
       const dp = dynamicPrices[apiKey];
       if (!dp || !PLAN_BASE[uiKey]) continue;
-      PLAN_BASE[uiKey] = { cup: dp.cup, mobile: dp.mobile, usdt: dp.usdt, stars: dp.stars, ton: dp.ton };
+      const paypalFixed = PLAN_BASE[uiKey].paypal; // preservar precio PayPal (no viene del servidor)
+      PLAN_BASE[uiKey] = { cup: dp.cup, mobile: dp.mobile, usdt: dp.usdt, stars: dp.stars, ton: dp.ton, paypal: paypalFixed };
     }
   } catch (e) {
     console.error('No se pudieron cargar precios dinámicos, se usan los valores por defecto:', e);
   }
+}
+
+function openPayPal() {
+  const p = PLAN_BASE[currentPlan];
+  const amount = p?.paypal || '';
+  const url = amount ? `https://paypal.me/vpncubaw/${amount}USD` : 'https://paypal.me/vpncubaw';
+  window.open(url, '_blank');
 }
 
 // ===== INICIALIZACIÓN =====
@@ -1620,6 +1657,12 @@ async function applyDynamicPricesPayment() {
       window.Telegram.WebApp.setHeaderColor('#06080e');
       window.Telegram.WebApp.setBackgroundColor('#06080e');
     }
+    // Mostrar ID del usuario en el concepto de PayPal
+    if (currentUserId) {
+      const paypalNote = document.getElementById('paypalNote');
+      if (paypalNote) paypalNote.textContent = currentUserId;
+    }
+
     const planParam = urlParams.get('plan') || 'anual';
 
     // Modo upgrade: ocultar cupón y descuento de referido
