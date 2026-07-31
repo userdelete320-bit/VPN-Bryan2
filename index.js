@@ -175,6 +175,9 @@ const DEFAULT_PLAN_PRICES = {
 
 let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
 
+// Disponibilidad de planes: true = agotado, false = disponible
+let PLAN_AVAILABILITY = { basico: false, avanzado: false, cuba_vip: false, premium: false, gaming_pro: false, anual: false };
+
 // Objetos derivados que el resto del código ya usa (se actualizan junto con PLAN_PRICES)
 let USDT_PRICES = {};
 let STARS_PRICES = {};
@@ -355,25 +358,25 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
     const inlineKeyboard = [
         [
             createButton("VER PLANES", isGroup ? { url: plansUrl, style: 'primary' } : { web_app: { url: plansUrl }, style: 'primary' }),
-            createButton("MI PERFIL", { callback_data: "check_status", style: 'primary'})
+            createButton("MI PERFIL", { callback_data: "check_status" })
         ],
         [
-            createButton("DESCARGAR VPN", { callback_data: "download_wireguard", style: 'danger' }),
+            createButton("DESCARGAR VPN", { callback_data: "download_wireguard" }),
             createButton("SOPORTE", { callback_data: "show_support", style: 'danger' })
         ],
         [
-            createButton("REFERIDOS", { callback_data: "referral_info", style: 'success'  }),
-            createButton("CÓMO FUNCIONA", { callback_data: "how_it_works", style: 'success' })
+            createButton("REFERIDOS", { callback_data: "referral_info", style: 'success' }),
+            createButton("CÓMO FUNCIONA", { callback_data: "how_it_works" })
         ],
         [
-            createButton("VPN CANAL", { url: "https://t.me/vpncubaw", style: 'primary'}),
-            createButton("POLÍTICAS", { callback_data: "politicas", style: 'primary' })
+            createButton("VPN CANAL", { url: "https://t.me/vpncubaw" }),
+            createButton("POLÍTICAS", { callback_data: "politicas" })
         ],
         [
-            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK , style: 'danger'}),   // 👈 sin emoji, solo texto
-            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK , style: 'danger'})    // 👈 sin emoji, solo texto
+            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),
+            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK })
         ],
-        [createButton("FAQ", { callback_data: "faq" , style: 'success',})]
+        [createButton("FAQ", { callback_data: "faq" })]
     ];
     if (esAdmin && !isGroup) {
         inlineKeyboard.push([createButton("PANEL ADMIN", { web_app: { url: adminUrl } })]);
@@ -955,6 +958,31 @@ app.post('/api/plan-prices/update', async (req, res) => {
   }
 });
 
+app.get('/api/plan-availability', (req, res) => {
+  res.json(PLAN_AVAILABILITY);
+});
+
+app.post('/api/plan-availability/update', async (req, res) => {
+  try {
+    const { requesterId, plan, agotado } = req.body;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede modificar la disponibilidad.' });
+    if (!plan || typeof agotado !== 'boolean') return res.status(400).json({ error: 'Datos inválidos.' });
+    if (!(plan in PLAN_AVAILABILITY)) return res.status(400).json({ error: `Plan desconocido: ${plan}` });
+    PLAN_AVAILABILITY[plan] = agotado;
+    try {
+      const sb = getSbClient();
+      await sb.from('settings').upsert(
+        { key: 'plan_availability', value: JSON.stringify(PLAN_AVAILABILITY), updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+    } catch (dbErr) { console.warn('⚠️ No se pudo persistir disponibilidad en DB:', dbErr.message); }
+    res.json({ success: true, availability: PLAN_AVAILABILITY });
+  } catch (error) {
+    console.error('❌ Error actualizando disponibilidad:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/accept-terms', async (req, res) => {
   try {
     const { telegramId, username, firstName, referrerId, referrerUsername } = req.body;
@@ -1044,7 +1072,7 @@ app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
 Ya registramos tu comprobante para <b>${getPlanName(plan)}</b>.
 No hace falta enviar otra foto. Tu pago quedó en revisión manual.
 
-<b>Estado:</b> ⏳ Revisión manual de 1-12 horas`;
+<b>Estado:</b> ⏳ Revisión en 1-48h`;
         await bot.telegram.sendMessage(telegramId, userMessage, { parse_mode: 'HTML' });
       } catch (e) {}
     } catch (e) {}
@@ -1500,8 +1528,8 @@ async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaU
     if (!users?.length) { await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 }); return; }
     await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0 });
     let sentCount = 0, failedCount = 0, unavailableCount = 0;
-    const caption = message ? `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @ErenJeager129182 | @JosherSnchz_` : null;
-    const textOnly = `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @ErenJeager129182 | @JosherSnchz_`;
+    const caption = message ? `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @rov3r777 | @JosherSnchz_` : null;
+    const textOnly = `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @rov3r777 | @JosherSnchz_`;
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       try {
@@ -2371,8 +2399,8 @@ bot.action('show_support', async (ctx) => {
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
-        [createButton("ADMIN", { url: 'https://t.me/ErenJeager129182', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("CEO", { url: 'https://t.me/vpncubawire', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("ADMIN", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
@@ -2655,6 +2683,16 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 Servidor en http://localhost:${PORT}`);
     await loadAdminsFromDb();
     await loadPlanPricesFromDb();
+    // Cargar disponibilidad de planes persistida
+    try {
+      const sb = getSbClient();
+      const { data } = await sb.from('settings').select('value').eq('key', 'plan_availability').single();
+      if (data?.value) {
+        const saved = JSON.parse(data.value);
+        Object.assign(PLAN_AVAILABILITY, saved);
+        console.log('📦 Disponibilidad de planes cargada desde DB');
+      }
+    } catch (e) { console.warn('⚠️ No se pudo cargar disponibilidad:', e.message); }
     console.log(`👑 Admins: ${ADMIN_IDS.join(', ')}`);
     console.log(`💰 USDT Wallet: ${USDT_CONFIG.WALLET_ADDRESS}`);
     await verifyStorageBuckets();
