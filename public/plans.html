@@ -1918,9 +1918,10 @@ function openModal(key) {
       </span>
     </div>
     <div style="display: flex; gap: 12px; margin-top: 8px;">
-      <button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor}; flex:1;" onclick="handleCTA('${key}')">
-        ${p.cta} (CUP/USDT)
-      </button>
+      ${isPlanAgotado(key)
+        ? `<button class="modal-cta" disabled style="background:rgba(255,60,60,0.12);color:#ff4444;border:1px solid rgba(255,60,60,0.35);flex:1;cursor:not-allowed;opacity:0.8">🔴 AGOTADO</button>`
+        : `<button class="modal-cta" style="background:${p.color};color:#000;box-shadow:0 0 30px ${p.shadowColor}; flex:1;" onclick="handleCTA('${key}')">${p.cta} (CUP/USDT)</button>`
+      }
       <button class="modal-cta" style="background:#5bf0ff;color:#000;box-shadow:0 0 30px rgba(91,240,255,0.3); flex:1;" onclick="payWithStars('${key}')">
         ⭐ Pagar con Stars
       </button>
@@ -2546,7 +2547,47 @@ function scrollTop() {
   }, { passive: true });
 })();
 
-// ===== SISTEMA DE ACTUALIZACIÓN DE PLAN =====
+// ===== DISPONIBILIDAD DE PLANES =====
+let PLAN_AVAILABILITY_STATE = {};
+
+async function checkPlanAvailability() {
+  try {
+    const res = await fetch('/api/plan-availability');
+    if (!res.ok) return;
+    PLAN_AVAILABILITY_STATE = await res.json();
+    applyAvailabilityToCards();
+  } catch (e) {}
+}
+
+// Mapa de key UI → key API
+const PLAN_KEY_TO_API = { basic:'basico', advanced:'avanzado', vip:'cuba_vip', gaming:'premium', 'gaming-pro':'gaming_pro', anual:'anual' };
+
+function isPlanAgotado(uiKey) {
+  const apiKey = PLAN_KEY_TO_API[uiKey];
+  return apiKey ? PLAN_AVAILABILITY_STATE[apiKey] === true : false;
+}
+
+function applyAvailabilityToCards() {
+  // Aplicar badge visual AGOTADO en las tarjetas del carrusel
+  document.querySelectorAll('.plan-card[data-plan]').forEach(card => {
+    const key = card.getAttribute('data-plan');
+    const btn = card.querySelector('.plan-btn');
+    if (!btn) return;
+    if (isPlanAgotado(key)) {
+      btn.textContent = '🔴 AGOTADO';
+      btn.style.background = 'rgba(255,60,60,0.15)';
+      btn.style.color = '#ff4444';
+      btn.style.border = '1px solid rgba(255,60,60,0.35)';
+      btn.style.cursor = 'not-allowed';
+      btn.style.pointerEvents = 'none';
+      card.style.opacity = '0.7';
+    } else {
+      btn.innerHTML = 'Ver plan <span>→</span>';
+      btn.style = '';
+      card.style.opacity = '';
+    }
+  });
+}
 const UPGRADE_PLAN_NAMES = {
   basico: 'Básico', avanzado: 'Avanzado', cuba_vip: 'Cuba VIP',
   premium: 'Gaming', gaming_pro: 'Gaming Pro', anual: 'Anual'
@@ -2657,6 +2698,7 @@ window.addEventListener('load', () => {
   loadAnnouncement();
   renderVoyageStack();
   checkUpgradeOptions();
+  checkPlanAvailability();
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();

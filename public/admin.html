@@ -283,7 +283,7 @@ select option{background:var(--ink)}
       <div class="nav-group"><div class="nav-group-label">// Usuarios</div><div class="nav-item" data-tab="users" onclick="switchTab('users')"><i class="fas fa-users"></i> Usuarios</div><div class="nav-item" data-tab="referrals" onclick="switchTab('referrals')"><i class="fas fa-share-alt"></i> Referidos</div></div>
       <div class="nav-group"><div class="nav-group-label">// Contenido</div><div class="nav-item" data-tab="plan-files" onclick="switchTab('plan-files')"><i class="fas fa-folder"></i> Archivos Planes</div><div class="nav-item" data-tab="coupons" onclick="switchTab('coupons')"><i class="fas fa-tag"></i> Cupones</div></div>
       <div class="nav-group"><div class="nav-group-label">// Mensajes</div><div class="nav-item" data-tab="broadcast" onclick="switchTab('broadcast')"><i class="fas fa-bullhorn"></i> Broadcast</div><div class="nav-item" data-tab="games" onclick="switchTab('games')"><i class="fas fa-gamepad"></i> Juegos</div></div>
-      <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div><div class="nav-item" data-tab="prices" onclick="switchTab('prices')"><i class="fas fa-dollar-sign"></i> Precios</div><div class="nav-item" data-tab="announcement" onclick="switchTab('announcement')"><i class="fas fa-bullhorn"></i> Anuncio</div></div>
+      <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div><div class="nav-item" data-tab="prices" onclick="switchTab('prices')"><i class="fas fa-dollar-sign"></i> Precios</div><div class="nav-item" data-tab="availability" onclick="switchTab('availability')"><i class="fas fa-toggle-on"></i> Disponibilidad</div><div class="nav-item" data-tab="announcement" onclick="switchTab('announcement')"><i class="fas fa-bullhorn"></i> Anuncio</div></div>
     </div>
     <div class="sidebar-footer">Panel Admin v3.0 · VPN Cuba</div>
   </nav>
@@ -484,6 +484,18 @@ select option{background:var(--ink)}
           <div id="pricesFormWrap" style="display:none">
             <div id="pricesGrid" style="display:flex;flex-direction:column;gap:14px"></div>
             <button class="btn green" style="margin-top:18px;width:100%" onclick="savePrices()"><i class="fas fa-save"></i> <span>Guardar todos los precios</span></button>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- ── DISPONIBILIDAD DE PLANES (solo super admin) ── -->
+      <div id="availabilityPanel" class="tab-panel">
+        <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-toggle-on"></i> Disponibilidad de Planes</div><button class="btn green" onclick="loadAvailability()"><i class="fas fa-sync-alt"></i> <span>Refrescar</span></button></div>
+        <div class="card-body">
+          <div class="loading" id="availabilityLoading"><div class="spinner"></div> Cargando...</div>
+          <div id="availabilityWrap" style="display:none">
+            <div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-3);margin-bottom:14px">Cuando un plan está AGOTADO, el botón de compra se muestra en rojo e inhabilitado en la tienda.</div>
+            <div id="availabilityGrid" style="display:flex;flex-direction:column;gap:10px"></div>
           </div>
         </div></div>
       </div>
@@ -1743,7 +1755,7 @@ async function loadGamesStats() {
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────
-const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes', announcement:'// Anuncio Web' };
+const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes', availability:'// Disponibilidad de Planes', announcement:'// Anuncio Web' };
 
 function switchTab(name) {
   stopBroadcastPolling(); // detener polling al cambiar de pestaña
@@ -1779,7 +1791,8 @@ function switchTab(name) {
     games: loadGamesStats,
     admins: loadAdmins,
     prices: loadPrices,
-    announcement: loadAnnouncementAdmin
+    announcement: loadAnnouncementAdmin,
+    availability: loadAvailability
   };
   if (loaders[name]) loaders[name]();
   // cerrar sidebar en móvil
@@ -1787,6 +1800,51 @@ function switchTab(name) {
 }
 
 function refreshCurrentTab() { switchTab(currentTab); }
+
+// ── DISPONIBILIDAD DE PLANES ───────────────────────────
+const AVAILABILITY_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', gaming_pro: '👑 Gaming Pro', anual: '📅 Anual' };
+
+async function loadAvailability() {
+  document.getElementById('availabilityLoading').style.display = 'flex';
+  document.getElementById('availabilityWrap').style.display = 'none';
+  try {
+    const data = await (await fetch('/api/plan-availability')).json();
+    const grid = document.getElementById('availabilityGrid');
+    grid.innerHTML = Object.keys(AVAILABILITY_LABELS).map(plan => {
+      const agotado = data[plan] === true;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-2);border:1px solid ${agotado ? 'rgba(255,60,60,0.35)' : 'var(--border)'};border-radius:10px;padding:12px 16px">
+        <div>
+          <div style="font-weight:700;font-size:.85rem">${AVAILABILITY_LABELS[plan]}</div>
+          <div style="font-family:var(--f-mono);font-size:.65rem;color:${agotado ? '#ff4444' : 'var(--green)'};margin-top:3px">${agotado ? '🔴 AGOTADO' : '🟢 DISPONIBLE'}</div>
+        </div>
+        <button class="btn ${agotado ? 'green' : 'red'}" onclick="togglePlanAvailability('${plan}', ${agotado})">
+          <i class="fas fa-${agotado ? 'check' : 'ban'}"></i> <span>${agotado ? 'Marcar disponible' : 'Marcar agotado'}</span>
+        </button>
+      </div>`;
+    }).join('');
+    document.getElementById('availabilityLoading').style.display = 'none';
+    document.getElementById('availabilityWrap').style.display = 'block';
+  } catch(e) {
+    document.getElementById('availabilityLoading').style.display = 'none';
+    showNotification('Error al cargar disponibilidad', 'error');
+  }
+}
+
+async function togglePlanAvailability(plan, currentlyAgotado) {
+  try {
+    const res = await fetch('/api/plan-availability/update', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requesterId: currentUserId, plan, agotado: !currentlyAgotado })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showNotification(`✅ Plan ${AVAILABILITY_LABELS[plan]} marcado como ${!currentlyAgotado ? 'AGOTADO' : 'DISPONIBLE'}`, 'success');
+      loadAvailability();
+    } else {
+      showNotification('❌ ' + (data.error || 'Error al actualizar'), 'error');
+    }
+  } catch(e) { showNotification('Error de conexión', 'error'); }
+}
 
 // ── INIT ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
