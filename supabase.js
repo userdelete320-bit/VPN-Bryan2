@@ -972,32 +972,31 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
   async markTrialAsSent(telegramId, sentBy) {
     try {
       const userId = String(telegramId).trim();
-
-      // Leer el plan actual y el historial antes de actualizar
       const user = await this.getUser(userId);
-      let history = [];
-      try { history = JSON.parse(user?.trials_history || '[]'); } catch(e) { history = []; }
-
       const planType = user?.trial_plan_type || 'basico';
-      // Añadir o actualizar la entrada de este plan en el historial
-      const existingIdx = history.findIndex(e => e.plan === planType);
-      const entry = { plan: planType, sent_at: new Date().toISOString() };
-      if (existingIdx >= 0) history[existingIdx] = entry;
-      else history.push(entry);
 
+      // 1. Actualizar campos del usuario
       const { data, error } = await dbClient
         .from('users')
         .update({
           trial_received: true,
           trial_sent_at: new Date().toISOString(),
           trial_sent_by: sentBy,
-          trials_history: JSON.stringify(history),
           updated_at: new Date().toISOString()
         })
         .eq('telegram_id', userId)
         .select()
         .single();
       if (error) throw error;
+
+      // 2. Insertar en la tabla trial_history
+      await dbClient.from('trial_history').insert({
+        telegram_id: userId,
+        plan: planType,
+        sent_at: new Date().toISOString(),
+        auto_sent: false
+      });
+
       return data;
     } catch (error) {
       console.error('❌ Error en markTrialAsSent:', error);
@@ -1005,37 +1004,74 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     }
   },
 
+  // Insertar registro en trial_history (usado por envíos automáticos del pool)
+  async insertTrialHistory(telegramId, plan, autoSent = true) {
+    try {
+      const { error } = await dbClient.from('trial_history').insert({
+        telegram_id: String(telegramId).trim(),
+        plan,
+        sent_at: new Date().toISOString(),
+        auto_sent: autoSent
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('❌ Error en insertTrialHistory:', error);
+      throw error;
+    }
+  },
+
+  // Obtener historial de pruebas de un usuario (para el panel admin)
+  async getTrialHistory(telegramId) {
+    try {
+      const { data, error } = await dbClient
+        .from('trial_history')
+        .select('*')
+        .eq('telegram_id', String(telegramId).trim())
+        .order('sent_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error en getTrialHistory:', error);
+      return [];
+    }
+  },
+
   async checkTrialEligibility(telegramId, planType = null) {
-  try {
-    const user = await this.getUser(telegramId);
-    if (!user) return { eligible: true, reason: 'Nuevo usuario' };
+    try {
+      const user = await this.getUser(telegramId);
+      if (!user) return { eligible: true, reason: 'Nuevo usuario' };
 
-    const targetPlan = planType || 'basico';
+      const targetPlan = planType || 'basico';
 
-    // Historial de planes ya recibidos (array JSON en trials_history)
-    let history = [];
-    try { history = JSON.parse(user.trials_history || '[]'); } catch(e) { history = []; }
+      // Consultar la tabla trial_history para este usuario y plan
+      const { data: historyRows, error } = await dbClient
+        .from('trial_history')
+        .select('sent_at')
+        .eq('telegram_id', String(telegramId).trim())
+        .eq('plan', targetPlan)
+        .order('sent_at', { ascending: false })
+        .limit(1);
 
-    // Verificar si este plan ya fue recibido antes
-    const prevEntry = history.find(e => e.plan === targetPlan);
-    if (prevEntry) {
-      const daysSince = Math.floor((Date.now() - new Date(prevEntry.sent_at).getTime()) / 86400000);
-      if (daysSince < 30) {
-        return { eligible: false, reason: `Ya recibiste la prueba del plan ${targetPlan.toUpperCase()}. Debes esperar ${30 - daysSince} días.` };
+      if (error) throw error;
+
+      if (historyRows && historyRows.length > 0) {
+        const daysSince = Math.floor((Date.now() - new Date(historyRows[0].sent_at).getTime()) / 86400000);
+        if (daysSince < 30) {
+          return { eligible: false, reason: `Ya recibiste la prueba del plan ${targetPlan.toUpperCase()}. Debes esperar ${30 - daysSince} días.` };
+        }
       }
-    }
 
-    // Verificar si tiene una solicitud PENDIENTE de este plan
-    if (user.trial_requested && user.trial_plan_type === targetPlan && !user.trial_received) {
-      return { eligible: false, reason: `Ya tienes una solicitud PENDIENTE del plan ${targetPlan.toUpperCase()}` };
-    }
+      // Verificar si tiene una solicitud PENDIENTE de este plan
+      if (user.trial_requested && user.trial_plan_type === targetPlan && !user.trial_received) {
+        return { eligible: false, reason: `Ya tienes una solicitud PENDIENTE del plan ${targetPlan.toUpperCase()}` };
+      }
 
-    return { eligible: true, reason: `Puedes solicitar tu prueba del plan ${targetPlan.toUpperCase()}` };
-  } catch (error) {
-    console.error('❌ Error en checkTrialEligibility:', error);
-    return { eligible: false, reason: 'Error verificando elegibilidad' };
-  }
-},
+      return { eligible: true, reason: `Puedes solicitar tu prueba del plan ${targetPlan.toUpperCase()}` };
+    } catch (error) {
+      console.error('❌ Error en checkTrialEligibility:', error);
+      return { eligible: false, reason: 'Error verificando elegibilidad' };
+    }
+  },
 
   // ========== BROADCASTS ==========
   async createBroadcast(message, targetUsers = 'all', sentBy) {
