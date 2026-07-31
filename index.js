@@ -1184,8 +1184,9 @@ app.get('/api/all-users', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const offset = (page - 1) * limit;
-    const users = await db.getAllUsers(limit, offset);
-    const total = await db.getTotalUsersCount();
+    const search = req.query.search || '';
+    const users = await db.getAllUsers(limit, offset, search);
+    const total = await db.getTotalUsersCount(search);
     res.json({ users, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) { res.status(500).json({ error: 'Error obteniendo usuarios: ' + error.message }); }
 });

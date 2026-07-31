@@ -216,11 +216,14 @@ const db = {
     }
   },
 
-  async getTotalUsersCount() {
+  async getTotalUsersCount(search = '') {
     try {
-      const { count, error } = await dbClient
-        .from('users')
-        .select('*', { count: 'exact', head: true });
+      let query = dbClient.from('users').select('*', { count: 'exact', head: true });
+      if (search && search.trim()) {
+        const term = search.trim();
+        query = query.or(`first_name.ilike.%${term}%,username.ilike.%${term}%,telegram_id.ilike.%${term}%`);
+      }
+      const { count, error } = await query;
       if (error) throw error;
       return count || 0;
     } catch (error) {
@@ -229,12 +232,15 @@ const db = {
     }
   },
 
-  async getAllUsers(limit = 100, offset = 0) {
+  async getAllUsers(limit = 100, offset = 0, search = '') {
     try {
       const safeLimit = Math.min(limit, 1000);
-      const { data, error } = await dbClient
-        .from('users')
-        .select('*')
+      let query = dbClient.from('users').select('*');
+      if (search && search.trim()) {
+        const term = search.trim();
+        query = query.or(`first_name.ilike.%${term}%,username.ilike.%${term}%,telegram_id.ilike.%${term}%`);
+      }
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .range(offset, offset + safeLimit - 1);
       if (error) throw error;
