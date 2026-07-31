@@ -2398,13 +2398,19 @@ bot.action('show_support', async (ctx) => {
     await ctx.answerCbQuery();
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
-    await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
+    const keyboard = { reply_markup: { inline_keyboard: [
         [createButton("CEO", { url: 'https://t.me/vpncubawire', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("ADMIN", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
-    ] } });
+    ] } };
+    const imgPath = path.join(__dirname, 'assets', 'soporte.jpg');
+    try {
+      await bot.telegram.sendPhoto(ctx.chat.id, { source: imgPath }, { caption: getSupportHtml(), parse_mode: 'HTML', ...keyboard });
+    } catch (e) {
+      await ctx.reply(getSupportHtml(), { parse_mode: 'HTML', ...keyboard });
+    }
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
 });
 
@@ -2417,19 +2423,27 @@ bot.action('check_status', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const user = await db.getUser(userId);
-    if (!user) { await ctx.reply('❌ *NO ESTÁS REGISTRADO*\n\nUsa "VER PLANES" para comenzar.', { parse_mode: 'Markdown' }); return; }
+    const imgPath = path.join(__dirname, 'assets', 'miperfil.jpg');
+    const sendImg = async (text, keyboard) => {
+      try {
+        await bot.telegram.sendPhoto(ctx.chat.id, { source: imgPath }, { caption: text, parse_mode: user ? 'HTML' : 'Markdown', ...keyboard });
+      } catch (e) {
+        await ctx.reply(text, { parse_mode: user ? 'HTML' : 'Markdown', ...keyboard });
+      }
+    };
+    if (!user) { await sendImg('❌ *NO ESTÁS REGISTRADO*\n\nUsa "VER PLANES" para comenzar.', {}); return; }
     const webappUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}/plans.html?userId=${userId}`;
     if (user?.vip) {
       const diasRestantes = calcularDiasRestantes(user);
       if (diasRestantes <= 0) {
         await db.removeVIP(userId);
-        await ctx.reply('⚠️ <b>Tu plan VIP ha expirado</b>\n\nRenueva ahora para continuar.', { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+        await sendImg('⚠️ <b>Tu plan VIP ha expirado</b>\n\nRenueva ahora para continuar.', { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
         return;
       }
-      await ctx.reply(getVipStatusHtml(user), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+      await sendImg(getVipStatusHtml(user), { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
       if (diasRestantes <= 5) await ctx.reply(`⏰ <b>Tu plan expira pronto:</b> ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("RENOVAR AHORA", wa(webappUrl, ctx))]] } });
     } else {
-      await ctx.reply('❌ *NO ERES USUARIO VIP*\n\nHaz clic para ver nuestros planes.', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+      await sendImg('❌ *NO ERES USUARIO VIP*\n\nHaz clic para ver nuestros planes.', { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
     }
   } catch (error) { try { await ctx.reply('❌ Error al verificar.'); } catch(e){} try { await ctx.answerCbQuery(); } catch(e){} }
 });
@@ -2447,7 +2461,13 @@ bot.action('referral_info', async (ctx) => {
     let referralStats = null;
     if (user) try { referralStats = await db.getReferralStats(userId); } catch (e) {}
     await ctx.answerCbQuery();
-    await ctx.reply(getReferralInfoHtml(userId, referralStats), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+    const imgPath = path.join(__dirname, 'assets', 'referidos.jpg');
+    const keyboard = { reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } };
+    try {
+      await bot.telegram.sendPhoto(ctx.chat.id, { source: imgPath }, { caption: getReferralInfoHtml(userId, referralStats), parse_mode: 'HTML', ...keyboard });
+    } catch (e) {
+      await ctx.reply(getReferralInfoHtml(userId, referralStats), { parse_mode: 'HTML', ...keyboard });
+    }
   } catch (error) { await ctx.answerCbQuery(); await ctx.reply(`🤝 Tu enlace: \`https://t.me/vpncubaw_bot?start=ref${userId}\``, { parse_mode: 'Markdown' }); }
 });
 
@@ -2487,7 +2507,13 @@ bot.action('politicas', async (ctx) => {
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     const userId = ctx.from.id.toString();
     await ctx.answerCbQuery();
-    await ctx.reply(getPoliticasHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("TÉRMINOS DE SERVICIO", wa(`${webappUrl}/politicas.html?section=terminos`, ctx))], [createButton("POLÍTICA DE REEMBOLSO", wa(`${webappUrl}/politicas.html?section=reembolso`, ctx))], [createButton("POLÍTICA DE PRIVACIDAD", wa(`${webappUrl}/politicas.html?section=privacidad`, ctx))], [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+    const imgPath = path.join(__dirname, 'assets', 'politicas.jpg');
+    const keyboard = { reply_markup: { inline_keyboard: [[createButton("TÉRMINOS DE SERVICIO", wa(`${webappUrl}/politicas.html?section=terminos`, ctx))], [createButton("POLÍTICA DE REEMBOLSO", wa(`${webappUrl}/politicas.html?section=reembolso`, ctx))], [createButton("POLÍTICA DE PRIVACIDAD", wa(`${webappUrl}/politicas.html?section=privacidad`, ctx))], [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } };
+    try {
+      await bot.telegram.sendPhoto(ctx.chat.id, { source: imgPath }, { caption: getPoliticasHtml(), parse_mode: 'HTML', ...keyboard });
+    } catch (e) {
+      await ctx.reply(getPoliticasHtml(), { parse_mode: 'HTML', ...keyboard });
+    }
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
 });
 
@@ -2495,7 +2521,13 @@ bot.action('faq', async (ctx) => {
   try {
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     await ctx.answerCbQuery();
-    await ctx.reply(getFaqHtml(), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("VER PREGUNTAS FRECUENTES", wa(`${webappUrl}/faq.html`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+    const imgPath = path.join(__dirname, 'assets', 'faq.jpg');
+    const keyboard = { reply_markup: { inline_keyboard: [[createButton("VER PREGUNTAS FRECUENTES", wa(`${webappUrl}/faq.html`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } };
+    try {
+      await bot.telegram.sendPhoto(ctx.chat.id, { source: imgPath }, { caption: getFaqHtml(), parse_mode: 'HTML', ...keyboard });
+    } catch (e) {
+      await ctx.reply(getFaqHtml(), { parse_mode: 'HTML', ...keyboard });
+    }
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
 });
 
