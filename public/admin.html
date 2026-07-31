@@ -1299,10 +1299,34 @@ async function changeUsersPage(dir) {
   await loadUsers();
 }
 
+let searchUsersTimer = null;
 function searchUsers() {
-  const term = document.getElementById('searchUserInput').value.toLowerCase();
-  filteredUsers = term ? allUsers.filter(u => (u.first_name?.toLowerCase().includes(term) || u.username?.toLowerCase().includes(term) || u.telegram_id?.toString().includes(term))) : [...allUsers];
-  displayUsersPage();
+  clearTimeout(searchUsersTimer);
+  searchUsersTimer = setTimeout(async () => {
+    const term = document.getElementById('searchUserInput').value.trim();
+    if (!term) {
+      // Sin búsqueda: volver a la paginación normal
+      currentUsersPage = 1;
+      await loadUsers();
+      return;
+    }
+    // Búsqueda global en BD
+    document.getElementById('usersLoading').style.display = 'flex';
+    document.getElementById('usersTableWrap').style.display = 'none';
+    document.getElementById('usersNoData').style.display = 'none';
+    try {
+      const res = await fetch(`/api/all-users?search=${encodeURIComponent(term)}&limit=200`);
+      const data = await res.json();
+      document.getElementById('usersLoading').style.display = 'none';
+      filteredUsers = data.users || [];
+      // Ocultar paginación durante búsqueda
+      document.getElementById('usersPagination').style.display = 'none';
+      displayUsersPage();
+    } catch(e) {
+      document.getElementById('usersLoading').style.display = 'none';
+      showNotification('Error en búsqueda', 'error');
+    }
+  }, 350); // debounce 350ms para no disparar con cada letra
 }
 
 async function viewUserDetailsModal(userId) {
