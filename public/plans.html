@@ -2559,7 +2559,6 @@ async function checkPlanAvailability() {
   } catch (e) {}
 }
 
-// Mapa de key UI → key API
 const PLAN_KEY_TO_API = { basic:'basico', advanced:'avanzado', vip:'cuba_vip', gaming:'premium', 'gaming-pro':'gaming_pro', anual:'anual' };
 
 function isPlanAgotado(uiKey) {
@@ -2568,7 +2567,6 @@ function isPlanAgotado(uiKey) {
 }
 
 function applyAvailabilityToCards() {
-  // Aplicar badge visual AGOTADO en las tarjetas del carrusel
   document.querySelectorAll('.plan-card[data-plan]').forEach(card => {
     const key = card.getAttribute('data-plan');
     const btn = card.querySelector('.plan-btn');
@@ -2588,6 +2586,8 @@ function applyAvailabilityToCards() {
     }
   });
 }
+
+// ===== SISTEMA DE ACTUALIZACIÓN DE PLAN =====
 const UPGRADE_PLAN_NAMES = {
   basico: 'Básico', avanzado: 'Avanzado', cuba_vip: 'Cuba VIP',
   premium: 'Gaming', gaming_pro: 'Gaming Pro', anual: 'Anual'
