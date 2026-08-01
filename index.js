@@ -372,7 +372,7 @@ function getDownloadWireguardHtml() {
 function getSupportHtml() {
     return `🛠 <b>Soporte VPN CUBA</b>\n\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @vpncubawire (CEO)\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @ErenJeager129182 (Admin)\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (Admin)\n` +
            `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @JosherSnchz (Moderador)\n\n` +
            `Responde rápido y te ayudaremos.`;
 }
@@ -2508,7 +2508,7 @@ bot.action('show_support', async (ctx) => {
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     const keyboard = { reply_markup: { inline_keyboard: [
         [createButton("CEO", { url: 'https://t.me/vpncubawire', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
-        [createButton("ADMIN", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/5350793992', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("ADMIN", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/56557646', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
