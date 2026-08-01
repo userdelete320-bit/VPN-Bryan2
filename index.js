@@ -22,6 +22,64 @@ const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', '
 
 // Jerarquía de planes de menor a mayor — cualquier plan puede subir a los que siguen
 const PLAN_HIERARCHY = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
+
+// ===== SISTEMA DE XP =====
+const XP_LEVELS = [
+  { key: 'bronce',   label: '🥉 Bronce',   min: 50  },
+  { key: 'plata',    label: '🥈 Plata',    min: 100 },
+  { key: 'oro',      label: '🥇 Oro',      min: 200 },
+  { key: 'diamante', label: '💎 Diamante', min: 400 },
+  { key: 'elite',    label: '👑 Elite',    min: 800 },
+];
+const XP_REWARDS = {
+  bronce:   { days: 3,  label: '3 días' },
+  plata:    { days: 7,  label: '7 días' },
+  oro:      { days: 14, label: '14 días' },
+  diamante: { days: 20, label: '20 días' },
+  elite:    { days: 30, label: '1 mes'  },
+};
+
+function getXPLevel(xp = 0) {
+  let current = null;
+  let next = XP_LEVELS[0];
+  for (let i = 0; i < XP_LEVELS.length; i++) {
+    if (xp >= XP_LEVELS[i].min) { current = XP_LEVELS[i]; next = XP_LEVELS[i + 1] || null; }
+    else { next = XP_LEVELS[i]; break; }
+  }
+  const prevMin = current ? current.min : 0;
+  const nextMin = next ? next.min : (current?.min || 0);
+  const progress = next ? Math.round(((xp - prevMin) / (nextMin - prevMin)) * 100) : 100;
+  return { current, next, progress: Math.max(0, Math.min(100, progress)) };
+}
+
+function buildXPBar(progress) {
+  const filled = Math.round(progress / 100 * 14);
+  return '█'.repeat(filled) + '░'.repeat(14 - filled);
+}
+
+function getXPProfileHtml(user) {
+  const xp = user.xp || 0;
+  const { current, next, progress } = getXPLevel(xp);
+  const claimed = user.claimed_rewards || [];
+  const levelLabel = current ? current.label : '🔰 Sin nivel';
+  const nextLabel = next ? `${next.label} (${next.min} XP)` : '¡Nivel máximo!';
+  const bar = buildXPBar(progress);
+
+  let rewardLine = '';
+  if (current) {
+    const reward = XP_REWARDS[current.key];
+    rewardLine = claimed.includes(current.key)
+      ? `\n🎁 <b>Recompensa ${current.label}:</b> <i>— ya adquirida —</i>`
+      : `\n🎁 <b>Recompensa ${current.label}:</b> <i>— disponible —</i> /reclamar`;
+  }
+
+  return `<b>⚡ Sistema de Niveles</b>\n\n` +
+    `🏅 <b>Nivel:</b> ${levelLabel}\n` +
+    `⚡ <b>XP Total:</b> ${xp}\n` +
+    `📊 <b>Progreso:</b> ${bar} ${progress}%\n` +
+    `🎯 <b>Siguiente:</b> ${nextLabel}` +
+    rewardLine;
+}
 const UPGRADE_PATHS = {};
 for (let i = 0; i < PLAN_HIERARCHY.length - 1; i++) {
   UPGRADE_PATHS[PLAN_HIERARCHY[i]] = PLAN_HIERARCHY.slice(i + 1);
@@ -983,6 +1041,35 @@ app.post('/api/plan-availability/update', async (req, res) => {
   }
 });
 
+// ===== ENDPOINTS XP =====
+app.post('/api/xp/add', async (req, res) => {
+  try {
+    const { requesterId, telegramId, amount, reason } = req.body;
+    if (!isSuperAdmin(requesterId)) return res.status(403).json({ error: 'Solo el super admin puede gestionar XP.' });
+    if (!telegramId || !amount || !reason) return res.status(400).json({ error: 'Faltan datos.' });
+    const result = await db.addXP(telegramId, parseInt(amount), reason, requesterId);
+    const { current, next, progress } = getXPLevel(result.newXp);
+    // Notificar al usuario
+    try {
+      await bot.telegram.sendMessage(telegramId,
+        `⚡ <b>+${amount} XP</b> — ${reason}\n📊 Total: ${result.newXp} XP\n${buildXPBar(progress)} ${progress}%` +
+        (current ? `\n🏅 Nivel: ${current.label}` : ''),
+        { parse_mode: 'HTML' }
+      );
+    } catch (e) {}
+    res.json({ success: true, ...result, level: current?.label || 'Sin nivel' });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/xp/log/:telegramId', async (req, res) => {
+  try {
+    const log = await db.getXPLog(req.params.telegramId);
+    const user = await db.getUser(req.params.telegramId);
+    const { current, progress } = getXPLevel(user?.xp || 0);
+    res.json({ log, xp: user?.xp || 0, level: current?.label || 'Sin nivel', progress, claimed_rewards: user?.claimed_rewards || [] });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 app.post('/api/accept-terms', async (req, res) => {
   try {
     const { telegramId, username, firstName, referrerId, referrerUsername } = req.body;
@@ -1146,8 +1233,28 @@ app.post('/api/payments/:id/approve', async (req, res) => {
       if (user.referrer_id) {
         const referrerUser = await db.getUser(user.referrer_id);
         if (referrerUser?.referrer_id) await db.markReferralAsPaid(referrerUser.telegram_id, 2);
+        // XP por referido que pagó
+        try {
+          await db.addXP(user.referrer_id, 10, 'Referido pagó un plan');
+          await bot.telegram.sendMessage(user.referrer_id, `⚡ +10 XP — ¡Un amigo que referiste acaba de comprar un plan!`);
+        } catch (e) {}
       }
     } catch (refError) { console.error('❌ Error marcando referido:', refError.message); }
+
+    // XP: 20 por compra nueva, 15 por renovación
+    try {
+      const isRenewal = payment.payment_type !== 'upgrade' && user?.vip;
+      const xpAmount = payment.payment_type === 'upgrade' ? 0 : (isRenewal ? 15 : 20);
+      const xpReason = isRenewal ? 'Renovación de plan' : 'Compra de plan';
+      if (xpAmount > 0) {
+        const xpResult = await db.addXP(payment.telegram_id, xpAmount, xpReason);
+        const { current } = getXPLevel(xpResult.newXp);
+        const { current: prev } = getXPLevel(xpResult.previousXp);
+        let xpMsg = `⚡ +${xpAmount} XP — ${xpReason}\n📊 Total: ${xpResult.newXp} XP`;
+        if (current && current.key !== prev?.key) xpMsg += `\n🎉 ¡Nuevo nivel desbloqueado: ${current.label}!`;
+        try { await bot.telegram.sendMessage(payment.telegram_id, xpMsg); } catch (e) {}
+      }
+    } catch (xpErr) { console.warn('⚠️ Error añadiendo XP:', xpErr.message); }
 
     res.json({ success: true, payment });
   } catch (error) { console.error('❌ Error aprobando pago:', error); res.status(500).json({ error: 'Error aprobando pago' }); }
@@ -2443,6 +2550,19 @@ bot.action('check_status', async (ctx) => {
       }
       await sendImg(getVipStatusHtml(user), { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
       if (diasRestantes <= 5) await ctx.reply(`⏰ <b>Tu plan expira pronto:</b> ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("RENOVAR AHORA", wa(webappUrl, ctx))]] } });
+      // Mostrar XP y nivel
+      try {
+        const xpUser = await db.getUser(userId);
+        const xpHtml = getXPProfileHtml(xpUser);
+        const { current } = getXPLevel(xpUser?.xp || 0);
+        const claimedRewards = xpUser?.claimed_rewards || [];
+        const xpKeyboard = [];
+        if (current && !claimedRewards.includes(current.key)) {
+          xpKeyboard.push([createButton(`🎁 Reclamar recompensa ${current.label}`, { callback_data: `claim_reward_${current.key}` })]);
+        }
+        xpKeyboard.push([createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]);
+        await ctx.reply(xpHtml, { parse_mode: 'HTML', reply_markup: { inline_keyboard: xpKeyboard } });
+      } catch (e) {}
     } else {
       await sendImg('❌ *NO ERES USUARIO VIP*\n\nHaz clic para ver nuestros planes.', { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
     }
@@ -2501,6 +2621,37 @@ bot.action('copy_referral_link', async (ctx) => {
     await ctx.answerCbQuery('📋 Enlace listo para copiar');
     await ctx.reply(`📋 *Enlace de referido:*\n\n\`${referralLink}\`\n\nMantén presionado para copiar.`, { parse_mode: 'Markdown', reply_to_message_id: ctx.callbackQuery.message.message_id });
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
+});
+
+// Reclamar recompensa de nivel XP
+bot.action(/^claim_reward_(.+)$/, async (ctx) => {
+  const level = ctx.match[1];
+  const userId = ctx.from.id.toString();
+  await ctx.answerCbQuery();
+  if (!XP_REWARDS[level]) return ctx.reply('❌ Nivel no válido.');
+  try {
+    const user = await db.getUser(userId);
+    const xp = user?.xp || 0;
+    const { current } = getXPLevel(xp);
+    if (!current || current.key !== level) return ctx.reply('❌ Aún no has alcanzado ese nivel.');
+    const result = await db.claimReward(userId, level);
+    if (!result.success) return ctx.reply(`ℹ️ ${result.reason}`);
+    const reward = XP_REWARDS[level];
+    const levelData = XP_LEVELS.find(l => l.key === level);
+    await ctx.reply(
+      `🎉 <b>¡Recompensa reclamada!</b>\n\n${levelData.label} → <b>${reward.label}</b> de cualquier plan.\n\nUn administrador te activará los días adicionales en breve. ¡Gracias por tu fidelidad!`,
+      { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("SOPORTE", { callback_data: 'show_support' })]] } }
+    );
+    // Notificar a los admins
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await bot.telegram.sendMessage(adminId,
+          `🎁 <b>RECOMPENSA XP RECLAMADA</b>\n\n👤 ${user.first_name || 'Usuario'} (@${user.username || 'sin_usuario'})\n🆔 ID: ${userId}\n🏅 Nivel: ${levelData.label}\n🎁 Recompensa: ${reward.label} de cualquier plan`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (e) {}
+    }
+  } catch (e) { ctx.reply('❌ Error al reclamar. Intenta de nuevo.'); }
 });
 
 bot.action('politicas', async (ctx) => {

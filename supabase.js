@@ -1596,6 +1596,56 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
         coupons: 'No probado'
       };
     }
+  },
+
+  // ===== SISTEMA DE XP / NIVELES =====
+
+  async addXP(telegramId, amount, reason, grantedBy = 'system') {
+    try {
+      const userId = String(telegramId).trim();
+      // Leer XP actual
+      const user = await this.getUser(userId);
+      const currentXp = user?.xp || 0;
+      const newXp = currentXp + amount;
+      // Actualizar XP en users
+      await dbClient.from('users').update({ xp: newXp, updated_at: new Date().toISOString() }).eq('telegram_id', userId);
+      // Registrar en xp_log
+      await dbClient.from('xp_log').insert({ telegram_id: userId, amount, reason, granted_by: grantedBy, created_at: new Date().toISOString() });
+      return { previousXp: currentXp, newXp, amount };
+    } catch (error) {
+      console.error('❌ Error en addXP:', error);
+      throw error;
+    }
+  },
+
+  async getXPLog(telegramId) {
+    try {
+      const { data, error } = await dbClient
+        .from('xp_log')
+        .select('*')
+        .eq('telegram_id', String(telegramId).trim())
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error en getXPLog:', error);
+      return [];
+    }
+  },
+
+  async claimReward(telegramId, level) {
+    try {
+      const userId = String(telegramId).trim();
+      const user = await this.getUser(userId);
+      const claimed = user?.claimed_rewards || [];
+      if (claimed.includes(level)) return { success: false, reason: 'Ya reclamaste esta recompensa' };
+      const newClaimed = [...claimed, level];
+      await dbClient.from('users').update({ claimed_rewards: newClaimed, updated_at: new Date().toISOString() }).eq('telegram_id', userId);
+      return { success: true, claimed: newClaimed };
+    } catch (error) {
+      console.error('❌ Error en claimReward:', error);
+      throw error;
+    }
   }
 };
 
