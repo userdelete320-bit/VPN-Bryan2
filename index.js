@@ -2546,26 +2546,25 @@ bot.action('check_status', async (ctx) => {
       if (diasRestantes <= 0) {
         await db.removeVIP(userId);
         await sendImg('⚠️ <b>Tu plan VIP ha expirado</b>\n\nRenueva ahora para continuar.', { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
-        return;
+      } else {
+        await sendImg(getVipStatusHtml(user), { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+        if (diasRestantes <= 5) await ctx.reply(`⏰ <b>Tu plan expira pronto:</b> ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("RENOVAR AHORA", wa(webappUrl, ctx))]] } });
       }
-      await sendImg(getVipStatusHtml(user), { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
-      if (diasRestantes <= 5) await ctx.reply(`⏰ <b>Tu plan expira pronto:</b> ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("RENOVAR AHORA", wa(webappUrl, ctx))]] } });
-      // Mostrar XP y nivel
-      try {
-        const xpUser = await db.getUser(userId);
-        const xpHtml = getXPProfileHtml(xpUser);
-        const { current } = getXPLevel(xpUser?.xp || 0);
-        const claimedRewards = xpUser?.claimed_rewards || [];
-        const xpKeyboard = [];
-        if (current && !claimedRewards.includes(current.key)) {
-          xpKeyboard.push([createButton(`🎁 Reclamar recompensa ${current.label}`, { callback_data: `claim_reward_${current.key}` })]);
-        }
-        xpKeyboard.push([createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]);
-        await ctx.reply(xpHtml, { parse_mode: 'HTML', reply_markup: { inline_keyboard: xpKeyboard } });
-      } catch (e) {}
     } else {
       await sendImg('❌ *NO ERES USUARIO VIP*\n\nHaz clic para ver nuestros planes.', { reply_markup: { inline_keyboard: [[createButton("VER PLANES", wa(webappUrl, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
     }
+    // Mostrar XP y nivel — visible para todos los usuarios registrados
+    try {
+      const xpHtml = getXPProfileHtml(user);
+      const { current } = getXPLevel(user?.xp || 0);
+      const claimedRewards = user?.claimed_rewards || [];
+      const xpKeyboard = [];
+      if (current && !claimedRewards.includes(current.key)) {
+        xpKeyboard.push([createButton(`🎁 Reclamar recompensa ${current.label}`, { callback_data: `claim_reward_${current.key}` })]);
+      }
+      xpKeyboard.push([createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]);
+      await ctx.reply(xpHtml, { parse_mode: 'HTML', reply_markup: { inline_keyboard: xpKeyboard } });
+    } catch (e) {}
   } catch (error) { try { await ctx.reply('❌ Error al verificar.'); } catch(e){} try { await ctx.answerCbQuery(); } catch(e){} }
 });
 
