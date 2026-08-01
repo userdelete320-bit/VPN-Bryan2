@@ -52,7 +52,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .nav-badge{margin-left:auto;background:var(--red);color:white;font-size:.58rem;font-weight:700;padding:1px 6px;border-radius:2px;min-width:18px;text-align:center}
 .sidebar-footer{padding:12px 16px;border-top:1px solid var(--wire);font-family:var(--f-mono);font-size:.58rem;color:var(--txt-3);letter-spacing:.08em}
 .menu-toggle{display:none;background:transparent;border:none;color:var(--sig);font-size:1.2rem;cursor:pointer;margin-right:12px}
-.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:45}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99}
 
 /* MAIN */
 .main{flex:1;overflow-y:auto;background:var(--panel);position:relative;z-index:1}
@@ -699,7 +699,8 @@ function closeEditCouponModal() { document.getElementById('editCouponModal').cla
 async function checkAdminAccess() {
   const urlParams = new URLSearchParams(window.location.search);
   let userId = urlParams.get('userId') || tg.initDataUnsafe?.user?.id?.toString();
-  if (!userId) { showNotification('❌ No se pudo identificar', 'error'); setTimeout(() => window.location.href = '/plans.html', 2000); return; }
+  if (!userId) { showNotification('❌ No se pudo identificar al usuario. Abre el panel desde el bot.', 'error'); return; }
+  console.log('🔐 checkAdminAccess userId:', userId);
   try {
     const res = await fetch(`/api/check-admin/${userId}`);
     const data = await res.json();
@@ -715,7 +716,10 @@ async function checkAdminAccess() {
 // ── STATS ────────────────────────────────────────────
 async function loadStats() {
   try {
-    const res = await fetch('/api/stats'); const stats = await res.json();
+    const res = await fetch('/api/stats');
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const stats = await res.json();
+    if (stats.error) throw new Error(stats.error);
     document.getElementById('totalUsers').textContent = stats.users?.total ?? '—';
     document.getElementById('vipUsers').textContent = stats.users?.vip ?? '—';
     document.getElementById('trialRequests').textContent = stats.users?.trial_requests ?? '—';
@@ -729,7 +733,7 @@ async function loadStats() {
     document.getElementById('badge-pending').textContent = stats.payments?.pending || 0;
     document.getElementById('badge-trial').textContent = stats.users?.trial_pending || 0;
     fetch('/api/refund-requests').then(r=>r.json()).then(reqs=>{ const b=document.getElementById('badge-refunds'); if(b) b.textContent = reqs?.length||0; }).catch(()=>{});
-  } catch(e) { showNotification('Error al cargar estadísticas', 'error'); }
+  } catch(e) { console.error('❌ Error loadStats:', e); showNotification('Error al cargar estadísticas: ' + e.message, 'error'); }
 }
 
 // ── PAGOS ────────────────────────────────────────────
