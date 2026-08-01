@@ -283,7 +283,7 @@ select option{background:var(--ink)}
       <div class="nav-group"><div class="nav-group-label">// Usuarios</div><div class="nav-item" data-tab="users" onclick="switchTab('users')"><i class="fas fa-users"></i> Usuarios</div><div class="nav-item" data-tab="referrals" onclick="switchTab('referrals')"><i class="fas fa-share-alt"></i> Referidos</div></div>
       <div class="nav-group"><div class="nav-group-label">// Contenido</div><div class="nav-item" data-tab="plan-files" onclick="switchTab('plan-files')"><i class="fas fa-folder"></i> Archivos Planes</div><div class="nav-item" data-tab="coupons" onclick="switchTab('coupons')"><i class="fas fa-tag"></i> Cupones</div></div>
       <div class="nav-group"><div class="nav-group-label">// Mensajes</div><div class="nav-item" data-tab="broadcast" onclick="switchTab('broadcast')"><i class="fas fa-bullhorn"></i> Broadcast</div><div class="nav-item" data-tab="games" onclick="switchTab('games')"><i class="fas fa-gamepad"></i> Juegos</div></div>
-      <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div><div class="nav-item" data-tab="prices" onclick="switchTab('prices')"><i class="fas fa-dollar-sign"></i> Precios</div><div class="nav-item" data-tab="availability" onclick="switchTab('availability')"><i class="fas fa-toggle-on"></i> Disponibilidad</div><div class="nav-item" data-tab="announcement" onclick="switchTab('announcement')"><i class="fas fa-bullhorn"></i> Anuncio</div></div>
+      <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div><div class="nav-item" data-tab="prices" onclick="switchTab('prices')"><i class="fas fa-dollar-sign"></i> Precios</div><div class="nav-item" data-tab="availability" onclick="switchTab('availability')"><i class="fas fa-toggle-on"></i> Disponibilidad</div><div class="nav-item" data-tab="xp" onclick="switchTab('xp')"><i class="fas fa-bolt"></i> XP / Niveles</div><div class="nav-item" data-tab="announcement" onclick="switchTab('announcement')"><i class="fas fa-bullhorn"></i> Anuncio</div></div>
     </div>
     <div class="sidebar-footer">Panel Admin v3.0 · VPN Cuba</div>
   </nav>
@@ -497,6 +497,60 @@ select option{background:var(--ink)}
             <div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-3);margin-bottom:14px">Cuando un plan está AGOTADO, el botón de compra se muestra en rojo e inhabilitado en la tienda.</div>
             <div id="availabilityGrid" style="display:flex;flex-direction:column;gap:10px"></div>
           </div>
+        </div></div>
+      </div>
+
+      <!-- ── XP / NIVELES (solo super admin) ── -->
+      <div id="xpPanel" class="tab-panel">
+        <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-bolt"></i> Gestión de XP</div></div>
+        <div class="card-body">
+
+          <!-- Buscar usuario -->
+          <div style="margin-bottom:18px">
+            <div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-3);margin-bottom:8px">ID DE TELEGRAM</div>
+            <div style="display:flex;gap:8px">
+              <input id="xpUserId" type="text" placeholder="ID del usuario..." style="flex:1;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--txt-1);font-size:.85rem" onkeydown="if(event.key==='Enter')loadUserXP()">
+              <button class="btn" onclick="loadUserXP()"><i class="fas fa-search"></i> <span>Buscar</span></button>
+            </div>
+          </div>
+
+          <!-- Info del usuario -->
+          <div id="xpUserInfo" style="display:none;margin-bottom:18px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div>
+                <div id="xpUserName" style="font-weight:700;font-size:.9rem"></div>
+                <div id="xpUserLevel" style="font-family:var(--f-mono);font-size:.7rem;color:var(--txt-3);margin-top:3px"></div>
+              </div>
+              <div style="text-align:right">
+                <div id="xpUserTotal" style="font-size:1.2rem;font-weight:700;color:var(--sig)"></div>
+                <div style="font-family:var(--f-mono);font-size:.6rem;color:var(--txt-3)">XP TOTAL</div>
+              </div>
+            </div>
+            <div id="xpBarWrap" style="background:var(--bg-3);border-radius:6px;height:8px;overflow:hidden;margin-bottom:6px">
+              <div id="xpBarFill" style="height:100%;background:var(--sig);border-radius:6px;transition:width .4s"></div>
+            </div>
+            <div id="xpBarLabel" style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-3)"></div>
+            <div id="xpClaimedInfo" style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-3);margin-top:4px"></div>
+          </div>
+
+          <!-- Acciones de XP -->
+          <div id="xpActions" style="display:none">
+            <div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-3);margin-bottom:10px">AÑADIR XP</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+              <button class="btn green" onclick="grantXP('Participar en evento', 10)"><i class="fas fa-calendar-check"></i> <span>Evento (+10 XP)</span></button>
+              <button class="btn green" onclick="grantXP('Completar dinámica', 10)"><i class="fas fa-gamepad"></i> <span>Dinámica (+10 XP)</span></button>
+              <div style="display:flex;gap:8px;margin-top:4px">
+                <input id="xpCustomAmount" type="number" min="1" max="1000" placeholder="Cantidad..." style="flex:1;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--txt-1);font-size:.85rem">
+                <input id="xpCustomReason" type="text" placeholder="Motivo..." style="flex:2;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--txt-1);font-size:.85rem">
+                <button class="btn" onclick="grantXPCustom()"><i class="fas fa-plus"></i> <span>Añadir</span></button>
+              </div>
+            </div>
+
+            <!-- Historial XP -->
+            <div style="font-family:var(--f-mono);font-size:.65rem;color:var(--txt-3);margin-bottom:8px">HISTORIAL</div>
+            <div id="xpLogList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>
+          </div>
+
         </div></div>
       </div>
 
@@ -1779,7 +1833,7 @@ async function loadGamesStats() {
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────
-const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes', availability:'// Disponibilidad de Planes', announcement:'// Anuncio Web' };
+const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes', availability:'// Disponibilidad de Planes', xp:'// XP / Niveles', announcement:'// Anuncio Web' };
 
 function switchTab(name) {
   stopBroadcastPolling(); // detener polling al cambiar de pestaña
@@ -1816,7 +1870,8 @@ function switchTab(name) {
     admins: loadAdmins,
     prices: loadPrices,
     announcement: loadAnnouncementAdmin,
-    availability: loadAvailability
+    availability: loadAvailability,
+    xp: () => { document.getElementById('xpUserInfo').style.display = 'none'; document.getElementById('xpActions').style.display = 'none'; }
   };
   if (loaders[name]) loaders[name]();
   // cerrar sidebar en móvil
@@ -1868,6 +1923,72 @@ async function togglePlanAvailability(plan, currentlyAgotado) {
       showNotification('❌ ' + (data.error || 'Error al actualizar'), 'error');
     }
   } catch(e) { showNotification('Error de conexión', 'error'); }
+}
+
+// ── XP / NIVELES ──────────────────────────────────────
+const XP_LEVEL_LABELS = { bronce:'🥉 Bronce', plata:'🥈 Plata', oro:'🥇 Oro', diamante:'💎 Diamante', elite:'👑 Elite' };
+const XP_THRESHOLDS = [{ key:'elite',800 },{ key:'diamante',400 },{ key:'oro',200 },{ key:'plata',100 },{ key:'bronce',50 }];
+
+function resolveXPLevel(xp) {
+  for (const t of XP_THRESHOLDS) if (xp >= t[1]) return t;
+  return null;
+}
+
+async function loadUserXP() {
+  const uid = document.getElementById('xpUserId').value.trim();
+  if (!uid) return showNotification('Introduce el ID del usuario', 'error');
+  try {
+    const res = await fetch(`/api/xp/log/${encodeURIComponent(uid)}`);
+    if (!res.ok) throw new Error('No encontrado');
+    const data = await res.json();
+    // Info del usuario
+    const userRes = await fetch(`/api/user-info/${uid}`);
+    const user = userRes.ok ? await userRes.json() : {};
+    document.getElementById('xpUserName').textContent = (user.first_name || 'Usuario') + (user.username ? ` · @${user.username}` : '');
+    const lvl = resolveXPLevel(data.xp);
+    document.getElementById('xpUserLevel').textContent = lvl ? XP_LEVEL_LABELS[lvl.key] : '🔰 Sin nivel';
+    document.getElementById('xpUserTotal').textContent = data.xp;
+    document.getElementById('xpBarFill').style.width = data.progress + '%';
+    document.getElementById('xpBarLabel').textContent = `⚡ ${data.progress}% hacia el siguiente nivel · ${data.level}`;
+    document.getElementById('xpClaimedInfo').textContent = data.claimed_rewards?.length
+      ? `🎁 Recompensas reclamadas: ${data.claimed_rewards.map(r => XP_LEVEL_LABELS[r] || r).join(', ')}`
+      : '🎁 Sin recompensas reclamadas aún';
+    document.getElementById('xpUserInfo').style.display = 'block';
+    document.getElementById('xpActions').style.display = 'block';
+    // Historial
+    const logEl = document.getElementById('xpLogList');
+    if (!data.log?.length) { logEl.innerHTML = '<div style="color:var(--txt-3);font-size:.8rem">Sin historial</div>'; }
+    else logEl.innerHTML = data.log.map(e => `
+      <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:8px 12px">
+        <div>
+          <div style="font-size:.8rem;font-weight:600">+${e.amount} XP</div>
+          <div style="font-size:.7rem;color:var(--txt-3)">${e.reason}</div>
+        </div>
+        <div style="font-size:.7rem;color:var(--txt-3);text-align:right">${new Date(e.created_at).toLocaleDateString('es-ES')}</div>
+      </div>`).join('');
+  } catch(e) { showNotification('Error cargando datos XP', 'error'); }
+}
+
+async function grantXP(reason, amount) {
+  const uid = document.getElementById('xpUserId').value.trim();
+  if (!uid) return showNotification('Busca un usuario primero', 'error');
+  try {
+    const res = await fetch('/api/xp/add', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requesterId: currentUserId, telegramId: uid, amount, reason }) });
+    const data = await res.json();
+    if (!res.ok) return showNotification('❌ ' + (data.error || 'Error'), 'error');
+    showNotification(`✅ +${amount} XP añadidos — ${data.level}`, 'success');
+    loadUserXP();
+  } catch(e) { showNotification('Error de conexión', 'error'); }
+}
+
+async function grantXPCustom() {
+  const amount = parseInt(document.getElementById('xpCustomAmount').value);
+  const reason = document.getElementById('xpCustomReason').value.trim();
+  if (!amount || amount < 1) return showNotification('Cantidad inválida', 'error');
+  if (!reason) return showNotification('Introduce un motivo', 'error');
+  await grantXP(reason, amount);
+  document.getElementById('xpCustomAmount').value = '';
+  document.getElementById('xpCustomReason').value = '';
 }
 
 // ── INIT ──────────────────────────────────────────────
