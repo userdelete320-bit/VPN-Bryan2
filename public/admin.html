@@ -1931,10 +1931,10 @@ async function togglePlanAvailability(plan, currentlyAgotado) {
 
 // ── XP / NIVELES ──────────────────────────────────────
 const XP_LEVEL_LABELS = { bronce:'🥉 Bronce', plata:'🥈 Plata', oro:'🥇 Oro', diamante:'💎 Diamante', elite:'👑 Elite' };
-const XP_THRESHOLDS = [{ key:'elite',800 },{ key:'diamante',400 },{ key:'oro',200 },{ key:'plata',100 },{ key:'bronce',50 }];
+const XP_THRESHOLDS = [{ key:'elite', min:800 },{ key:'diamante', min:400 },{ key:'oro', min:200 },{ key:'plata', min:100 },{ key:'bronce', min:50 }];
 
 function resolveXPLevel(xp) {
-  for (const t of XP_THRESHOLDS) if (xp >= t[1]) return t;
+  for (const t of XP_THRESHOLDS) if (xp >= t.min) return t;
   return null;
 }
 
