@@ -1424,8 +1424,8 @@ app.post('/api/request-trial', async (req, res) => {
   pendingTrialLocks.set(telegramId, now);
 
   try {
-    // 1. Verificar elegibilidad
-    const eligibility = await db.checkTrialEligibility(telegramId);
+    // 1. Verificar elegibilidad por plan específico
+    const eligibility = await db.checkTrialEligibility(telegramId, trialPlanType || 'basico');
     if (!eligibility.eligible) {
       pendingTrialLocks.delete(telegramId);
       return res.status(400).json({ error: `No puedes solicitar una prueba: ${eligibility.reason}` });
