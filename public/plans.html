@@ -1306,6 +1306,7 @@
     </ul>
   </div>
   <button class="terms-btn-accept" onclick="acceptTermsFromWeb()">✅ Acepto los términos y condiciones</button>
+  <button class="terms-btn-decline" onclick="openTermsDoc()" style="color:rgba(255,255,255,0.6);border-color:rgba(91,240,255,0.25);margin-bottom:8px">📄 Leer términos completos</button>
   <button class="terms-btn-decline" onclick="declineTermsFromWeb()">❌ No acepto — salir</button>
   <div class="terms-loading" id="termsLoading">Guardando...</div>
 </div>
@@ -2603,6 +2604,13 @@ function scrollTop() {
 })();
 
 // ===== GATE DE TÉRMINOS (WebApp) =====
+function openTermsDoc() {
+  const tg = window.Telegram?.WebApp;
+  const baseUrl = window.location.origin;
+  if (tg?.openLink) tg.openLink(`${baseUrl}/politicas.html?section=terminos`);
+  else window.open(`${baseUrl}/politicas.html?section=terminos`, '_blank');
+}
+
 async function acceptTermsFromWeb() {
   const tg = window.Telegram?.WebApp;
   const urlParams = new URLSearchParams(window.location.search);
