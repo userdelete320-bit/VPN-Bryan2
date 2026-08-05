@@ -2500,7 +2500,7 @@ bot.use(async (ctx, next) => {
 });
 
 // Middleware: verificar aceptación de Términos y Servicios
-const TERMS_EXEMPT_ACTIONS = new Set(['accept_terms', 'decline_terms']);
+const TERMS_EXEMPT_ACTIONS = new Set(['accept_terms', 'decline_terms', 'politicas']);
 const TERMS_EXEMPT_COMMANDS = new Set(['start']);
 
 bot.use(async (ctx, next) => {
@@ -2530,6 +2530,7 @@ bot.use(async (ctx, next) => {
       `📄 Puedes leer los términos completos en el menú <b>POLÍTICAS</b>.`;
 
     const keyboard = { reply_markup: { inline_keyboard: [
+      [createButton('📄 Leer términos completos', { callback_data: 'politicas' })],
       [createButton('✅ Acepto los términos', { callback_data: 'accept_terms' })],
       [createButton('❌ No acepto', { callback_data: 'decline_terms' })]
     ] } };
@@ -2779,6 +2780,7 @@ bot.start(async (ctx) => {
         `• Entiendes que el servicio puede tener interrupciones ocasionales\n\n` +
         `📄 Puedes leer los términos completos en el menú <b>POLÍTICAS</b>.`;
       await ctx.reply(termsMsg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
+        [createButton('📄 Leer términos completos', { callback_data: 'politicas' })],
         [createButton('✅ Acepto los términos', { callback_data: 'accept_terms' })],
         [createButton('❌ No acepto', { callback_data: 'decline_terms' })]
       ] } });
