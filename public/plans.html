@@ -1224,6 +1224,43 @@
   .upg-modal-price-val { font-size: 14px; font-weight: 700; color: #f5c842; font-family: 'Space Mono', monospace; }
   .upg-modal-price-lbl { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
 
+  /* ===== GATE DE TÉRMINOS ===== */
+  #termsGate {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #0a0d18;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px;
+    text-align: center;
+  }
+  #termsGate.visible { display: flex; }
+  .terms-logo { font-size: 44px; margin-bottom: 16px; }
+  .terms-title { font-family: 'Space Mono', monospace; font-size: 13px; letter-spacing: 0.1em; color: #5bf0ff; margin-bottom: 8px; }
+  .terms-body { font-size: 13px; color: rgba(255,255,255,0.65); line-height: 1.6; max-width: 340px; margin-bottom: 24px; }
+  .terms-list { text-align: left; margin: 12px 0; font-size: 12px; color: rgba(255,255,255,0.5); }
+  .terms-list li { margin-bottom: 6px; list-style: none; padding-left: 4px; }
+  .terms-list li::before { content: '→ '; color: #5bf0ff; }
+  .terms-btn-accept {
+    width: 100%; max-width: 320px; padding: 14px;
+    background: linear-gradient(135deg, #5bf0ff, #b17fff);
+    border: none; border-radius: 14px; color: #000;
+    font-family: 'Space Mono', monospace; font-size: 12px;
+    font-weight: 700; letter-spacing: 0.05em; cursor: pointer;
+    margin-bottom: 10px; transition: opacity .2s;
+  }
+  .terms-btn-accept:active { opacity: 0.85; }
+  .terms-btn-decline {
+    width: 100%; max-width: 320px; padding: 12px;
+    background: transparent; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px; color: rgba(255,255,255,0.4);
+    font-size: 12px; cursor: pointer; transition: opacity .2s;
+  }
+  .terms-loading { font-family: 'Space Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 8px; display: none; }
+
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -1253,6 +1290,24 @@
 <div class="push-fx" id="pushFx" aria-hidden="true">
   <span class="push-blade push-blade-1"></span>
   <span class="push-blade push-blade-2"></span>
+</div>
+
+<!-- GATE DE TÉRMINOS Y CONDICIONES -->
+<div id="termsGate" class="visible">
+  <div class="terms-logo">📋</div>
+  <div class="terms-title">TÉRMINOS Y CONDICIONES</div>
+  <div class="terms-body">
+    Para usar VPN Cuba debes leer y aceptar nuestros términos de servicio.
+    <ul class="terms-list">
+      <li>Usarás el servicio de forma legal y responsable</li>
+      <li>No realizarás actividades ilegales a través de la VPN</li>
+      <li>Aceptas nuestra política de privacidad y reembolso</li>
+      <li>El servicio puede tener interrupciones ocasionales</li>
+    </ul>
+  </div>
+  <button class="terms-btn-accept" onclick="acceptTermsFromWeb()">✅ Acepto los términos y condiciones</button>
+  <button class="terms-btn-decline" onclick="declineTermsFromWeb()">❌ No acepto — salir</button>
+  <div class="terms-loading" id="termsLoading">Guardando...</div>
 </div>
 
 <!-- BARRA DE ANUNCIO (controlada desde el panel admin) -->
@@ -2547,6 +2602,40 @@ function scrollTop() {
   }, { passive: true });
 })();
 
+// ===== GATE DE TÉRMINOS (WebApp) =====
+async function acceptTermsFromWeb() {
+  const tg = window.Telegram?.WebApp;
+  const urlParams = new URLSearchParams(window.location.search);
+  const uid = urlParams.get('userId') || tg?.initDataUnsafe?.user?.id?.toString();
+  if (!uid) { document.getElementById('termsGate').classList.remove('visible'); return; }
+
+  const loadingEl = document.getElementById('termsLoading');
+  loadingEl.style.display = 'block';
+  try {
+    const res = await fetch('/api/accept-terms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: uid, username: tg?.initDataUnsafe?.user?.username || '', firstName: tg?.initDataUnsafe?.user?.first_name || '' })
+    });
+    if (res.ok) {
+      document.getElementById('termsGate').classList.remove('visible');
+    } else {
+      loadingEl.textContent = 'Error al guardar. Intenta de nuevo.';
+    }
+  } catch (e) {
+    loadingEl.textContent = 'Error de conexión.';
+  }
+}
+
+function declineTermsFromWeb() {
+  const tg = window.Telegram?.WebApp;
+  if (tg?.close) { tg.close(); return; }
+  document.getElementById('termsGate').innerHTML =
+    `<div class="terms-logo">❌</div>
+     <div class="terms-title">ACCESO DENEGADO</div>
+     <div class="terms-body">Sin aceptar los términos no puedes acceder a VPN Cuba.<br><br>Vuelve al bot y acepta los términos para continuar.</div>`;
+}
+
 // ===== DISPONIBILIDAD DE PLANES =====
 let PLAN_AVAILABILITY_STATE = {};
 
@@ -2699,6 +2788,28 @@ window.addEventListener('load', () => {
   renderVoyageStack();
   checkUpgradeOptions();
   checkPlanAvailability();
+
+  // Verificar si el usuario ya aceptó los términos
+  const tg = window.Telegram?.WebApp;
+  const urlParams = new URLSearchParams(window.location.search);
+  const uid = urlParams.get('userId') || tg?.initDataUnsafe?.user?.id?.toString();
+  if (uid) {
+    fetch(`/api/user-info/${encodeURIComponent(uid)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(user => {
+        if (user?.accepted_terms) {
+          document.getElementById('termsGate').classList.remove('visible');
+        }
+        // Si no hay user o no aceptó, el gate permanece visible
+      })
+      .catch(() => {
+        // Si hay error de red, ocultar el gate para no bloquear permanentemente
+        document.getElementById('termsGate').classList.remove('visible');
+      });
+  } else {
+    // Sin userId no podemos verificar — ocultar el gate para no bloquear
+    document.getElementById('termsGate').classList.remove('visible');
+  }
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
