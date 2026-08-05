@@ -233,6 +233,10 @@ const DEFAULT_PLAN_PRICES = {
 
 let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
 
+// Caché del file_id del GIF de bienvenida — se rellena en el primer envío
+// para que Telegram no recomprima en envíos posteriores
+let START_GIF_FILE_ID = null;
+
 // Disponibilidad de planes: true = agotado, false = disponible
 let PLAN_AVAILABILITY = { basico: false, avanzado: false, cuba_vip: false, premium: false, gaming_pro: false, anual: false };
 
@@ -2797,7 +2801,17 @@ bot.start(async (ctx) => {
 <tg-emoji emoji-id="5406745015365943482">📋</tg-emoji> Selecciona una opción:`;
     try {
         const gifPath = path.join(__dirname, 'assets', 'vpncuba-premium.gif');
-        await bot.telegram.sendAnimation(ctx.chat.id, { source: gifPath }, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
+        if (START_GIF_FILE_ID) {
+            // Reutilizar file_id — Telegram no recomprime
+            await bot.telegram.sendAnimation(ctx.chat.id, START_GIF_FILE_ID, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
+        } else {
+            // Primera vez: subir desde disco y guardar el file_id
+            const sent = await bot.telegram.sendAnimation(ctx.chat.id, { source: gifPath }, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
+            if (sent?.animation?.file_id) {
+                START_GIF_FILE_ID = sent.animation.file_id;
+                console.log('✅ GIF file_id cacheado:', START_GIF_FILE_ID);
+            }
+        }
     } catch (e) {
         console.error('Error enviando GIF de bienvenida:', e);
         await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'HTML', ...keyboard });
