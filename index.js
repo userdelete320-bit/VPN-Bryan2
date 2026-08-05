@@ -2499,7 +2499,69 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
+// Middleware: verificar aceptación de Términos y Servicios
+const TERMS_EXEMPT_ACTIONS = new Set(['accept_terms', 'decline_terms']);
+const TERMS_EXEMPT_COMMANDS = new Set(['start']);
+
+bot.use(async (ctx, next) => {
+  if (!ctx.from) return next();
+  const userId = ctx.from.id.toString();
+  if (isAdmin(userId)) return next();
+
+  // Exempts: /start y las acciones de aceptar/rechazar
+  const command = ctx.message?.text?.match(/^\/(\w+)/)?.[1];
+  const action = ctx.callbackQuery?.data;
+  if (command && TERMS_EXEMPT_COMMANDS.has(command)) return next();
+  if (action && TERMS_EXEMPT_ACTIONS.has(action)) return next();
+
+  try {
+    const user = await db.getUser(userId);
+    if (user?.accepted_terms) return next();
+
+    // El usuario no ha aceptado los términos — mostrar gate
+    const termsMsg =
+      `📋 <b>Términos y Condiciones de VPN Cuba</b>\n\n` +
+      `Antes de continuar, debes leer y aceptar nuestros términos de servicio.\n\n` +
+      `<b>Al aceptar confirmas que:</b>\n` +
+      `• Usarás el servicio de forma legal y responsable\n` +
+      `• No realizarás actividades ilegales a través de la VPN\n` +
+      `• Aceptas nuestra política de privacidad y reembolso\n` +
+      `• Entiendes que el servicio puede tener interrupciones ocasionales\n\n` +
+      `📄 Puedes leer los términos completos en el menú <b>POLÍTICAS</b>.`;
+
+    const keyboard = { reply_markup: { inline_keyboard: [
+      [createButton('✅ Acepto los términos', { callback_data: 'accept_terms' })],
+      [createButton('❌ No acepto', { callback_data: 'decline_terms' })]
+    ] } };
+
+    if (ctx.callbackQuery) await ctx.answerCbQuery('⚠️ Debes aceptar los términos primero.', { show_alert: true }).catch(() => {});
+    await ctx.reply(termsMsg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    return; // Bloquear la acción original
+  } catch (e) { return next(); }
+});
+
 bot.catch((err, ctx) => { console.error('❌ Error en el bot:', err); });
+
+// ── ACEPTAR / RECHAZAR TÉRMINOS ───────────────────────
+bot.action('accept_terms', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  try {
+    await db.acceptTerms(userId);
+    await ctx.editMessageText(
+      `✅ <b>¡Términos aceptados!</b>\n\nBienvenido a VPN Cuba. Ya puedes usar todos los servicios del bot.\n\nUsa /start para ver el menú principal.`,
+      { parse_mode: 'HTML' }
+    ).catch(() => {});
+  } catch (e) { await ctx.reply('❌ Error al registrar la aceptación. Intenta de nuevo.'); }
+});
+
+bot.action('decline_terms', async (ctx) => {
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(
+    `❌ <b>Has rechazado los términos.</b>\n\nSin aceptar los Términos y Condiciones no puedes acceder a los servicios de VPN Cuba.\n\nSi cambias de opinión, usa /start en cualquier momento.`,
+    { parse_mode: 'HTML' }
+  ).catch(() => {});
+});
 
 bot.action('show_support', async (ctx) => {
   try {
@@ -2702,6 +2764,25 @@ bot.start(async (ctx) => {
     if (referrerId) {
         try { await db.createReferral(referrerId, userId.toString(), ctx.from.username, firstName); }
         catch (e) { console.error('❌ Error creando referido (start):', e.message); }
+    }
+
+    // Verificar si ya aceptó los términos
+    const userRecord = await db.getUser(userId.toString()).catch(() => null);
+    if (!userRecord?.accepted_terms && !esAdmin) {
+      const termsMsg =
+        `📋 <b>Términos y Condiciones de VPN Cuba</b>\n\n` +
+        `Antes de continuar, debes leer y aceptar nuestros términos de servicio.\n\n` +
+        `<b>Al aceptar confirmas que:</b>\n` +
+        `• Usarás el servicio de forma legal y responsable\n` +
+        `• No realizarás actividades ilegales a través de la VPN\n` +
+        `• Aceptas nuestra política de privacidad y reembolso\n` +
+        `• Entiendes que el servicio puede tener interrupciones ocasionales\n\n` +
+        `📄 Puedes leer los términos completos en el menú <b>POLÍTICAS</b>.`;
+      await ctx.reply(termsMsg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
+        [createButton('✅ Acepto los términos', { callback_data: 'accept_terms' })],
+        [createButton('❌ No acepto', { callback_data: 'decline_terms' })]
+      ] } });
+      return;
     }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage =
