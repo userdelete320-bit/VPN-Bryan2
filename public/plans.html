@@ -2605,25 +2605,24 @@ function scrollTop() {
 
 // ===== GATE DE TÉRMINOS (WebApp) =====
 function openTermsDoc() {
-  const tg = window.Telegram?.WebApp;
+  const tgLocal = window.Telegram?.WebApp;
   const baseUrl = window.location.origin;
-  if (tg?.openLink) tg.openLink(`${baseUrl}/politicas.html?section=terminos`);
+  if (tgLocal?.openLink) tgLocal.openLink(`${baseUrl}/politicas.html?section=terminos`);
   else window.open(`${baseUrl}/politicas.html?section=terminos`, '_blank');
 }
 
 async function acceptTermsFromWeb() {
-  const tg = window.Telegram?.WebApp;
-  const urlParams = new URLSearchParams(window.location.search);
-  const uid = urlParams.get('userId') || tg?.initDataUnsafe?.user?.id?.toString();
+  const tgLocal = window.Telegram?.WebApp;
+  const urlParamsLocal = new URLSearchParams(window.location.search);
+  const uid = urlParamsLocal.get('userId') || tgLocal?.initDataUnsafe?.user?.id?.toString();
   if (!uid) { document.getElementById('termsGate').classList.remove('visible'); return; }
-
   const loadingEl = document.getElementById('termsLoading');
   loadingEl.style.display = 'block';
   try {
     const res = await fetch('/api/accept-terms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramId: uid, username: tg?.initDataUnsafe?.user?.username || '', firstName: tg?.initDataUnsafe?.user?.first_name || '' })
+      body: JSON.stringify({ telegramId: uid, username: tgLocal?.initDataUnsafe?.user?.username || '', firstName: tgLocal?.initDataUnsafe?.user?.first_name || '' })
     });
     if (res.ok) {
       document.getElementById('termsGate').classList.remove('visible');
@@ -2636,8 +2635,8 @@ async function acceptTermsFromWeb() {
 }
 
 function declineTermsFromWeb() {
-  const tg = window.Telegram?.WebApp;
-  if (tg?.close) { tg.close(); return; }
+  const tgLocal = window.Telegram?.WebApp;
+  if (tgLocal?.close) { tgLocal.close(); return; }
   document.getElementById('termsGate').innerHTML =
     `<div class="terms-logo">❌</div>
      <div class="terms-title">ACCESO DENEGADO</div>
@@ -2798,26 +2797,20 @@ window.addEventListener('load', () => {
   checkPlanAvailability();
 
   // Verificar si el usuario ya aceptó los términos
-  const tg = window.Telegram?.WebApp;
-  const urlParams = new URLSearchParams(window.location.search);
-  const uid = urlParams.get('userId') || tg?.initDataUnsafe?.user?.id?.toString();
-  if (uid) {
-    fetch(`/api/user-info/${encodeURIComponent(uid)}`)
+  const urlParamsTerms = new URLSearchParams(window.location.search);
+  const tgTerms = window.Telegram?.WebApp;
+  const uidTerms = urlParamsTerms.get('userId') || tgTerms?.initDataUnsafe?.user?.id?.toString();
+  if (uidTerms) {
+    fetch(`/api/user-info/${encodeURIComponent(uidTerms)}`)
       .then(r => r.ok ? r.json() : null)
       .then(user => {
-        if (user?.accepted_terms) {
-          document.getElementById('termsGate').classList.remove('visible');
-        }
-        // Si no hay user o no aceptó, el gate permanece visible
+        if (user?.accepted_terms) document.getElementById('termsGate').classList.remove('visible');
       })
-      .catch(() => {
-        // Si hay error de red, ocultar el gate para no bloquear permanentemente
-        document.getElementById('termsGate').classList.remove('visible');
-      });
+      .catch(() => { document.getElementById('termsGate').classList.remove('visible'); });
   } else {
-    // Sin userId no podemos verificar — ocultar el gate para no bloquear
     document.getElementById('termsGate').classList.remove('visible');
   }
+
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
