@@ -1137,6 +1137,14 @@ const planData = {
     accentColor:'#39ffa0', tagBg:'rgba(57,255,160,0.08)', tagBorder:'rgba(57,255,160,0.3)',
     heroTag2:'PRUEBA', refBanner:false,
   },
+  express: {
+    tag:'⚡ EXPRESS · ELIGE DURACIÓN', name:'EXPRESS', sub:'Conexión rápida sin compromisos. Elige tu duración e IP.',
+    price:'300 CUP', mobile:'300 CUP', usdt:'1.0 USDT', duration:'24H',
+    sumPlan:'Plan Express', sumDuration:'—',
+    features:[['⏱','24h/3d/7d'],['🌐','Cuba o USA'],['⚡','Inmediata'],['🔒','AES-256'],['📦','Sin límite'],['🆘','Soporte']],
+    accentColor:'#ff9500', tagBg:'rgba(255,149,0,0.08)', tagBorder:'rgba(255,149,0,0.3)',
+    heroTag2:'EXPRESS', refBanner:false,
+  },
 };
 
 let currentPlan = 'anual';
@@ -1152,7 +1160,7 @@ const currentUsername = tgUser.username || '';
 const currentFirstName = tgUser.first_name || '';
 
 const PLAN_KEYS = {
-  basic: 'basico', advanced: 'avanzado', vip: 'cuba_vip', gaming: 'premium', 'gaming-pro': 'gaming_pro', anual: 'anual', turbo: 'trial', trial: 'trial'
+  basic: 'basico', advanced: 'avanzado', vip: 'cuba_vip', gaming: 'premium', 'gaming-pro': 'gaming_pro', anual: 'anual', turbo: 'trial', trial: 'trial', express: 'express'
 };
 
 const PLAN_BASE = {
@@ -1162,7 +1170,8 @@ const PLAN_BASE = {
   gaming:      { cup: 1500,  mobile: 700,   usdt: 2.3,  stars: 210,  paypal: 5  },
   'gaming-pro':{ cup: 2000,  mobile: 1300,  usdt: 4.0,  stars: 300,  paypal: 8  },
   anual:       { cup: 15000, mobile: 10000, usdt: 25,   stars: 2100, paypal: 40 },
-  trial:       { cup: 0,     mobile: 0,     usdt: 0,    stars: 0,    paypal: null }
+  trial:       { cup: 0,     mobile: 0,     usdt: 0,    stars: 0,    paypal: null },
+  express:     { cup: 300,   mobile: 300,   usdt: 1.0,  stars: 100,  paypal: 1  }
 };
 
 // Descuento de referido (viene del backend, ya neto)
@@ -1179,6 +1188,19 @@ const upgradePriceCup    = parseFloat(urlParams.get('price') || '0');
 const upgradePriceMobile = parseFloat(urlParams.get('mobile') || '0');
 const upgradePriceUsdt   = parseFloat(urlParams.get('usdtAmount') || '0');
 
+// Estado del plan Express
+const expressDuration = urlParams.get('duration') || '';
+const expressIP       = urlParams.get('ip_choice') || '';
+const expressPaypal   = parseFloat(urlParams.get('paypalAmount') || '0');
+
+// Sobreescribir PLAN_BASE express con los precios de la duración elegida
+if (expressDuration && urlParams.get('plan') === 'express') {
+  const cup    = parseFloat(urlParams.get('price') || '300');
+  const mobile = parseFloat(urlParams.get('mobile') || '300');
+  const usdt   = parseFloat(urlParams.get('usdtAmount') || '1.0');
+  PLAN_BASE.express = { cup, mobile, usdt, stars: parseInt(urlParams.get('stars') || '100'), paypal: expressPaypal || null };
+}
+
 function safeText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
 function formatCUP(value) { return Number(value || 0).toLocaleString('es-ES') + ' CUP'; }
 
@@ -1190,6 +1212,7 @@ function normalizePlan(key) {
   if (k === 'cuba_vip' || k === 'vip') return 'vip';
   if (k === 'premium' || k === 'gaming') return 'gaming';
   if (k === 'gaming_pro' || k === 'gaming-pro') return 'gaming-pro';
+  if (k === 'express') return 'express';
   if (k === 'anual') return 'anual';
   if (k === 'trial' || k === 'turbo') return 'trial';
   return 'anual';
@@ -1326,7 +1349,13 @@ if (heroTagEl) {
   const hgStop = document.getElementById('hgStop');
   if (hgStop) hgStop.setAttribute('stop-color', p.accentColor);
   safeText('sumPlan', p.sumPlan);
-  safeText('sumDuration', p.sumDuration);
+  // Express: mostrar duración e IP en el resumen si vienen por URL
+  if (currentPlan === 'express' && expressDuration) {
+    const durLabel = expressDuration === '24h' ? '24 horas' : expressDuration === '3dias' ? '3 días' : '7 días';
+    safeText('sumDuration', `${durLabel} · ${expressIP || ''}`);
+  } else {
+    safeText('sumDuration', p.sumDuration);
+  }
   safeText('sumID', Math.floor(Math.random()*9000000000)+1000000000);
   safeText('heroTag2', p.heroTag2);
 
@@ -1509,6 +1538,10 @@ async function sendOrder() {
       form.append('upgrade_to', upgradeTo);
       form.append('from_plan', upgradeFrom);
     }
+    if (currentPlan === 'express' && expressDuration) {
+      form.append('duration', expressDuration);
+      form.append('ip_choice', expressIP);
+    }
     const fileInput = document.getElementById('fileInput');
     const fileToSend = selectedFile || fileInput.files?.[0];
     if (!fileToSend) throw new Error('Archivo no encontrado. Vuelve a seleccionar la imagen.');
@@ -1664,6 +1697,29 @@ function openPayPal() {
     }
 
     const planParam = urlParams.get('plan') || 'anual';
+
+    // Check de plan agotado
+    try {
+      const availRes = await fetch('/api/plan-availability');
+      if (availRes.ok) {
+        const avail = await availRes.json();
+        const apiKey = planParam === 'express' ? 'express' : planParam;
+        if (avail[apiKey] === true) {
+          // Plan agotado — mostrar banner y deshabilitar botón de envío
+          const sendBtn = document.getElementById('sendBtn');
+          if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.textContent = '🔴 PLAN AGOTADO';
+            sendBtn.style.background = 'rgba(255,60,60,0.15)';
+            sendBtn.style.color = '#ff4444';
+            sendBtn.style.border = '1px solid rgba(255,60,60,0.35)';
+            sendBtn.style.cursor = 'not-allowed';
+          }
+          const heroPrice = document.getElementById('heroPrice');
+          if (heroPrice) { heroPrice.textContent = 'AGOTADO'; heroPrice.style.color = '#ff4444'; }
+        }
+      }
+    } catch (e) {}
 
     // Modo upgrade: ocultar cupón y descuento de referido
     if (isUpgrade) {

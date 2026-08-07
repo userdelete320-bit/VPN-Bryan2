@@ -169,6 +169,10 @@ select option{background:var(--ink)}
 .pool-card[data-plan="gaming_pro"] .plan-dot{background:#f5c842;box-shadow:0 0 6px #f5c842}
 .pool-card[data-plan="gaming_pro"] .pool-upload-zone{border-color:rgba(245,200,66,.3);color:#f5c842}
 .pool-card[data-plan="gaming_pro"] .pool-upload-zone:hover{background:rgba(245,200,66,.06)}
+.pool-card[data-plan="express"]{border-top-color:#ff9500}
+.pool-card[data-plan="express"] .plan-dot{background:#ff9500;box-shadow:0 0 6px #ff9500}
+.pool-card[data-plan="express"] .pool-upload-zone{border-color:rgba(255,149,0,.3);color:#ff9500}
+.pool-card[data-plan="express"] .pool-upload-zone:hover{background:rgba(255,149,0,.06)}
 .pool-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--wire)}
 .pool-card-title{font-family:var(--f-head);font-size:.85rem;letter-spacing:.1em;color:var(--txt);display:flex;align-items:center;gap:6px}
 .pool-card-title .plan-dot{width:8px;height:8px;border-radius:50%}
@@ -483,6 +487,12 @@ select option{background:var(--ink)}
           <div class="loading" id="pricesLoading"><div class="spinner"></div> Cargando...</div>
           <div id="pricesFormWrap" style="display:none">
             <div id="pricesGrid" style="display:flex;flex-direction:column;gap:14px"></div>
+            <!-- Sección especial para Plan Express (precios por duración) -->
+            <div id="expressSection" style="margin-top:14px;background:var(--bg-2);border:1px solid rgba(255,149,0,0.35);border-radius:10px;padding:14px">
+              <div style="font-weight:700;margin-bottom:12px;color:#ff9500">⚡ Plan Express — Precios por duración</div>
+              <div style="font-family:var(--f-mono);font-size:.6rem;color:var(--txt-3);margin-bottom:10px">Cada duración tiene sus propios precios independientes para cada método de pago.</div>
+              <div id="expressPricesGrid" style="display:flex;flex-direction:column;gap:12px"></div>
+            </div>
             <button class="btn green" style="margin-top:18px;width:100%" onclick="savePrices()"><i class="fas fa-save"></i> <span>Guardar todos los precios</span></button>
           </div>
         </div></div>
@@ -670,9 +680,9 @@ let allReferrals = [], filteredReferrals = [], currentReferralsPage = 1, referra
 let allCoupons = [];
 let broadcastPollingInterval = null; // Para el polling de broadcasts
 
-const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
-const PLAN_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', gaming_pro: '👑 Gaming Pro', anual: '📅 Anual' };
-const PLAN_NAMES  = { basico: 'Básico (1 mes)', avanzado: 'Avanzado (2 meses)', cuba_vip: 'Cuba VIP (1 mes)', premium: 'Gaming (1 mes)', gaming_pro: 'Gaming Pro (1 mes)', anual: 'Anual (12 meses)', trial: 'Prueba Gratuita' };
+const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual', 'express'];
+const PLAN_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', gaming_pro: '👑 Gaming Pro', anual: '📅 Anual', express: '⚡ Express' };
+const PLAN_NAMES  = { basico: 'Básico (1 mes)', avanzado: 'Avanzado (2 meses)', cuba_vip: 'Cuba VIP (1 mes)', premium: 'Gaming (1 mes)', gaming_pro: 'Gaming Pro (1 mes)', anual: 'Anual (12 meses)', express: 'Express (duración variable)', trial: 'Prueba Gratuita' };
 
 // ── helpers ──────────────────────────────────────────
 function getPlanName(p) { return PLAN_NAMES[p] || p || '—'; }
@@ -965,6 +975,29 @@ async function loadPrices() {
         </div>
       </div>`;
     }).join('');
+
+    // Sección Express: precios por duración
+    const expressDurs = [
+      { key: '24h',    label: '⏱️ 24 horas',  defaults: { cup:300,  mobile:300,  usdt:1.0, stars:100, ton:1.5, paypal:1 } },
+      { key: '3dias',  label: '📆 3 días',     defaults: { cup:500,  mobile:500,  usdt:2.3, stars:150, ton:2.3, paypal:2 } },
+      { key: '7dias',  label: '🗓 7 días',     defaults: { cup:800,  mobile:800,  usdt:3.2, stars:200, ton:3.5, paypal:4 } },
+    ];
+    const expPrices = prices.express_durations || {};
+    document.getElementById('expressPricesGrid').innerHTML = expressDurs.map(d => {
+      const p = expPrices[d.key] || d.defaults;
+      return `<div style="background:var(--bg);border:1px solid rgba(255,149,0,0.2);border-radius:8px;padding:12px">
+        <div style="font-family:var(--f-mono);font-size:.7rem;color:#ff9500;margin-bottom:8px">${d.label}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
+          ${priceField('express_'+d.key, 'cup',    'CUP',        p.cup)}
+          ${priceField('express_'+d.key, 'mobile', 'Saldo Móvil',p.mobile)}
+          ${priceField('express_'+d.key, 'usdt',   'USDT',       p.usdt,   '0.01')}
+          ${priceField('express_'+d.key, 'stars',  'Stars ⭐',   p.stars)}
+          ${priceField('express_'+d.key, 'ton',    'TON 💎',     p.ton,    '0.01')}
+          ${priceField('express_'+d.key, 'paypal', 'PayPal $',   p.paypal, '0.01')}
+        </div>
+      </div>`;
+    }).join('');
+
     document.getElementById('pricesFormWrap').style.display = 'block';
   } catch(e) { document.getElementById('pricesLoading').style.display = 'none'; showNotification('Error al cargar precios', 'error'); }
 }
@@ -985,6 +1018,19 @@ async function savePrices() {
       usdt: document.getElementById(`price_${plan}_usdt`).value,
       stars: document.getElementById(`price_${plan}_stars`).value,
       ton: document.getElementById(`price_${plan}_ton`).value
+    };
+  }
+  // Precios Express por duración
+  const expressDurs = ['24h', '3dias', '7dias'];
+  prices.express_durations = {};
+  for (const dur of expressDurs) {
+    prices.express_durations[dur] = {
+      cup:    parseFloat(document.getElementById(`price_express_${dur}_cup`)?.value    || 0),
+      mobile: parseFloat(document.getElementById(`price_express_${dur}_mobile`)?.value || 0),
+      usdt:   parseFloat(document.getElementById(`price_express_${dur}_usdt`)?.value   || 0),
+      stars:  parseFloat(document.getElementById(`price_express_${dur}_stars`)?.value  || 0),
+      ton:    parseFloat(document.getElementById(`price_express_${dur}_ton`)?.value    || 0),
+      paypal: parseFloat(document.getElementById(`price_express_${dur}_paypal`)?.value || 0),
     };
   }
   showNotification('⏳ Guardando precios...', 'info');
@@ -1126,7 +1172,7 @@ async function loadPendingTrials() {
     trials.forEach(t => {
       const planType = t.trial_plan_type || t.trial_info?.plan_type || 'basico';
       const planLbl = getPlanLabel(planType);
-      const planColors = { basico: 'var(--col-basico)', avanzado: 'var(--col-avanzado)', cuba_vip: 'var(--col-cuba)', premium: 'var(--col-premium)', gaming_pro: '#f5c842', anual: 'var(--col-anual)' };
+      const planColors = { basico: 'var(--col-basico)', avanzado: 'var(--col-avanzado)', cuba_vip: 'var(--col-cuba)', premium: 'var(--col-premium)', gaming_pro: '#f5c842', anual: 'var(--col-anual)', express: '#ff9500' };
       const color = planColors[planType] || 'var(--sig)';
       tb.innerHTML += `<tr>
         <td><code>${t.telegram_id}</code></td>
@@ -1539,8 +1585,8 @@ async function loadPlanFiles() {
   try {
     const res = await fetch('/api/plan-files');
     const files = await res.json();
-    const plans = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
-    const planNames = { basico: 'Básico (1 mes)', avanzado: 'Avanzado (2 meses)', cuba_vip: 'Cuba VIP (1 mes)', premium: 'Gaming (1 mes)', gaming_pro: 'Gaming Pro (1 mes)', anual: 'Anual (12 meses)' };
+    const plans = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual', 'express'];
+    const planNames = { basico: 'Básico (1 mes)', avanzado: 'Avanzado (2 meses)', cuba_vip: 'Cuba VIP (1 mes)', premium: 'Gaming (1 mes)', gaming_pro: 'Gaming Pro (1 mes)', anual: 'Anual (12 meses)', express: 'Express (variable)' };
     const grid = document.getElementById('planFilesGrid'); grid.innerHTML = '';
     for (const plan of plans) {
       const file = (files || []).find(f => f.plan === plan);
@@ -1885,7 +1931,7 @@ function switchTab(name) {
 function refreshCurrentTab() { switchTab(currentTab); }
 
 // ── DISPONIBILIDAD DE PLANES ───────────────────────────
-const AVAILABILITY_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', gaming_pro: '👑 Gaming Pro', anual: '📅 Anual' };
+const AVAILABILITY_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', gaming_pro: '👑 Gaming Pro', anual: '📅 Anual', express: '⚡ Express' };
 
 async function loadAvailability() {
   document.getElementById('availabilityLoading').style.display = 'flex';

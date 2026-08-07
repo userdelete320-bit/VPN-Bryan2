@@ -445,7 +445,20 @@
   .plan-card.vip { --accent: var(--neon-yellow); --accent-glow: rgba(255,229,102,0.1); --accent-active: var(--neon-yellow); }
   .plan-card.gaming { --accent: var(--neon-pink); --accent-glow: rgba(255,110,180,0.12); --accent-active: var(--neon-pink); }
   .plan-card.gaming-pro { --accent: #f5c842; --accent-glow: rgba(245,200,66,0.18); --accent-active: #f5c842; }
-  .plan-card.anual { --accent: var(--pastel-peach); --accent-glow: rgba(255,212,184,0.12); --accent-active: var(--pastel-peach); }
+  .plan-card.express { --accent: #ff9500; --accent-glow: rgba(255,149,0,0.18); --accent-active: #ff9500; }
+
+  /* Modal Express: selector de duración e IP */
+  .express-selector { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+  .express-option {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 12px 16px; cursor: pointer; transition: border-color .2s, background .2s;
+  }
+  .express-option.selected { border-color: #ff9500; background: rgba(255,149,0,0.08); }
+  .express-option:active { opacity: .85; }
+  .express-option-label { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+  .express-option-price { font-family: 'Space Mono', monospace; font-size: 12px; color: #ff9500; }
+  .express-section-title { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .08em; color: var(--text-dim); margin-bottom: 4px; }
 
   .plan-card::after {
     content: '';
@@ -1550,6 +1563,29 @@
       </div>
     </div>
 
+    <div class="plan-card express" data-plan="express" onclick="voyageCardClick('express')">
+      <div class="plan-card-glow"></div>
+      <div class="plan-row1">
+        <div class="plan-icon">⚡</div>
+        <div class="plan-price-block">
+          <div class="plan-price" id="cardPrice-express">300 CUP</div>
+          <div class="plan-price-period">desde</div>
+        </div>
+      </div>
+      <div class="plan-name">Express</div>
+      <div class="plan-tagline">Conexión rápida por horas o días. Elige duración e IP.</div>
+      <div class="plan-features">
+        <div class="plan-feature"><span class="check">✓</span> 24h · 3 días · 7 días</div>
+        <div class="plan-feature"><span class="check">✓</span> IP Cuba o IP USA</div>
+        <div class="plan-feature"><span class="check">✓</span> Activación inmediata</div>
+        <div class="plan-feature"><span class="check">✓</span> Sin compromiso</div>
+      </div>
+      <div class="plan-footer">
+        <button class="plan-btn">Ver plan <span>→</span></button>
+        <div class="plan-popular"><span class="dot"></span> Flexible</div>
+      </div>
+    </div>
+
   </div>
 
   <div class="voyage-nav">
@@ -1704,6 +1740,21 @@ const plans = {
     ],
     cta: 'Ir Anual',
   },
+  express: {
+    icon: '⚡', name: 'Express', color: '#ff9500', shadowColor: 'rgba(255,149,0,0.3)',
+    price: { cup: 300, mobile: 300, usdt: 1.0 }, stars: 100, ton: 1.5,
+    desc: 'Conexión rápida por horas o días. Elige la duración que necesitas y la IP de tu preferencia.',
+    features: [
+      { icon: '⏱', label: '24H', val: '300 CUP / $1 USD' },
+      { icon: '📆', label: '3 DÍAS', val: '500 CUP / $2 USD' },
+      { icon: '🗓', label: '7 DÍAS', val: '800 CUP / $4 USD' },
+      { icon: '🌐', label: 'IP', val: 'Cuba o USA' },
+      { icon: '⚡', label: 'ACTIVACIÓN', val: 'Inmediata' },
+      { icon: '🆘', label: 'SOPORTE', val: 'Incluido' },
+    ],
+    cta: 'Elegir Express',
+    isExpress: true,
+  },
 };
 const PLAN_API_KEYS = {
   basic: 'basico',
@@ -1711,7 +1762,8 @@ const PLAN_API_KEYS = {
   vip: 'cuba_vip',
   gaming: 'premium',
   'gaming-pro': 'gaming_pro',
-  anual: 'anual'
+  anual: 'anual',
+  express: 'express'
 };
 
 const PLAN_CUP = {
@@ -1807,7 +1859,7 @@ const currentUsername = tgUser.username || '';
 const currentFirstName = tgUser.first_name || '';
 
 // ===== VOYAGE STYLE: carrusel vertical de tarjetas apiladas =====
-const VOYAGE_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'gaming-pro', 'anual'];
+const VOYAGE_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'gaming-pro', 'anual', 'express'];
 let voyageIndex = 0;
 let voyageClickGuard = false; // evita que el tap que cambia de tarjeta también abra el modal
 
@@ -1950,6 +2002,46 @@ function openModal(key) {
         Cerrar
       </button>
     `;
+  } else if (key === 'express') {
+  content.innerHTML = `
+    <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
+    <div class="modal-plan-name">${p.name}</div>
+    <div class="modal-plan-desc">${p.desc}</div>
+    ${isPlanAgotado(key)
+      ? `<button class="modal-cta" disabled style="background:rgba(255,60,60,0.12);color:#ff4444;border:1px solid rgba(255,60,60,0.35);width:100%;cursor:not-allowed;opacity:0.8;margin-top:16px">🔴 AGOTADO</button>`
+      : `
+    <div class="express-section-title" style="margin-top:14px">⏱ ELIGE LA DURACIÓN</div>
+    <div class="express-selector" id="expressDurationSelector">
+      <div class="express-option selected" data-duration="24h" data-cup="300" data-mobile="300" data-usdt="1.0" data-stars="100" data-ton="1.5" data-paypal="1" onclick="selectExpressOption(this,'duration')">
+        <div class="express-option-label">⏱️ 24 horas</div>
+        <div class="express-option-price">300 CUP · $1</div>
+      </div>
+      <div class="express-option" data-duration="3dias" data-cup="500" data-mobile="500" data-usdt="2.3" data-stars="150" data-ton="2.3" data-paypal="2" onclick="selectExpressOption(this,'duration')">
+        <div class="express-option-label">📆 3 días</div>
+        <div class="express-option-price">500 CUP · $2</div>
+      </div>
+      <div class="express-option" data-duration="7dias" data-cup="800" data-mobile="800" data-usdt="3.2" data-stars="200" data-ton="3.5" data-paypal="4" onclick="selectExpressOption(this,'duration')">
+        <div class="express-option-label">🗓 7 días</div>
+        <div class="express-option-price">800 CUP · $4</div>
+      </div>
+    </div>
+    <div class="express-section-title" style="margin-top:10px">🌐 ELIGE LA IP</div>
+    <div class="express-selector" id="expressIPSelector">
+      <div class="express-option selected" data-ip="IP Cuba" onclick="selectExpressOption(this,'ip')">
+        <div class="express-option-label">🇨🇺 IP Cuba</div>
+        <div class="express-option-price">Local</div>
+      </div>
+      <div class="express-option" data-ip="IP USA" onclick="selectExpressOption(this,'ip')">
+        <div class="express-option-label">🇺🇸 IP USA</div>
+        <div class="express-option-price">Internacional</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="modal-cta" style="background:#ff9500;color:#000;box-shadow:0 0 30px rgba(255,149,0,0.3);flex:1" onclick="handleExpressCTA()">Pagar Express (CUP/USDT)</button>
+      <button class="modal-cta" style="background:#5bf0ff;color:#000;box-shadow:0 0 30px rgba(91,240,255,0.3);flex:1" onclick="payExpressStars()">⭐ Stars</button>
+    </div>`
+    }
+  `;
   } else {
   content.innerHTML = `
     <div style="margin-bottom:4px;font-size:36px">${p.icon}</div>
@@ -2000,6 +2092,65 @@ function closeModal() {
 
 function closeModalOutside(e) {
   if (e.target === document.getElementById('modal')) closeModal();
+}
+
+// ===== PLAN EXPRESS =====
+function selectExpressOption(el, type) {
+  const container = type === 'duration' ? 'expressDurationSelector' : 'expressIPSelector';
+  document.querySelectorAll(`#${container} .express-option`).forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function getExpressSelection() {
+  const dur = document.querySelector('#expressDurationSelector .express-option.selected');
+  const ip  = document.querySelector('#expressIPSelector .express-option.selected');
+  if (!dur || !ip) return null;
+  return {
+    duration: dur.dataset.duration,
+    durationLabel: dur.querySelector('.express-option-label').textContent,
+    ip: ip.dataset.ip,
+    cup: parseInt(dur.dataset.cup),
+    mobile: parseInt(dur.dataset.mobile),
+    usdt: parseFloat(dur.dataset.usdt),
+    stars: parseInt(dur.dataset.stars),
+    ton: parseFloat(dur.dataset.ton),
+    paypal: parseFloat(dur.dataset.paypal),
+  };
+}
+
+function handleExpressCTA() {
+  const sel = getExpressSelection();
+  if (!sel) return;
+  const params = new URLSearchParams({
+    userId: currentUserId,
+    plan: 'express',
+    price: String(sel.cup),
+    mobile: String(sel.mobile),
+    usdtAmount: String(sel.usdt),
+    planLabel: `Express ${sel.durationLabel} · ${sel.ip}`,
+    duration: sel.duration,
+    ip_choice: sel.ip,
+    paypalAmount: String(sel.paypal),
+  });
+  window.location.href = `payment.html?${params.toString()}`;
+}
+
+function payExpressStars() {
+  const sel = getExpressSelection();
+  if (!sel) return;
+  payWithStarsAmount('express', sel.stars, `Express ${sel.durationLabel}`, sel.duration, sel.ip);
+}
+
+function payWithStarsAmount(key, starsAmount, label, duration, ip) {
+  const tg = window.Telegram?.WebApp;
+  if (!tg) { alert('Abre desde Telegram para pagar con Stars'); return; }
+  tg.openInvoice({
+    title: `⚡ VPN Cuba — ${label}`,
+    description: `Plan Express VPN Cuba · ${ip}`,
+    currency: 'XTR',
+    prices: [{ label, amount: starsAmount }],
+    payload: JSON.stringify({ userId: currentUserId, plan: key, duration, ip_choice: ip }),
+  }, status => { if (status === 'paid') alert('✅ ¡Pago con Stars confirmado! Recibirás la configuración en breve.'); });
 }
 
 function handleCTA(key) {
@@ -2136,7 +2287,8 @@ async function requestTrial(planKey) {
     'cuba_vip': 'Cuba VIP',
     'premium': 'Premium',
     'gaming_pro': 'Gaming Pro',
-    'anual': 'Anual'
+    'anual': 'Anual',
+    'express': 'Express'
   };
   
   const selectedPlanName = planNames[PLAN_API_KEYS[planKey]] || PLAN_API_KEYS[planKey];
@@ -2655,7 +2807,7 @@ async function checkPlanAvailability() {
   } catch (e) {}
 }
 
-const PLAN_KEY_TO_API = { basic:'basico', advanced:'avanzado', vip:'cuba_vip', gaming:'premium', 'gaming-pro':'gaming_pro', anual:'anual' };
+const PLAN_KEY_TO_API = { basic:'basico', advanced:'avanzado', vip:'cuba_vip', gaming:'premium', 'gaming-pro':'gaming_pro', anual:'anual', express:'express' };
 
 function isPlanAgotado(uiKey) {
   const apiKey = PLAN_KEY_TO_API[uiKey];
