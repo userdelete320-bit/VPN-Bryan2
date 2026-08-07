@@ -18,10 +18,10 @@ const db = require('./supabase');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
-const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
+const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual', 'express'];
 
 // Jerarquía de planes de menor a mayor — cualquier plan puede subir a los que siguen
-const PLAN_HIERARCHY = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual'];
+const PLAN_HIERARCHY = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual', 'express'];
 
 // ===== SISTEMA DE XP =====
 const XP_LEVELS = [
@@ -228,7 +228,8 @@ const DEFAULT_PLAN_PRICES = {
     cuba_vip: { cup: 1200,  mobile: 500,   usdt: 2.0,  stars: 180,  ton: 2.2 },
     premium:  { cup: 1500,  mobile: 700,   usdt: 1.1,  stars: 210,  ton: 2.5 },
     gaming_pro: { cup: 2000, mobile: 1300, usdt: 4.0,  stars: 300,  ton: 3.5 },
-    anual:    { cup: 15000, mobile: 10000, usdt: 30,   stars: 2100, ton: 26.0 }
+    anual:    { cup: 15000, mobile: 10000, usdt: 30,   stars: 2100, ton: 26.0 },
+    express:  { cup: 300,   mobile: 300,   usdt: 1.0,  stars: 100,  ton: 1.5 }
 };
 
 let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
@@ -238,7 +239,7 @@ let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
 let START_GIF_FILE_ID = null;
 
 // Disponibilidad de planes: true = agotado, false = disponible
-let PLAN_AVAILABILITY = { basico: false, avanzado: false, cuba_vip: false, premium: false, gaming_pro: false, anual: false };
+let PLAN_AVAILABILITY = { basico: false, avanzado: false, cuba_vip: false, premium: false, gaming_pro: false, anual: false, express: false };
 
 // Objetos derivados que el resto del código ya usa (se actualizan junto con PLAN_PRICES)
 let USDT_PRICES = {};
@@ -1097,7 +1098,7 @@ app.get('/api/check-terms/:telegramId', async (req, res) => {
 
 app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
   try {
-    const { telegramId, plan, price, notes, method, couponCode, upgrade_to, from_plan } = req.body;
+    const { telegramId, plan, price, notes, method, couponCode, upgrade_to, from_plan, duration, ip_choice } = req.body;
     if (!telegramId || !plan || !price) return res.status(400).json({ error: 'Datos incompletos' });
     if (!req.file) return res.status(400).json({ error: 'Captura de pantalla requerida' });
 
@@ -1141,7 +1142,8 @@ app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
       method: method || 'transfer', screenshot_url: screenshotUrl, notes: notes || '',
       status: 'pending', created_at: new Date().toISOString(),
       coupon_used: couponUsed, coupon_code: couponUsed ? couponCode?.toUpperCase() : null, coupon_discount: couponDiscount,
-      payment_type: isUpgrade ? 'upgrade' : 'purchase', upgrade_to: upgrade_to || null, from_plan: from_plan || null
+      payment_type: isUpgrade ? 'upgrade' : 'purchase', upgrade_to: upgrade_to || null, from_plan: from_plan || null,
+      duration: duration || null, ip_choice: ip_choice || null
     });
     if (!payment) throw new Error('No se pudo crear el pago en la base de datos');
 
@@ -1149,7 +1151,7 @@ app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
       const methodNames = { transfer: 'BPA', metropolitan: 'Metropolitana', mitransfer: 'MITRANSFER', mobile: 'Saldo Móvil', usdt: 'USDT (BEP20)' };
       let adminMessage = isUpgrade
         ? `⬆️ *ACTUALIZACIÓN DE PLAN*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *De:* ${getPlanName(from_plan)} → ${getPlanName(upgrade_to)}\n💰 *Diferencia:* ${price} ${method === 'usdt' ? 'USDT' : 'CUP'}\n💳 *Método:* ${methodNames[method] || method}\n⏰ *Fecha:* ${new Date().toLocaleString('es-ES')}\n📝 *Estado:* ⏳ Pendiente`
-        : `💰 *NUEVO PAGO - ${method === 'usdt' ? 'USDT' : 'CUP'}*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${getPlanName(plan)}\n💰 *Monto:* ${price} ${method === 'usdt' ? 'USDT' : 'CUP'}\n`;
+        : `💰 *NUEVO PAGO - ${method === 'usdt' ? 'USDT' : method === 'paypal' ? 'PayPal' : 'CUP'}*\n\n👤 *Usuario:* ${firstName}\n📱 *Telegram:* ${username}\n🆔 *ID:* ${telegramId}\n📋 *Plan:* ${getPlanName(plan)}${duration ? ` — ${duration}` : ''}${ip_choice ? `\n🌐 *IP:* ${ip_choice}` : ''}\n💰 *Monto:* ${price} ${method === 'usdt' ? 'USDT' : method === 'paypal' ? 'USD' : 'CUP'}\n`;
       if (!isUpgrade && couponUsed) adminMessage += `🎫 *Cupón:* ${couponCode} (${couponDiscount}%)\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
       else if (!isUpgrade && referralDiscountApplied > 0) adminMessage += `👥 *Descuento:* ${referralDiscountApplied}%\n💰 *Final:* ${finalPrice.toFixed(2)}\n`;
       if (!isUpgrade) adminMessage += `💳 *Método:* ${methodNames[method] || method}\n⏰ *Fecha:* ${new Date().toLocaleString('es-ES')}\n📝 *Estado:* ⏳ Pendiente`;
