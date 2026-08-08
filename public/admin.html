@@ -285,7 +285,7 @@ select option{background:var(--ink)}
       <div class="nav-group"><div class="nav-group-label">// Pagos</div><div class="nav-item" data-tab="pending" onclick="switchTab('pending')"><i class="fas fa-clock"></i> Pendientes <span class="nav-badge" id="badge-pending">0</span></div><div class="nav-item" data-tab="approved" onclick="switchTab('approved')"><i class="fas fa-check"></i> Aprobados</div><div class="nav-item" data-tab="refunds" onclick="switchTab('refunds')"><i class="fas fa-rotate-left"></i> Reembolsos <span class="nav-badge" id="badge-refunds">0</span></div></div>
       <div class="nav-group"><div class="nav-group-label">// Pruebas</div><div class="nav-item" data-tab="trial-pending" onclick="switchTab('trial-pending')"><i class="fas fa-gift"></i> Solicitudes <span class="nav-badge" id="badge-trial">0</span></div><div class="nav-item" data-tab="trial-files" onclick="switchTab('trial-files')"><i class="fas fa-database"></i> Pool de Pruebas</div></div>
       <div class="nav-group"><div class="nav-group-label">// Usuarios</div><div class="nav-item" data-tab="users" onclick="switchTab('users')"><i class="fas fa-users"></i> Usuarios</div><div class="nav-item" data-tab="referrals" onclick="switchTab('referrals')"><i class="fas fa-share-alt"></i> Referidos</div></div>
-      <div class="nav-group"><div class="nav-group-label">// Contenido</div><div class="nav-item" data-tab="plan-files" onclick="switchTab('plan-files')"><i class="fas fa-folder"></i> Archivos Planes</div><div class="nav-item" data-tab="coupons" onclick="switchTab('coupons')"><i class="fas fa-tag"></i> Cupones</div></div>
+      <div class="nav-group"><div class="nav-group-label">// Contenido</div><div class="nav-item" data-tab="config-files" onclick="switchTab('config-files')"><i class="fas fa-key"></i> Pool de Configs</div><div class="nav-item" data-tab="plan-files" onclick="switchTab('plan-files')"><i class="fas fa-folder"></i> Archivos Planes</div><div class="nav-item" data-tab="coupons" onclick="switchTab('coupons')"><i class="fas fa-tag"></i> Cupones</div></div>
       <div class="nav-group"><div class="nav-group-label">// Mensajes</div><div class="nav-item" data-tab="broadcast" onclick="switchTab('broadcast')"><i class="fas fa-bullhorn"></i> Broadcast</div><div class="nav-item" data-tab="games" onclick="switchTab('games')"><i class="fas fa-gamepad"></i> Juegos</div></div>
       <div class="nav-group" id="adminsNavGroup" style="display:none"><div class="nav-group-label">// Sistema</div><div class="nav-item" data-tab="admins" onclick="switchTab('admins')"><i class="fas fa-user-shield"></i> Administradores</div><div class="nav-item" data-tab="prices" onclick="switchTab('prices')"><i class="fas fa-dollar-sign"></i> Precios</div><div class="nav-item" data-tab="availability" onclick="switchTab('availability')"><i class="fas fa-toggle-on"></i> Disponibilidad</div><div class="nav-item" data-tab="xp" onclick="switchTab('xp')"><i class="fas fa-bolt"></i> XP / Niveles</div><div class="nav-item" data-tab="announcement" onclick="switchTab('announcement')"><i class="fas fa-bullhorn"></i> Anuncio</div></div>
     </div>
@@ -396,6 +396,15 @@ select option{background:var(--ink)}
       </div>
 
       <!-- ── POOL DE PRUEBAS POR PLAN ── -->
+      <div id="config-filesPanel" class="tab-panel">
+        <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-key"></i> Pool de Configuraciones</div><button class="btn" onclick="loadAllConfigPools()"><i class="fas fa-sync-alt"></i> <span>Refrescar</span></button></div>
+        <div class="card-body">
+          <div class="info-box"><i class="fas fa-info-circle"></i> Sube los archivos .conf de WireGuard para cada plan. Al aprobar un pago, el sistema tomará automáticamente un archivo no usado del pool correspondiente y lo enviará al usuario.</div>
+          <div class="loading" id="configPoolLoading"><div class="spinner"></div> Cargando...</div>
+          <div id="configPoolGrid" style="display:none;display:flex;flex-direction:column;gap:14px;margin-top:14px"></div>
+        </div></div>
+      </div>
+
       <div id="trial-filesPanel" class="tab-panel">
         <div class="card"><div class="card-head"><div class="card-title"><i class="fas fa-database"></i> Pool de Archivos de Prueba</div><button class="btn" onclick="loadAllTrialPools()"><i class="fas fa-sync-alt"></i> <span>Refrescar todo</span></button></div>
         <div class="card-body">
@@ -1111,12 +1120,23 @@ function viewScreenshot(paymentId, telegramId, plan, amount, date, screenshotUrl
 }
 
 async function approvePayment(paymentId) {
-  if (!confirm('¿Aprobar pago? El envío de archivo será manual.')) return;
-  showNotification('⏳ Aprobando...', 'info');
+  if (!confirm('¿Aprobar pago? El sistema intentará enviar la configuración automáticamente.')) return;
+  showNotification('⏳ Aprobando y enviando config...', 'info');
   try {
     const res = await fetch(`/api/payments/${paymentId}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId: currentUserId }) });
-    if (res.ok) { showNotification('✅ Aprobado', 'success'); closeModal(); loadPendingPayments(); loadApprovedPayments(); loadStats(); }
-    else showNotification('Error al aprobar', 'error');
+    const data = res.ok ? await res.json() : null;
+    if (res.ok) {
+      if (data.configAutoSent) {
+        showNotification('✅ Pago aprobado — configuración enviada automáticamente', 'success');
+      } else if (data.configWarning) {
+        showNotification(`⚠️ Pago aprobado — ${data.configWarning}`, 'error');
+      } else {
+        showNotification('✅ Pago aprobado', 'success');
+      }
+      closeModal(); loadPendingPayments(); loadApprovedPayments(); loadStats();
+    } else {
+      showNotification('Error al aprobar', 'error');
+    }
   } catch(e) { showNotification('Error', 'error'); }
 }
 
@@ -1883,7 +1903,7 @@ async function loadGamesStats() {
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────
-const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes', availability:'// Disponibilidad de Planes', xp:'// XP / Niveles', announcement:'// Anuncio Web' };
+const tabTitles = { stats:'// Estadísticas', pending:'// Pagos Pendientes', approved:'// Pagos Aprobados', refunds:'// Solicitudes de Reembolso', 'trial-pending':'// Solicitudes de Prueba', 'trial-files':'// Pool de Pruebas', 'config-files':'// Pool de Configuraciones', users:'// Usuarios', referrals:'// Sistema de Referidos', 'plan-files':'// Archivos de Planes', coupons:'// Cupones', broadcast:'// Broadcast', games:'// Juegos', admins:'// Administradores', prices:'// Precios de Planes', availability:'// Disponibilidad de Planes', xp:'// XP / Niveles', announcement:'// Anuncio Web' };
 
 function switchTab(name) {
   stopBroadcastPolling(); // detener polling al cambiar de pestaña
@@ -1902,6 +1922,7 @@ function switchTab(name) {
     refunds: loadRefundRequests,
     'trial-pending': loadPendingTrials,
     'trial-files': () => { buildPoolCards(); loadAllTrialPools(); },
+    'config-files': loadAllConfigPools,
     users: loadUsers,
     referrals: loadReferrals,
     'plan-files': loadPlanFiles,
@@ -1929,6 +1950,93 @@ function switchTab(name) {
 }
 
 function refreshCurrentTab() { switchTab(currentTab); }
+
+// ── POOL DE CONFIGURACIONES ──────────────────────────
+const CONFIG_POOL_PLANS = [
+  { key: 'basico',       label: '🌐 Básico',         color: 'var(--col-basico)' },
+  { key: 'avanzado',     label: '🌟 Avanzado',        color: 'var(--col-avanzado)' },
+  { key: 'cuba_vip',     label: '🇨🇺 Cuba VIP',       color: 'var(--col-cuba)' },
+  { key: 'premium',      label: '🎮 Gaming',          color: 'var(--col-premium)' },
+  { key: 'gaming_pro',   label: '👑 Gaming Pro',      color: '#f5c842' },
+  { key: 'anual',        label: '📅 Anual',           color: 'var(--col-anual)' },
+  { key: 'express_24h',  label: '⚡ Express 24h',     color: '#ff9500' },
+  { key: 'express_3dias',label: '⚡ Express 3 días',  color: '#ff9500' },
+  { key: 'express_7dias',label: '⚡ Express 7 días',  color: '#ff9500' },
+];
+
+async function loadAllConfigPools() {
+  document.getElementById('configPoolLoading').style.display = 'flex';
+  const grid = document.getElementById('configPoolGrid');
+  grid.style.display = 'none';
+  grid.innerHTML = '';
+  for (const p of CONFIG_POOL_PLANS) {
+    try {
+      const res = await fetch(`/api/config-files/${p.key}`);
+      const data = res.ok ? await res.json() : { files: [], available: 0, total: 0 };
+      grid.innerHTML += buildConfigPoolCard(p, data);
+    } catch (e) { grid.innerHTML += buildConfigPoolCard(p, { files: [], available: 0, total: 0 }); }
+  }
+  document.getElementById('configPoolLoading').style.display = 'none';
+  grid.style.display = 'flex';
+}
+
+function buildConfigPoolCard(plan, data) {
+  const availPct = data.total > 0 ? Math.round(data.available / data.total * 100) : 0;
+  const statusColor = data.available === 0 ? 'var(--red)' : data.available < 3 ? 'var(--amber)' : 'var(--green)';
+  const filesHtml = data.files.length === 0
+    ? '<div style="color:var(--txt-3);font-size:.8rem;padding:8px 0">Sin archivos en el pool</div>'
+    : data.files.map(f => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--wire)">
+        <div>
+          <div style="font-size:.8rem;font-weight:600">${f.name}</div>
+          <div style="font-size:.65rem;color:var(--txt-3)">${f.used ? `✅ Usado — ${f.used_by ? 'ID: '+f.used_by : ''}` : '🟢 Disponible'}</div>
+        </div>
+        ${!f.used ? `<button class="btn red" style="padding:4px 8px;font-size:.7rem" onclick="deleteConfigFile(${f.id},'${plan.key}')"><i class="fas fa-trash"></i></button>` : ''}
+      </div>`).join('');
+
+  return `<div style="background:var(--bg-2);border:1px solid var(--border);border-top:3px solid ${plan.color};border-radius:10px;padding:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div>
+        <div style="font-weight:700;font-size:.9rem">${plan.label}</div>
+        <div style="font-family:var(--f-mono);font-size:.65rem;color:${statusColor};margin-top:3px">
+          ${data.available} disponible${data.available !== 1 ? 's' : ''} / ${data.total} total
+        </div>
+      </div>
+      <label style="background:var(--sig-soft);border:1px solid var(--sig);color:var(--sig);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:.75rem">
+        <i class="fas fa-upload"></i> Subir
+        <input type="file" accept=".conf,.txt,.zip" multiple style="display:none" onchange="uploadConfigFiles('${plan.key}', this)">
+      </label>
+    </div>
+    <div style="max-height:200px;overflow-y:auto">${filesHtml}</div>
+  </div>`;
+}
+
+async function uploadConfigFiles(planKey, input) {
+  const files = input.files;
+  if (!files.length) return;
+  showNotification(`📤 Subiendo ${files.length} archivo(s) al pool ${planKey}...`, 'info');
+  let ok = 0, fail = 0;
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('configFile', file);
+    try {
+      const res = await fetch(`/api/config-files/${planKey}/upload`, { method: 'POST', body: fd });
+      if (res.ok) ok++; else fail++;
+    } catch (e) { fail++; }
+  }
+  input.value = '';
+  showNotification(`✅ Pool ${planKey}: ${ok} subido(s)${fail > 0 ? `, ${fail} fallo(s)` : ''}`, ok > 0 ? 'success' : 'error');
+  loadAllConfigPools();
+}
+
+async function deleteConfigFile(id, planKey) {
+  if (!confirm(`¿Eliminar este archivo del pool ${planKey}?`)) return;
+  try {
+    const res = await fetch(`/api/config-files/${id}`, { method: 'DELETE' });
+    if (res.ok) { showNotification('✅ Archivo eliminado', 'success'); loadAllConfigPools(); }
+    else showNotification('❌ Error al eliminar', 'error');
+  } catch (e) { showNotification('Error de conexión', 'error'); }
+}
 
 // ── DISPONIBILIDAD DE PLANES ───────────────────────────
 const AVAILABILITY_LABELS = { basico: '🌐 Básico', avanzado: '🌟 Avanzado', cuba_vip: '🇨🇺 Cuba VIP', premium: '🎮 Gaming', gaming_pro: '👑 Gaming Pro', anual: '📅 Anual', express: '⚡ Express' };
