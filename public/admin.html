@@ -978,9 +978,9 @@ async function loadPrices() {
 
     // Sección Express: precios por duración
     const expressDurs = [
-      { key: '24h',    label: '⏱️ 24 horas',  defaults: { cup:300,  mobile:300,  usdt:1.0, stars:100, ton:1.5, paypal:1 } },
-      { key: '3dias',  label: '📆 3 días',     defaults: { cup:500,  mobile:500,  usdt:2.3, stars:150, ton:2.3, paypal:2 } },
-      { key: '7dias',  label: '🗓 7 días',     defaults: { cup:800,  mobile:800,  usdt:3.2, stars:200, ton:3.5, paypal:4 } },
+      { key: '24h',    label: '⏱️ 24 horas',  defaults: { cup:300,  mobile:150,  usdt:1.0, stars:100, ton:1.5, paypal:1 } },
+      { key: '3dias',  label: '📆 3 días',     defaults: { cup:500,  mobile:240,  usdt:2.3, stars:150, ton:2.3, paypal:2 } },
+      { key: '7dias',  label: '🗓 7 días',     defaults: { cup:800,  mobile:400,  usdt:3.2, stars:200, ton:3.5, paypal:4 } },
     ];
     const expPrices = prices.express_durations || {};
     document.getElementById('expressPricesGrid').innerHTML = expressDurs.map(d => {
