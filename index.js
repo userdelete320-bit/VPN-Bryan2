@@ -229,7 +229,7 @@ const DEFAULT_PLAN_PRICES = {
     premium:  { cup: 1500,  mobile: 700,   usdt: 1.1,  stars: 210,  ton: 2.5 },
     gaming_pro: { cup: 2000, mobile: 1300, usdt: 4.0,  stars: 300,  ton: 3.5 },
     anual:    { cup: 15000, mobile: 10000, usdt: 30,   stars: 2100, ton: 26.0 },
-    express:  { cup: 300,   mobile: 300,   usdt: 1.0,  stars: 100,  ton: 1.5 }
+    express:  { cup: 300,   mobile: 150,   usdt: 1.0,  stars: 100,  ton: 1.5 }
 };
 
 let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
