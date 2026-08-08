@@ -232,6 +232,23 @@ const DEFAULT_PLAN_PRICES = {
     express:  { cup: 300,   mobile: 150,   usdt: 1.0,  stars: 100,  ton: 1.5 }
 };
 
+// Clave del pool de configs según plan y duración
+function getConfigPlanKey(plan, duration) {
+  if (plan === 'express') {
+    if (duration === '3dias') return 'express_3dias';
+    if (duration === '7dias') return 'express_7dias';
+    return 'express_24h';
+  }
+  return plan;
+}
+
+// Directorio local para configs (fallback si Supabase falla)
+const CONFIG_DIRS = {};
+for (const pt of [...PLAN_TYPES, 'express_24h', 'express_3dias', 'express_7dias']) {
+  CONFIG_DIRS[pt] = path.join(__dirname, `uploads/config_files_${pt}`);
+  if (!fs.existsSync(CONFIG_DIRS[pt])) fs.mkdirSync(CONFIG_DIRS[pt], { recursive: true });
+}
+
 let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
 
 // Caché del file_id del GIF de bienvenida — se rellena en el primer envío
@@ -1178,6 +1195,54 @@ No hace falta enviar otra foto. Tu pago quedó en revisión manual.
   }
 });
 
+// ===== POOL DE CONFIGURACIONES =====
+const CONFIG_PLAN_KEYS = [
+  'basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual',
+  'express_24h', 'express_3dias', 'express_7dias'
+];
+
+app.get('/api/config-files/:planKey', async (req, res) => {
+  try {
+    const { planKey } = req.params;
+    if (!CONFIG_PLAN_KEYS.includes(planKey)) return res.status(400).json({ error: 'Plan inválido' });
+    const files = await db.getConfigFiles(planKey);
+    const available = files.filter(f => !f.used).length;
+    res.json({ files, available, total: files.length });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/config-files/:planKey/upload', upload.single('configFile'), async (req, res) => {
+  try {
+    const { planKey } = req.params;
+    if (!CONFIG_PLAN_KEYS.includes(planKey)) return res.status(400).json({ error: 'Plan inválido' });
+    if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' });
+    let fileUrl = '';
+    let filePath = '';
+    try {
+      fileUrl = await db.uploadImage(req.file.path, `config_${planKey}`);
+      fs.unlink(req.file.path, () => {});
+      filePath = fileUrl;
+    } catch (e) {
+      // Fallback: mover al directorio local
+      const destDir = CONFIG_DIRS[planKey] || path.join(__dirname, `uploads/config_files_${planKey}`);
+      if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+      const destPath = path.join(destDir, req.file.originalname);
+      fs.renameSync(req.file.path, destPath);
+      fileUrl = `/uploads/config_files_${planKey}/${req.file.originalname}`;
+      filePath = destPath;
+    }
+    const record = await db.addConfigFile(planKey, req.file.originalname, fileUrl, filePath);
+    res.json({ success: true, file: record });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.delete('/api/config-files/:id', async (req, res) => {
+  try {
+    await db.deleteConfigFile(req.params.id);
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 app.get('/api/payments/pending', async (req, res) => {
   try {
     const payments = await db.getPendingPayments();
@@ -1221,17 +1286,51 @@ app.post('/api/payments/:id/approve', async (req, res) => {
     try {
       let userMessage = '<tg-emoji emoji-id="6019175208240289774">🎉</tg-emoji> <b>¡Tu pago ha sido aprobado!</b>\n\nAhora eres usuario VIP de VPN Cuba.\nEl administrador te enviará el archivo de configuración en breve.\n\n';
       if (payment.coupon_used && payment.coupon_discount) userMessage += `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}% descuento)\n`;
-      userMessage += '<b>Nota:</b> Sistema de envío automático desactivado.';
       await bot.telegram.sendMessage(payment.telegram_id, userMessage, { parse_mode: 'HTML' });
     } catch (botError) { console.log('❌ No se pudo notificar al usuario:', botError.message); }
 
     const user = await db.getUser(payment.telegram_id);
     if (payment.payment_type === 'upgrade' && payment.upgrade_to) {
-      // Upgrade: actualizar al plan destino manteniendo vip_since original
       await db.makeUserVIP(payment.telegram_id, { plan: payment.upgrade_to, plan_price: payment.price, vip_since: user?.vip_since || new Date().toISOString() });
     } else {
-      // Compra nueva o renovación: siempre actualizar, aunque ya sea VIP
       await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
+    }
+
+    // Auto-envío de configuración desde el pool
+    let configAutoSent = false;
+    let configWarning = null;
+    try {
+      const configPlanKey = getConfigPlanKey(payment.plan, payment.duration);
+      const configFile = await db.getConfigFile(configPlanKey);
+      if (configFile) {
+        // Enviar el archivo al usuario
+        const fetch = require('node-fetch');
+        const fileRes = await fetch(configFile.file_url);
+        const fileBuffer = await fileRes.buffer();
+        await bot.telegram.sendDocument(
+          payment.telegram_id,
+          { source: fileBuffer, filename: configFile.name },
+          {
+            caption: `🔑 <b>Archivo de configuración — ${getPlanName(payment.plan)}</b>${payment.duration ? ` (${payment.duration})` : ''}\n\n` +
+              `📲 Importa este archivo en WireGuard para activar tu VPN.\n` +
+              `📋 <b>ID de pedido:</b> ${payment.id}`,
+            parse_mode: 'HTML'
+          }
+        );
+        await db.markConfigFileAsUsed(configFile.id, payment.telegram_id);
+        await db.updatePayment(payment.id, { config_sent: true, config_sent_at: new Date().toISOString(), config_sent_by: 'system' });
+        configAutoSent = true;
+        console.log(`✅ Config auto-enviada: plan=${configPlanKey} file=${configFile.name} user=${payment.telegram_id}`);
+      } else {
+        // Sin configs disponibles — avisar al admin
+        configWarning = `⚠️ Pool de configs vacío para ${getPlanName(payment.plan)}${payment.duration ? ` (${payment.duration})` : ''}. Envía la configuración manualmente.`;
+        for (const adminId of ADMIN_IDS) {
+          try { await bot.telegram.sendMessage(adminId, configWarning); } catch (e) {}
+        }
+      }
+    } catch (cfgErr) {
+      console.error('❌ Error en auto-envío de config:', cfgErr.message);
+      configWarning = 'Error al enviar la configuración automáticamente. Envía manualmente.';
     }
 
     try {
@@ -1239,7 +1338,6 @@ app.post('/api/payments/:id/approve', async (req, res) => {
       if (user.referrer_id) {
         const referrerUser = await db.getUser(user.referrer_id);
         if (referrerUser?.referrer_id) await db.markReferralAsPaid(referrerUser.telegram_id, 2);
-        // XP por referido que pagó
         try {
           await db.addXP(user.referrer_id, 10, 'Referido pagó un plan');
           await bot.telegram.sendMessage(user.referrer_id, `⚡ +10 XP — ¡Un amigo que referiste acaba de comprar un plan!`);
@@ -1247,7 +1345,6 @@ app.post('/api/payments/:id/approve', async (req, res) => {
       }
     } catch (refError) { console.error('❌ Error marcando referido:', refError.message); }
 
-    // XP: 20 por compra nueva, 15 por renovación
     try {
       const isRenewal = payment.payment_type !== 'upgrade' && user?.vip;
       const xpAmount = payment.payment_type === 'upgrade' ? 0 : (isRenewal ? 15 : 20);
@@ -1262,7 +1359,7 @@ app.post('/api/payments/:id/approve', async (req, res) => {
       }
     } catch (xpErr) { console.warn('⚠️ Error añadiendo XP:', xpErr.message); }
 
-    res.json({ success: true, payment });
+    res.json({ success: true, payment, configAutoSent, configWarning });
   } catch (error) { console.error('❌ Error aprobando pago:', error); res.status(500).json({ error: 'Error aprobando pago' }); }
 });
 

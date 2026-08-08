@@ -1598,6 +1598,103 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     }
   },
 
+  // ===== POOL DE ARCHIVOS DE CONFIGURACIÓN =====
+
+  // Obtener un archivo de configuración no usado para un plan
+  async getConfigFile(planKey) {
+    try {
+      const { data, error } = await dbClient
+        .from('config_files')
+        .select('*')
+        .eq('plan', planKey)
+        .eq('used', false)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data || null;
+    } catch (error) {
+      console.error('❌ Error en getConfigFile:', error);
+      return null;
+    }
+  },
+
+  // Marcar un archivo de configuración como usado
+  async markConfigFileAsUsed(id, telegramId) {
+    try {
+      const { data, error } = await dbClient
+        .from('config_files')
+        .update({ used: true, used_at: new Date().toISOString(), used_by: String(telegramId) })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Error en markConfigFileAsUsed:', error);
+      throw error;
+    }
+  },
+
+  // Listar todos los archivos de configuración de un plan
+  async getConfigFiles(planKey) {
+    try {
+      const { data, error } = await dbClient
+        .from('config_files')
+        .select('*')
+        .eq('plan', planKey)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error en getConfigFiles:', error);
+      return [];
+    }
+  },
+
+  // Contar archivos disponibles (no usados) de un plan
+  async countAvailableConfigs(planKey) {
+    try {
+      const { count, error } = await dbClient
+        .from('config_files')
+        .select('*', { count: 'exact', head: true })
+        .eq('plan', planKey)
+        .eq('used', false);
+      if (error) throw error;
+      return count || 0;
+    } catch (error) {
+      console.error('❌ Error en countAvailableConfigs:', error);
+      return 0;
+    }
+  },
+
+  // Guardar referencia de archivo subido al pool
+  async addConfigFile(planKey, name, fileUrl, filePath) {
+    try {
+      const { data, error } = await dbClient
+        .from('config_files')
+        .insert({ plan: planKey, name, file_url: fileUrl, file_path: filePath, created_at: new Date().toISOString() })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Error en addConfigFile:', error);
+      throw error;
+    }
+  },
+
+  // Eliminar un archivo del pool
+  async deleteConfigFile(id) {
+    try {
+      const { error } = await dbClient.from('config_files').delete().eq('id', id);
+      if (error) throw error;
+    } catch (error) {
+      console.error('❌ Error en deleteConfigFile:', error);
+      throw error;
+    }
+  },
+
   // ===== SISTEMA DE XP / NIVELES =====
 
   async addXP(telegramId, amount, reason, grantedBy = 'system') {
