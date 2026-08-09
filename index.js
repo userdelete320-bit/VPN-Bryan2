@@ -1739,8 +1739,8 @@ async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaU
     if (!users?.length) { await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 }); return; }
     await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0 });
     let sentCount = 0, failedCount = 0, unavailableCount = 0;
-    const caption = message ? `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @rov3r777 | @JosherSnchz_` : null;
-    const textOnly = `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @vpncubawire | @rov3r777 | @JosherSnchz_`;
+    const caption = message ? `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @L0quen2` : null;
+    const textOnly = `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @L0quen2`;
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       try {
@@ -2673,9 +2673,7 @@ bot.action('show_support', async (ctx) => {
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     const keyboard = { reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/vpncubawire', icon_custom_emoji_id: '5332455502917949981' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
-        [createButton("ADMIN", { url: 'https://t.me/rov3r777', icon_custom_emoji_id: '5445221832074483553' }), createButton("WHATSAPP ", { url: 'https://wa.me/56557646', icon_custom_emoji_id: '5935973359480213803'})],
-        [createButton("MODERADOR", { url: 'https://t.me/JosherSnchz', icon_custom_emoji_id: '5197269100878907942' }), createButton("WHATSAPP ", { url: 'https://wa.me/5351435068' , icon_custom_emoji_id: '5935973359480213803' })],
+        [createButton("CEO", { url: 'https://t.me/L0quen2', icon_custom_emoji_id: '5253742260054409879' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
     ] } };
