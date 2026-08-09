@@ -393,9 +393,7 @@ function getDownloadWireguardHtml() {
 
 function getSupportHtml() {
     return `🛠 <b>Soporte VPN CUBA</b>\n\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @vpncubawire (CEO)\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @rov3r777 (Admin)\n` +
-           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @JosherSnchz (Moderador)\n\n` +
+           `<tg-emoji emoji-id="5807453545548487345">👉</tg-emoji> @L0quen2 (CEO)\n` +
            `Responde rápido y te ayudaremos.`;
 }
 
