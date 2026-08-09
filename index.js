@@ -2686,9 +2686,7 @@ bot.action('show_support', async (ctx) => {
   } catch (error) { await ctx.answerCbQuery('❌ Error'); }
 });
 
-bot.action('wa_ceo',   async (ctx) => { await ctx.answerCbQuery(); await ctx.reply('https://wa.me/5356557646'); });
-bot.action('wa_admin', async (ctx) => { await ctx.answerCbQuery(); await ctx.reply('https://wa.me/5350793992'); });
-bot.action('wa_mod',   async (ctx) => { await ctx.answerCbQuery(); await ctx.reply('https://wa.me/5351435068'); });
+bot.action('wa_ceo',   async (ctx) => { await ctx.answerCbQuery(); await ctx.reply('https://wa.me/5356557646'); };
 
 bot.action('check_status', async (ctx) => {
   const userId = ctx.from.id.toString();
