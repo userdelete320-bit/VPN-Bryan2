@@ -1274,6 +1274,226 @@
   }
   .terms-loading { font-family: 'Space Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 8px; display: none; }
 
+  /* ===== CATÁLOGO DE PLANES ===== */
+  .catalog-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--text-dim);
+    padding: 0 16px;
+    margin-bottom: 10px;
+  }
+  .catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 0 12px 24px;
+    width: 100%;
+  }
+  .catalog-card {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 2/3;
+    cursor: pointer;
+    transition: transform .2s cubic-bezier(.16,1,.3,1), box-shadow .2s;
+    will-change: transform;
+  }
+  .catalog-card:active { transform: scale(.95); }
+  .catalog-card-bg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 6px;
+  }
+  .catalog-card-icon { font-size: 28px; margin-bottom: 6px; }
+  .catalog-card-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-align: center;
+    color: rgba(0,0,0,0.85);
+    margin-bottom: 4px;
+  }
+  .catalog-card-price {
+    font-size: 9px;
+    font-weight: 800;
+    color: rgba(0,0,0,0.7);
+    text-align: center;
+  }
+  /* Brillo en la esquina superior del card */
+  .catalog-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,.25) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  /* Borde agotado */
+  .catalog-card.agotado .catalog-card-bg::after {
+    content: '🔴';
+    position: absolute;
+    top: 6px; right: 6px;
+    font-size: 12px;
+  }
+  .catalog-card.agotado { opacity: .55; }
+
+  /* ===== MODAL PANTALLA COMPLETA (CATÁLOGO) ===== */
+  .catalog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    backdrop-filter: blur(0px);
+    z-index: 8990;
+    display: none;
+    transition: background .35s, backdrop-filter .35s;
+  }
+  .catalog-backdrop.active {
+    display: block;
+    background: rgba(0,0,0,.65);
+    backdrop-filter: blur(10px);
+  }
+  .catalog-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 8995;
+    display: none;
+    flex-direction: row;
+    transform: scale(0.05);
+    opacity: 0;
+    border-radius: 24px;
+    overflow: hidden;
+    transition: transform .4s cubic-bezier(.16,1,.3,1), opacity .3s, border-radius .4s;
+    will-change: transform, opacity;
+  }
+  .catalog-modal.open {
+    display: flex;
+    transform: scale(1);
+    opacity: 1;
+    border-radius: 0;
+  }
+  /* Paneles del modal */
+  .catalog-modal-left {
+    width: 40%;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .catalog-modal-left::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, rgba(255,255,255,.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .catalog-modal-icon-big { font-size: 56px; position: relative; z-index: 1; }
+  .catalog-modal-name-big {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: rgba(0,0,0,.8);
+    text-align: center;
+    position: relative; z-index: 1;
+  }
+  .catalog-modal-price-big {
+    font-size: 20px;
+    font-weight: 800;
+    color: rgba(0,0,0,.7);
+    text-align: center;
+    position: relative; z-index: 1;
+    line-height: 1.1;
+  }
+  .catalog-modal-right {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 18px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    position: relative;
+  }
+  .catalog-close-btn {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #e2e8f0;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    flex-shrink: 0;
+  }
+  .catalog-modal-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-top: 36px; /* espacio para el botón cerrar */
+  }
+  .catalog-features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+  .catalog-feature-chip {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: #cbd5e1;
+  }
+  .catalog-feature-chip span:first-child { font-size: 14px; }
+  .catalog-cta-group { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 8px; }
+  .catalog-cta-btn {
+    width: 100%;
+    padding: 13px;
+    border-radius: 12px;
+    border: none;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    cursor: pointer;
+    transition: opacity .15s, transform .15s;
+  }
+  .catalog-cta-btn:active { transform: scale(.97); opacity: .85; }
+  .catalog-cta-secondary {
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #94a3b8;
+    font-size: 11px;
+    padding: 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    width: 100%;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: .04em;
+    transition: background .15s;
+  }
+  .catalog-cta-secondary:active { background: rgba(255,255,255,.14); }
+
+  @media (max-width: 380px) {
+    .catalog-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0 8px 20px; }
+    .catalog-card-icon { font-size: 22px; }
+  }
+
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -1417,188 +1637,29 @@
 </section>
 
 <section class="snap-section plans-section" id="sectionPlans">
-  <!-- PLANES REGULARES -->
-  <div class="section-label" style="margin-top:24px">// PLANES DISPONIBLES</div>
-  <div class="voyage-stack" id="voyageStack">
-
-    <!-- BÁSICO -->
-    <div class="plan-card basic" data-plan="basic" onclick="voyageCardClick('basic')">
-      <div class="plan-card-glow"></div>
-      <div class="plan-row1">
-        <div class="plan-icon">🌐</div>
-        <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-basic">900 CUP</div>
-          <div class="plan-price-period">/mes</div>
-        </div>
-      </div>
-      <div class="plan-name">Básico</div>
-      <div class="plan-tagline">Navega y streamea USA. Perfecto para el día a día.</div>
-      <div class="plan-features">
-        <div class="plan-feature"><span class="check">✓</span> Streaming USA (Netflix, Hulu, Prime)</div>
-        <div class="plan-feature"><span class="check">✓</span> Velocidad hasta 2 Mbps</div>
-        <div class="plan-feature"><span class="check">✓</span> WireGuard encriptado</div>
-      </div>
-      <div class="plan-footer">
-        <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Más popular</div>
-      </div>
-    </div>
-
-    <!-- AVANZADO -->
-    <div class="plan-card advanced" data-plan="advanced" onclick="voyageCardClick('advanced')">
-      <div class="plan-card-glow"></div>
-      <div class="plan-row1">
-        <div class="plan-icon">🚀</div>
-        <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-advanced">1800 CUP</div>
-          <div class="plan-price-period">2 meses</div>
-        </div>
-      </div>
-      <div class="plan-name">Avanzado</div>
-      <div class="plan-tagline">2 meses del plan Básico. La opción inteligente.</div>
-      <div class="plan-features">
-        <div class="plan-feature"><span class="check">✓</span> Todo del plan Básico</div>
-        <div class="plan-feature"><span class="check">✓</span> 2 meses continuos</div>
-        <div class="plan-feature"><span class="check">✓</span> Ahorro garantizado</div>
-      </div>
-      <div class="plan-footer">
-        <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Mejor precio</div>
-      </div>
-    </div>
-
-    <!-- VIP -->
-    <div class="plan-card vip" data-plan="vip" onclick="voyageCardClick('vip')">
-      <div class="plan-card-glow"></div>
-      <div class="plan-row1">
-        <div class="plan-icon">🏦</div>
-        <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-vip">1200 CUP</div>
-          <div class="plan-price-period">/mes</div>
-        </div>
-      </div>
-      <div class="plan-name">VIP Cuba <span class="new-badge">ÚNICO</span></div>
-      <div class="plan-tagline">IP Residencial Cubana para Enzona y Transfermóvil.</div>
-      <div class="plan-features">
-        <div class="plan-feature"><span class="check">✓</span> IP residencial 🇨🇺 real</div>
-        <div class="plan-feature"><span class="check">✓</span> Compatible Enzona</div>
-        <div class="plan-feature"><span class="check">✓</span> Compatible Transfermóvil</div>
-        <div class="plan-feature"><span class="check">✓</span> Acceso banca online Cuba</div>
-      </div>
-      <div class="plan-footer">
-        <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Exclusivo</div>
-      </div>
-    </div>
-
-    <!-- GAMING -->
-    <div class="plan-card gaming" data-plan="gaming" onclick="voyageCardClick('gaming')">
-      <div class="plan-card-glow"></div>
-      <div class="plan-row1">
-        <div class="plan-icon">🎮</div>
-        <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-gaming">1500 CUP</div>
-          <div class="plan-price-period">/mes</div>
-        </div>
-      </div>
-      <div class="plan-name">Gaming</div>
-      <div class="plan-tagline">QoS prioritario. Latencia mínima para MLBB, CoD, Free Fire.</div>
-      <div class="plan-features">
-        <div class="plan-feature"><span class="check">✓</span> Tráfico gaming prioritario</div>
-        <div class="plan-feature"><span class="check">✓</span> Latencia &lt;25ms optimizada</div>
-        <div class="plan-feature"><span class="check">✓</span> Sin packet loss</div>
-        <div class="plan-feature"><span class="check">✓</span> MLBB · CoD · Free Fire</div>
-      </div>
-      <div class="plan-footer">
-        <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Pro players</div>
-      </div>
-    </div>
-
-    <!-- GAMING PRO -->
-    <div class="plan-card gaming-pro" data-plan="gaming-pro" onclick="voyageCardClick('gaming-pro')">
-      <div class="plan-card-glow"></div>
-      <div class="plan-row1">
-        <div class="plan-icon">👑</div>
-        <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-gaming-pro">2000 CUP</div>
-          <div class="plan-price-period">/mes</div>
-        </div>
-      </div>
-      <div class="plan-name">Gaming Pro</div>
-      <div class="plan-tagline">Servidor privado exclusivo. Estabilidad premium para competitivos de alto nivel.</div>
-      <div class="plan-features">
-        <div class="plan-feature"><span class="check">✓</span> Estabilidad premium garantizada</div>
-        <div class="plan-feature"><span class="check">✓</span> Servidor privado exclusivo</div>
-        <div class="plan-feature"><span class="check">✓</span> Latencia ultrabaja &lt;15ms</div>
-        <div class="plan-feature"><span class="check">✓</span> IP de baja congestión</div>
-      </div>
-      <div class="plan-footer">
-        <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Premium</div>
-      </div>
-    </div>
-
-    <!-- ANUAL -->
-    <div class="plan-card anual" data-plan="anual" onclick="voyageCardClick('anual')">
-      <div class="plan-card-glow"></div>
-      <div class="plan-row1">
-        <div class="plan-icon">♾️</div>
-        <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-anual">15000 CUP</div>
-          <div class="plan-price-period">/año</div>
-        </div>
-      </div>
-      <div class="plan-name">Anual Total</div>
-      <div class="plan-tagline">Acceso completo 12 meses. Todo desbloqueado.</div>
-      <div class="plan-features">
-        <div class="plan-feature"><span class="check">✓</span> Acceso a TODOS los planes</div>
-        <div class="plan-feature"><span class="check">✓</span> 12 meses continuos</div>
-        <div class="plan-feature"><span class="check">✓</span> Máximo ahorro del año</div>
-        <div class="plan-feature"><span class="check">✓</span> Soporte prioritario</div>
-      </div>
-      <div class="plan-footer">
-        <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Máximo ahorro</div>
-      </div>
-    </div>
-
-    <div class="plan-card express" data-plan="express" onclick="voyageCardClick('express')">
-      <div class="plan-card-glow"></div>
-      <div class="plan-row1">
-        <div class="plan-icon">⚡</div>
-        <div class="plan-price-block">
-          <div class="plan-price" id="cardPrice-express">300 CUP</div>
-          <div class="plan-price-period">desde</div>
-        </div>
-      </div>
-      <div class="plan-name">Express</div>
-      <div class="plan-tagline">Conexión rápida por horas o días. Elige duración e IP.</div>
-      <div class="plan-features">
-        <div class="plan-feature"><span class="check">✓</span> 24h · 3 días · 7 días</div>
-        <div class="plan-feature"><span class="check">✓</span> IP Cuba o IP USA</div>
-        <div class="plan-feature"><span class="check">✓</span> Activación inmediata</div>
-        <div class="plan-feature"><span class="check">✓</span> Sin compromiso</div>
-      </div>
-      <div class="plan-footer">
-        <button class="plan-btn">Ver plan <span>→</span></button>
-        <div class="plan-popular"><span class="dot"></span> Flexible</div>
-      </div>
-    </div>
-
-  </div>
-
-  <div class="voyage-nav">
-    <div class="voyage-nav-btn" onclick="voyagePrev()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-    </div>
-    <div class="voyage-dots" id="voyageDots"></div>
-    <div class="voyage-nav-btn" onclick="voyageNext()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
-    </div>
+  <div class="catalog-label">// PLANES DISPONIBLES</div>
+  <div class="catalog-grid" id="catalogGrid">
+    <!-- Generado por renderCatalogGrid() -->
   </div>
 
 </section>
+
+<!-- BACKDROP Y MODAL DE CATÁLOGO -->
+<div class="catalog-backdrop" id="catalogBackdrop" onclick="closeCatalogModal()"></div>
+<div class="catalog-modal" id="catalogModal">
+  <div class="catalog-modal-left" id="catalogModalLeft">
+    <div class="catalog-modal-icon-big" id="catalogModalIcon"></div>
+    <div class="catalog-modal-name-big" id="catalogModalName"></div>
+    <div class="catalog-modal-price-big" id="catalogModalPrice"></div>
+  </div>
+  <div class="catalog-modal-right" id="catalogModalRight">
+    <button class="catalog-close-btn" onclick="closeCatalogModal()">✕</button>
+    <div class="catalog-modal-desc" id="catalogModalDesc"></div>
+    <div class="catalog-features-grid" id="catalogModalFeatures"></div>
+    <div class="catalog-cta-group" id="catalogModalCtas"></div>
+  </div>
+</div>
+
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
@@ -2815,24 +2876,131 @@ function isPlanAgotado(uiKey) {
 }
 
 function applyAvailabilityToCards() {
-  document.querySelectorAll('.plan-card[data-plan]').forEach(card => {
-    const key = card.getAttribute('data-plan');
-    const btn = card.querySelector('.plan-btn');
-    if (!btn) return;
-    if (isPlanAgotado(key)) {
-      btn.textContent = '🔴 AGOTADO';
-      btn.style.background = 'rgba(255,60,60,0.15)';
-      btn.style.color = '#ff4444';
-      btn.style.border = '1px solid rgba(255,60,60,0.35)';
-      btn.style.cursor = 'not-allowed';
-      btn.style.pointerEvents = 'none';
-      card.style.opacity = '0.7';
-    } else {
-      btn.innerHTML = 'Ver plan <span>→</span>';
-      btn.style = '';
-      card.style.opacity = '';
-    }
-  });
+  // Refrescar tarjetas del catálogo con estado de agotado
+  renderCatalogGrid();
+}
+
+// ===== CATÁLOGO DE PLANES =====
+const CATALOG_ORDER = ['basic', 'advanced', 'vip', 'gaming', 'gaming-pro', 'anual', 'express'];
+
+function catalogPrice(key) {
+  const b = PLAN_BASE?.[key === 'basic' ? 'basic' : key === 'advanced' ? 'advanced' : key === 'vip' ? 'vip' : key === 'gaming' ? 'gaming' : key === 'gaming-pro' ? 'gaming-pro' : key === 'anual' ? 'anual' : 'express'];
+  const cup = b?.cup || plans[key]?.price?.cup;
+  if (!cup) return '';
+  if (key === 'express') return 'desde 300 CUP';
+  return `${Number(cup).toLocaleString('es-ES')} CUP`;
+}
+
+function renderCatalogGrid() {
+  const grid = document.getElementById('catalogGrid');
+  if (!grid) return;
+  grid.innerHTML = CATALOG_ORDER.map(key => {
+    const p = plans[key];
+    if (!p) return '';
+    const agotado = isPlanAgotado(key);
+    return `<div class="catalog-card${agotado ? ' agotado' : ''}" data-key="${key}"
+      onclick="openCatalogModal('${key}', this)"
+      style="background:${p.color}">
+      <div class="catalog-card-bg">
+        <div class="catalog-card-icon">${p.icon}</div>
+        <div class="catalog-card-name">${p.name.toUpperCase()}</div>
+        <div class="catalog-card-price">${catalogPrice(key)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let catalogModalOpen = false;
+
+function openCatalogModal(key, cardEl) {
+  if (catalogModalOpen) return;
+  const p = plans[key];
+  if (!p) return;
+
+  // Transformación desde el card
+  const rect    = cardEl.getBoundingClientRect();
+  const originX = ((rect.left + rect.width  / 2) / window.innerWidth  * 100).toFixed(1);
+  const originY = ((rect.top  + rect.height / 2) / window.innerHeight * 100).toFixed(1);
+
+  populateCatalogModal(key, p);
+
+  const modal    = document.getElementById('catalogModal');
+  const backdrop = document.getElementById('catalogBackdrop');
+  const left     = document.getElementById('catalogModalLeft');
+  const right    = document.getElementById('catalogModalRight');
+
+  left.style.background  = p.color;
+  right.style.background = `linear-gradient(135deg, ${p.color}22, #0d111a 60%)`;
+
+  modal.style.transformOrigin = `${originX}% ${originY}%`;
+  modal.style.display     = 'flex';
+  modal.style.transform   = 'scale(0.05)';
+  modal.style.opacity     = '0';
+  modal.style.borderRadius= '28px';
+  modal.style.transition  = 'none';
+
+  backdrop.style.display          = 'block';
+  backdrop.style.backdropFilter   = 'blur(0px)';
+  backdrop.style.background       = 'rgba(0,0,0,0)';
+  backdrop.style.transition       = 'none';
+
+  // Forzar reflow y lanzar animación
+  modal.offsetHeight;
+  modal.style.transition    = 'transform .44s cubic-bezier(.16,1,.3,1), opacity .28s ease, border-radius .44s';
+  backdrop.style.transition = 'backdrop-filter .44s ease, background .44s ease';
+
+  modal.style.transform    = 'scale(1)';
+  modal.style.opacity      = '1';
+  modal.style.borderRadius = '0';
+  backdrop.style.backdropFilter = 'blur(10px)';
+  backdrop.style.background     = 'rgba(0,0,0,.7)';
+
+  catalogModalOpen = true;
+  document.body.style.overflow = 'hidden';
+}
+
+function populateCatalogModal(key, p) {
+  const agotado = isPlanAgotado(key);
+  document.getElementById('catalogModalIcon').textContent  = p.icon;
+  document.getElementById('catalogModalName').textContent  = p.name.toUpperCase();
+  document.getElementById('catalogModalPrice').textContent = catalogPrice(key);
+  document.getElementById('catalogModalDesc').textContent  = p.desc || '';
+
+  document.getElementById('catalogModalFeatures').innerHTML = (p.features || []).map(f =>
+    `<div class="catalog-feature-chip"><span>${f.icon}</span><span>${f.label}: ${f.val}</span></div>`
+  ).join('');
+
+  const ctas = document.getElementById('catalogModalCtas');
+  if (agotado) {
+    ctas.innerHTML = `<button class="catalog-cta-btn" disabled style="background:rgba(255,60,60,0.15);color:#ff4444;border:1px solid rgba(255,60,60,0.4);cursor:not-allowed">🔴 PLAN AGOTADO</button>`;
+  } else if (key === 'express') {
+    ctas.innerHTML = `
+      <button class="catalog-cta-btn" style="background:${p.color};color:#000" onclick="closeCatalogModal();setTimeout(()=>openModal('express'),80)">⚡ Ver opciones Express</button>
+      <button class="catalog-cta-secondary" onclick="closeCatalogModal()">Volver al catálogo</button>`;
+  } else {
+    ctas.innerHTML = `
+      <button class="catalog-cta-btn" style="background:${p.color};color:#000" onclick="closeCatalogModal();setTimeout(()=>handleCTA('${key}'),80)">${p.cta}</button>
+      <button class="catalog-cta-btn" style="background:#5bf0ff;color:#000" onclick="closeCatalogModal();setTimeout(()=>payWithStars('${key}'),80)">⭐ Pagar con Stars</button>
+      <button class="catalog-cta-secondary" onclick="closeCatalogModal()">Volver al catálogo</button>`;
+  }
+}
+
+function closeCatalogModal() {
+  if (!catalogModalOpen) return;
+  const modal    = document.getElementById('catalogModal');
+  const backdrop = document.getElementById('catalogBackdrop');
+  modal.style.transition    = 'transform .26s cubic-bezier(.55,0,.85,.35), opacity .2s ease';
+  backdrop.style.transition = 'backdrop-filter .26s, background .26s';
+  modal.style.transform     = 'scale(0.05)';
+  modal.style.opacity       = '0';
+  backdrop.style.backdropFilter = 'blur(0px)';
+  backdrop.style.background     = 'rgba(0,0,0,0)';
+  setTimeout(() => {
+    modal.style.display    = 'none';
+    backdrop.style.display = 'none';
+    catalogModalOpen = false;
+    document.body.style.overflow = '';
+  }, 280);
 }
 
 // ===== SISTEMA DE ACTUALIZACIÓN DE PLAN =====
@@ -2941,10 +3109,105 @@ function requestUpgrade(targetPlan, diffCup, diffMobile, diffUsdt) {
   window.location.href = `payment.html?${params.toString()}`;
 }
 
+// ===== CATÁLOGO DE PLANES =====
+const CATALOG_BG = {
+  basic:      'linear-gradient(145deg,#a8dcff,#7ec8f7)',
+  advanced:   'linear-gradient(145deg,#d4b8ff,#b89aef)',
+  vip:        'linear-gradient(145deg,#ffe566,#ffd020)',
+  gaming:     'linear-gradient(145deg,#ff9ec7,#ff6eb4)',
+  'gaming-pro':'linear-gradient(145deg,#f5e080,#f5c842)',
+  anual:      'linear-gradient(145deg,#ffd4b8,#ffb07c)',
+  express:    'linear-gradient(145deg,#ffb84d,#ff9500)',
+};
+
+function renderCatalogGrid() {
+  const grid = document.getElementById('catalogGrid');
+  if (!grid) return;
+  grid.innerHTML = VOYAGE_ORDER.map(key => {
+    const p = plans[key];
+    if (!p) return '';
+    const bg = CATALOG_BG[key] || 'linear-gradient(145deg,#334155,#1e293b)';
+    const agotado = isPlanAgotado(key);
+    const priceText = key === 'express' ? 'desde 300 CUP' : (PLAN_CUP[key] ? PLAN_CUP[key].toLocaleString('es-ES') + ' CUP' : '—');
+    return `<div class="catalog-card${agotado ? ' agotado' : ''}" onclick="openCatalogModal('${key}', this)" data-key="${key}">
+      <div class="catalog-card-bg" style="background:${bg}">
+        <div class="catalog-card-icon">${p.icon}</div>
+        <div class="catalog-card-name">${p.name.toUpperCase()}</div>
+        <div class="catalog-card-price">${priceText}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCatalogModal(key, cardEl) {
+  if (isPlanAgotado(key)) return; // agotado — no abrir
+  const p = plans[key];
+  if (!p) return;
+
+  // Calcular transform-origin desde posición de la tarjeta
+  const rect = cardEl.getBoundingClientRect();
+  const originX = ((rect.left + rect.width / 2) / window.innerWidth * 100).toFixed(1);
+  const originY = ((rect.top + rect.height / 2) / window.innerHeight * 100).toFixed(1);
+
+  const modal = document.getElementById('catalogModal');
+  const backdrop = document.getElementById('catalogBackdrop');
+  const bg = CATALOG_BG[key] || '#1e293b';
+
+  // Panel izquierdo
+  document.getElementById('catalogModalLeft').style.background = bg;
+  document.getElementById('catalogModalIcon').textContent = p.icon;
+  document.getElementById('catalogModalName').textContent = p.name.toUpperCase();
+
+  // Precio hero
+  const dynBase = PLAN_BASE?.[key];
+  const priceVal = dynBase ? dynBase.cup.toLocaleString('es-ES') + ' CUP' : (PLAN_CUP[key] ? PLAN_CUP[key].toLocaleString('es-ES') + ' CUP' : '—');
+  document.getElementById('catalogModalPrice').textContent = key === 'express' ? 'desde 300 CUP' : priceVal;
+
+  // Panel derecho: color con transparencia
+  document.getElementById('catalogModalRight').style.background =
+    `linear-gradient(160deg, ${p.shadowColor?.replace('0.3','0.18') || 'rgba(30,41,59,0.95)'}, rgba(10,13,24,0.97))`;
+
+  // Descripción
+  document.getElementById('catalogModalDesc').textContent = p.desc;
+
+  // Features
+  document.getElementById('catalogModalFeatures').innerHTML =
+    p.features.map(f => `<div class="catalog-feature-chip"><span>${f.icon}</span><span>${f.val}</span></div>`).join('');
+
+  // CTAs
+  let ctasHtml = '';
+  if (key === 'express') {
+    ctasHtml = `<button class="catalog-cta-btn" style="background:${bg};color:#000" onclick="closeCatalogModal();setTimeout(()=>openModal('express'),60)">⚡ Elegir duración e IP</button>`;
+  } else {
+    ctasHtml = `<button class="catalog-cta-btn" style="background:${bg};color:#000" onclick="closeCatalogModal();setTimeout(()=>handleCTA('${key}'),60)">${p.cta} (CUP/USDT)</button>
+    <button class="catalog-cta-secondary" onclick="closeCatalogModal();setTimeout(()=>payWithStars('${key}'),60)">⭐ Pagar con Stars</button>`;
+  }
+  document.getElementById('catalogModalCtas').innerHTML = ctasHtml;
+
+  // Animar desde la tarjeta
+  modal.style.transformOrigin = `${originX}% ${originY}%`;
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  requestAnimationFrame(() => {
+    backdrop.classList.add('active');
+    requestAnimationFrame(() => modal.classList.add('open'));
+  });
+}
+
+function closeCatalogModal() {
+  const modal = document.getElementById('catalogModal');
+  const backdrop = document.getElementById('catalogBackdrop');
+  modal.classList.remove('open');
+  backdrop.classList.remove('active');
+  document.body.style.overflow = '';
+  setTimeout(() => { modal.style.display = 'none'; }, 400);
+}
+
 window.addEventListener('load', () => {
   applyDynamicPrices();
   loadAnnouncement();
-  renderVoyageStack();
+  renderCatalogGrid();
   checkUpgradeOptions();
   checkPlanAvailability();
 
