@@ -1737,8 +1737,8 @@ async function sendBroadcastToUsers(broadcastId, message, users, adminId, mediaU
     if (!users?.length) { await db.updateBroadcastStatus(broadcastId, 'completed', { sent_count: 0, failed_count: 0, unavailable_count: 0, total_users: 0 }); return; }
     await db.updateBroadcastStatus(broadcastId, 'sending', { total_users: users.length, sent_count: 0 });
     let sentCount = 0, failedCount = 0, unavailableCount = 0;
-    const caption = message ? `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @L0quen2` : null;
-    const textOnly = `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @L0quen2`;
+    const caption = message ? `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @L0quen2_` : null;
+    const textOnly = `📢 *MENSAJE IMPORTANTE - VPN CUBA*\n\n${message}\n\n_Soporte: @L0quen2_`;
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       try {
