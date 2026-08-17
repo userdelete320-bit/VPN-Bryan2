@@ -1527,31 +1527,39 @@
     padding: 32px 20px;
     position: relative;
     overflow: hidden;
+    background-size: cover;
+    background-position: center;
   }
   .catalog-modal-left::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(160deg, rgba(255,255,255,.15) 0%, transparent 60%);
+    background: linear-gradient(170deg, rgba(255,255,255,.10) 0%, rgba(0,0,0,.35) 100%);
     pointer-events: none;
   }
-  .catalog-modal-icon-big { font-size: 56px; position: relative; z-index: 1; }
+  .catalog-modal-icon-big {
+    font-size: 56px;
+    position: relative; z-index: 1;
+    filter: drop-shadow(0 2px 10px rgba(0,0,0,.45));
+  }
   .catalog-modal-name-big {
     font-family: 'Space Mono', monospace;
     font-size: 13px;
     font-weight: 700;
     letter-spacing: .08em;
-    color: rgba(0,0,0,.8);
+    color: #fff;
     text-align: center;
     position: relative; z-index: 1;
+    text-shadow: 0 1px 8px rgba(0,0,0,.55);
   }
   .catalog-modal-price-big {
     font-size: 20px;
     font-weight: 800;
-    color: rgba(0,0,0,.7);
+    color: #fff;
     text-align: center;
     position: relative; z-index: 1;
     line-height: 1.1;
+    text-shadow: 0 1px 8px rgba(0,0,0,.55);
   }
   .catalog-modal-right {
     flex: 1;
@@ -2813,7 +2821,8 @@ let catalogModalOpen = false;
 
 function openCatalogModal(key, cardEl) {
   if (catalogModalOpen) return;
-  const p = plans[key];
+  const p   = plans[key];
+  const cfg = PLAN_CARD_CFG[key];
   if (!p) return;
 
   // Transformación desde el card
@@ -2828,7 +2837,12 @@ function openCatalogModal(key, cardEl) {
   const left     = document.getElementById('catalogModalLeft');
   const right    = document.getElementById('catalogModalRight');
 
-  left.style.background  = p.color;
+  if (cfg?.img) {
+    left.style.backgroundImage = `${cfg.overlay}, url('${cfg.img}')`;
+  } else {
+    left.style.backgroundImage = 'none';
+    left.style.background = p.color;
+  }
   right.style.background = `linear-gradient(135deg, ${p.color}22, #0d111a 60%)`;
 
   modal.style.transformOrigin = `${originX}% ${originY}%`;
