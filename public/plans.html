@@ -2883,44 +2883,44 @@ const CATALOG_ORDER = ['trial', 'basic', 'advanced', 'vip', 'gaming', 'gaming-pr
 
 const PLAN_CARD_CFG = {
   trial: {
-    img: '../assets/planes_background/test.jpg',
+    img: 'assets/planes_background/test.jpg',
     overlay: 'linear-gradient(170deg, rgba(255,255,255,0.18) 0%, rgba(190,145,0,0.62) 100%)',
     glow: 'rgba(210,170,0,0.5)', text: '#fff', sub: 'rgba(255,235,180,0.85)',
     price: 'rgba(255,235,130,0.9)', accent: '#ffd700',
     title: 'Prueba', tagline: 'Solicita tu prueba gratuita hoy.', priceLabel: 'GRATIS', buyLabel: 'SOLICITAR →', icon: '🧪',
   },
   basic: {
-    img: '../assets/planes_background/basico.jpg',
+    img: 'assets/planes_background/basico.jpg',
     overlay: 'linear-gradient(170deg, rgba(255,255,255,0.14) 0%, rgba(200,20,20,0.68) 100%)',
     glow: 'rgba(220,40,40,0.5)', text: '#fff', sub: 'rgba(255,200,200,0.85)', price: 'rgba(255,180,180,0.9)', accent: '#ff6b6b',
   },
   advanced: {
-    img: '../assets/planes_background/avanzado.jpg',
+    img: 'assets/planes_background/avanzado.jpg',
     overlay: 'linear-gradient(170deg, rgba(255,255,255,0.12) 0%, rgba(100,20,180,0.72) 100%)',
     glow: 'rgba(130,40,200,0.5)', text: '#fff', sub: 'rgba(220,190,255,0.85)', price: 'rgba(210,180,255,0.9)', accent: '#c084fc',
   },
   vip: {
-    img: '../assets/planes_background/vipcuba.jpg',
+    img: 'assets/planes_background/vipcuba.jpg',
     overlay: 'linear-gradient(170deg, rgba(255,255,255,0.35) 0%, rgba(240,240,240,0.55) 100%)',
     glow: 'rgba(255,240,180,0.5)', text: '#1a1a1a', sub: 'rgba(60,60,60,0.85)', price: 'rgba(40,40,40,0.9)', accent: '#7a6000',
   },
   gaming: {
-    img: '../assets/planes_background/gaming.jpg',
+    img: 'assets/planes_background/gaming.jpg',
     overlay: 'linear-gradient(170deg, rgba(255,255,255,0.14) 0%, rgba(20,110,240,0.68) 100%)',
     glow: 'rgba(30,130,255,0.5)', text: '#fff', sub: 'rgba(180,220,255,0.85)', price: 'rgba(160,210,255,0.9)', accent: '#60b8ff',
   },
   'gaming-pro': {
-    img: '../assets/planes_background/gaming_pro.jpg',
+    img: 'assets/planes_background/gaming_pro.jpg',
     overlay: 'linear-gradient(170deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.75) 100%)',
     glow: 'rgba(245,200,66,0.5)', text: '#fff', sub: 'rgba(245,200,66,0.8)', price: 'rgba(245,200,66,0.9)', accent: '#f5c842',
   },
   express: {
-    img: '../assets/planes_background/express.jpg',
+    img: 'assets/planes_background/express.jpg',
     overlay: 'linear-gradient(170deg, rgba(255,149,0,0.58) 0%, rgba(255,255,255,0.12) 100%)',
     glow: 'rgba(255,149,0,0.5)', text: '#1a0a00', sub: 'rgba(100,50,0,0.85)', price: 'rgba(80,40,0,0.9)', accent: '#c46000',
   },
   anual: {
-    img: '../assets/planes_background/anual.jpg',
+    img: 'assets/planes_background/anual.jpg',
     overlay: 'linear-gradient(170deg, rgba(255,255,255,0.15) 0%, rgba(20,170,70,0.68) 100%)',
     glow: 'rgba(20,180,70,0.5)', text: '#fff', sub: 'rgba(180,255,210,0.85)', price: 'rgba(160,255,195,0.9)', accent: '#4ade80',
   },
@@ -2928,8 +2928,7 @@ const PLAN_CARD_CFG = {
 
 function catalogPrice(key) {
   if (key === 'trial') return 'GRATIS';
-  const b = PLAN_BASE?.[key];
-  const cup = b?.cup || plans[key]?.price?.cup;
+  const cup = plans[key]?.price?.cup || PLAN_CUP[key];
   if (!cup) return '';
   if (key === 'express') return 'desde 300 CUP';
   return `${Number(cup).toLocaleString('es-ES')} CUP`;
