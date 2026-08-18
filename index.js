@@ -1309,9 +1309,20 @@ app.post('/api/payments/:id/approve', async (req, res) => {
           payment.telegram_id,
           { source: fileBuffer, filename: configFile.name },
           {
-            caption: `🔑 <b>Archivo de configuración — ${getPlanName(payment.plan)}</b>${payment.duration ? ` (${payment.duration})` : ''}\n\n` +
-              `📲 Importa este archivo en WireGuard para activar tu VPN.\n` +
-              `📋 <b>ID de pedido:</b> ${payment.id}`,
+            caption:
+              `<tg-emoji emoji-id="5064672027248427816">🎆</tg-emoji> <b>¡Tu configuración está lista!</b>\n\n` +
+              `<tg-emoji emoji-id="5890882606668452641">🔓</tg-emoji> <b>VPN CUBA</b>\n` +
+              `Tu acceso ha sido generado correctamente y ya puedes comenzar a utilizar tu servicio.\n\n` +
+              `<tg-emoji emoji-id="6021672250686576456">📁</tg-emoji> <b>Configuración:</b> "${configFile.name}"\n` +
+              `<tg-emoji emoji-id="5197269100878907942">✍️</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}${payment.duration ? ' · ' + payment.duration : ''}\n\n` +
+              `━━━━━━━━━━━━━━\n\n` +
+              `<tg-emoji emoji-id="5019413195186504264">⚙️</tg-emoji> <b>Cómo activarla</b>\n` +
+              `<tg-emoji emoji-id="5794182096603847292">1⃣</tg-emoji> Descarga el archivo ".conf"\n` +
+              `<tg-emoji emoji-id="5794303034292968945">2⃣</tg-emoji> Ábrelo desde WireGuard y selecciona <b>Importar túnel</b>\n` +
+              `<tg-emoji emoji-id="5794031944547178894">3⃣</tg-emoji> Activa la conexión\n` +
+              `<tg-emoji emoji-id="5793901252987330401">4⃣</tg-emoji> <tg-emoji emoji-id="5195033767969839232">🚀</tg-emoji> <b>¡Listo! Ya estás conectado.</b>\n\n` +
+              `<tg-emoji emoji-id="5197288647275071607">🛡</tg-emoji> Conexión segura · Soporte · Servicio activo\n\n` +
+              `Gracias por confiar en VPN CUBA. <tg-emoji emoji-id="5199814019325646173">🇨🇺</tg-emoji>`,
             parse_mode: 'HTML'
           }
         );
@@ -1435,11 +1446,20 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         await bot.telegram.sendDocument(chatId, { source: req.file.path, filename: req.file.originalname }, {
-  caption: `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu configuración VPN Cuba está lista!</b>\n\n` +
-           `<tg-emoji emoji-id="6021375494216226506">📁</tg-emoji> <b>Archivo:</b> ${req.file.originalname}\n` +
-           `<tg-emoji emoji-id="6021744990252702234">📋</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n` +
-           `${payment.coupon_used ? `<tg-emoji emoji-id="6021793768196282527">🎫</tg-emoji> <b>Cupón:</b> ${payment.coupon_code} (${payment.coupon_discount}%)\n` : ''}` +
-           `\n<b>Instrucciones:</b>\n1. Descarga este archivo\n2. ${fileName.endsWith('.conf') ? 'Importa el archivo .conf directamente en WireGuard' : 'Descomprime y luego importa el archivo .conf en WireGuard'}\n3. Activa la conexión\n4. ¡Disfruta! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
+  caption:
+    `<tg-emoji emoji-id="5064672027248427816">🎆</tg-emoji> <b>¡Tu configuración está lista!</b>\n\n` +
+    `<tg-emoji emoji-id="5890882606668452641">🔓</tg-emoji> <b>VPN CUBA</b>\n` +
+    `Tu acceso ha sido generado correctamente y ya puedes comenzar a utilizar tu servicio.\n\n` +
+    `<tg-emoji emoji-id="6021672250686576456">📁</tg-emoji> <b>Configuración:</b> "${req.file.originalname}"\n` +
+    `<tg-emoji emoji-id="5197269100878907942">✍️</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n\n` +
+    `━━━━━━━━━━━━━━\n\n` +
+    `<tg-emoji emoji-id="5019413195186504264">⚙️</tg-emoji> <b>Cómo activarla</b>\n` +
+    `<tg-emoji emoji-id="5794182096603847292">1⃣</tg-emoji> Descarga el archivo ".conf"\n` +
+    `<tg-emoji emoji-id="5794303034292968945">2⃣</tg-emoji> Ábrelo desde WireGuard y selecciona <b>Importar túnel</b>\n` +
+    `<tg-emoji emoji-id="5794031944547178894">3⃣</tg-emoji> Activa la conexión\n` +
+    `<tg-emoji emoji-id="5793901252987330401">4⃣</tg-emoji> <tg-emoji emoji-id="5195033767969839232">🚀</tg-emoji> <b>¡Listo! Ya estás conectado.</b>\n\n` +
+    `<tg-emoji emoji-id="5197288647275071607">🛡</tg-emoji> Conexión segura · Soporte · Servicio activo\n\n` +
+    `Gracias por confiar en VPN CUBA. <tg-emoji emoji-id="5199814019325646173">🇨🇺</tg-emoji>`,
   parse_mode: 'HTML'
 });
         sent = true; break;
