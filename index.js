@@ -251,10 +251,6 @@ for (const pt of [...PLAN_TYPES, 'express_24h', 'express_3dias', 'express_7dias'
 
 let PLAN_PRICES = JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICES));
 
-// Caché del file_id del GIF de bienvenida — se rellena en el primer envío
-// para que Telegram no recomprima en envíos posteriores
-let START_GIF_FILE_ID = null;
-
 // Disponibilidad de planes: true = agotado, false = disponible
 let PLAN_AVAILABILITY = { basico: false, avanzado: false, cuba_vip: false, premium: false, gaming_pro: false, anual: false, express: false };
 
@@ -2905,28 +2901,14 @@ bot.start(async (ctx) => {
     }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage =
-`<tg-emoji emoji-id="5339262759794123186">👋</tg-emoji> ¡Hola @${ctx.from.username || firstName}
+`<tg-emoji emoji-id="5080453055648892904">🏳️</tg-emoji> VpnCUBA — ¡Protección del mundo online!
 
-<tg-emoji emoji-id="5199814019325646173">🚀</tg-emoji> <b>VPN CUBA - MENÚ PRINCIPAL</b>
-
-<tg-emoji emoji-id="5861561131226632101">⚡</tg-emoji> Conéctate con la mejor latencia para gaming y navegación.
-
-<tg-emoji emoji-id="5406745015365943482">📋</tg-emoji> Selecciona una opción:`;
+<tg-emoji emoji-id="5253877736207821121">🔥</tg-emoji> Te proporcionaremos acceso a un Internet mundial y libre. ¡Comencemos:`;
     try {
-        const gifPath = path.join(__dirname, 'assets', 'vpncuba-premium.gif');
-        if (START_GIF_FILE_ID) {
-            // Reutilizar file_id — Telegram no recomprime
-            await bot.telegram.sendAnimation(ctx.chat.id, START_GIF_FILE_ID, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
-        } else {
-            // Primera vez: subir desde disco y guardar el file_id
-            const sent = await bot.telegram.sendAnimation(ctx.chat.id, { source: gifPath }, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
-            if (sent?.animation?.file_id) {
-                START_GIF_FILE_ID = sent.animation.file_id;
-                console.log('✅ GIF file_id cacheado:', START_GIF_FILE_ID);
-            }
-        }
+        const imgPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
+        await bot.telegram.sendPhoto(ctx.chat.id, { source: imgPath }, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
     } catch (e) {
-        console.error('Error enviando GIF de bienvenida:', e);
+        console.error('Error enviando imagen de bienvenida:', e);
         await bot.telegram.sendMessage(ctx.chat.id, welcomeMessage, { parse_mode: 'HTML', ...keyboard });
     }
 });
