@@ -321,6 +321,15 @@ async function canSendMessageToUser(telegramId) {
 }
 
 const BUTTON_ICONS = {
+    'REFERIDOS': '5255977030322760582',
+    'COMUNIDAD': '5253830568876977751',
+    'POLÍTICAS': '5256113064821926998',
+    'COPIAR ENLACE': '5256057883082107781',
+    'CANAL OFICIAL': '5771868281212245617',
+    'WHATSAPP OFICIAL': '5253590213917158323',
+    'WHATSAPP #2': '5253590213917158323',
+    'GRUPO ABIERTO': '5915556996215476302',
+
     // Menú principal
     'VER PLANES': '5255713220546538619',
     'MI PERFIL': '5255835635704408236',
@@ -407,15 +416,38 @@ function getReferralInfoHtml(userId, referralStats) {
     const referralLink = `https://t.me/vpncubaw_bot?start=ref${userId}`;
     const totalReferidos = (referralStats?.level1?.total || 0) + (referralStats?.level2?.total || 0);
     const descuento = referralStats?.discount_percentage || 0;
-    const detalle = descuento >= 30 ? 'Alto' : descuento >= 15 ? 'Medio' : 'Bajo';
 
-    let html = `<tg-emoji emoji-id="5944956300759668915">🤝</tg-emoji> <b>SISTEMA DE REFERIDOS</b>\n\n` +
-               `<tg-emoji emoji-id="5778168620278354602">🔗</tg-emoji> <b>Tu enlace único:</b>\n${referralLink}\n\n` +
-               `<tg-emoji emoji-id="5190806721286657692">📊</tg-emoji> Total referidos: ${totalReferidos}\n` +
-               `<tg-emoji emoji-id="5987880246865565644">💰</tg-emoji> Descuentos por Referidos sin usar: ${descuento}%\n\n` +
-               `<i>Detalle: ${detalle}</i>\n\n` +
-               `<tg-emoji emoji-id="6023897907034330805">💡</tg-emoji> Cada referido que paga te da 20% (nivel 1) o 10% (nivel 2). El descuento se reduce al usarlo (40%→20%→0%).`;
-    return html;
+    return `<tg-emoji emoji-id="5080483464017348252">🤝</tg-emoji> <b>REFERIDOS</b>
+
+` +
+           `Invita nuevos usuarios y obtén descuentos exclusivos.
+
+` +
+           `<tg-emoji emoji-id="5256057883082107781">🔗</tg-emoji> <b>Tu enlace</b>
+` +
+           `<a href="${referralLink}">${referralLink}</a>
+
+` +
+           `<tg-emoji emoji-id="5255977030322760582">🫂</tg-emoji> Referidos: ${totalReferidos}
+` +
+           `<tg-emoji emoji-id="5255713220546538619">💳</tg-emoji> Descuento disponible: ${descuento}%
+
+` +
+           `━━━━━━━━━━━━━━
+
+` +
+           `<tg-emoji emoji-id="5440539497383087970">🥇</tg-emoji> Nivel 1 · +20%
+` +
+           `<tg-emoji emoji-id="5447203607294265305">🥈</tg-emoji> Nivel 2 · +10%
+
+` +
+           `Cada pago de tus referidos genera descuento para ti.
+
+` +
+           `Descuento: 40% → 20% → 0%
+
+` +
+           `<tg-emoji emoji-id="5929216723088576715">🎁</tg-emoji> Comparte tu enlace y empieza a ganar.`;
 }
 
 function getHowItWorksHtml() {
@@ -1315,22 +1347,31 @@ app.post('/api/payments/:id/approve', async (req, res) => {
           { source: fileBuffer, filename: configFile.name },
           {
             caption:
-              `<tg-emoji emoji-id="5064672027248427816">🎆</tg-emoji> <b>¡Tu configuración está lista!</b>\n\n` +
-              `<tg-emoji emoji-id="5890882606668452641">🔓</tg-emoji> <b>VPN CUBA</b>\n` +
-              `Tu acceso ha sido generado correctamente y ya puedes comenzar a utilizar tu servicio.\n\n` +
-              `<tg-emoji emoji-id="6021672250686576456">📁</tg-emoji> <b>Configuración:</b> "${configFile.name}"\n` +
-              `<tg-emoji emoji-id="5197269100878907942">✍️</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}${payment.duration ? ' · ' + payment.duration : ''}\n\n` +
-              `━━━━━━━━━━━━━━\n\n` +
-              `<tg-emoji emoji-id="5019413195186504264">⚙️</tg-emoji> <b>Cómo activarla</b>\n` +
-              `<tg-emoji emoji-id="5794182096603847292">1⃣</tg-emoji> Descarga el archivo ".conf"\n` +
-              `<tg-emoji emoji-id="5794303034292968945">2⃣</tg-emoji> Ábrelo desde WireGuard y selecciona <b>Importar túnel</b>\n` +
-              `<tg-emoji emoji-id="5794031944547178894">3⃣</tg-emoji> Activa la conexión\n` +
-              `<tg-emoji emoji-id="5793901252987330401">4⃣</tg-emoji> <tg-emoji emoji-id="5195033767969839232">🚀</tg-emoji> <b>¡Listo! Ya estás conectado.</b>\n\n` +
-              `<tg-emoji emoji-id="5197288647275071607">🛡</tg-emoji> Conexión segura · Soporte · Servicio activo\n\n` +
-              `Gracias por confiar en VPN CUBA. <tg-emoji emoji-id="5199814019325646173">🇨🇺</tg-emoji>`,
-            parse_mode: 'HTML'
+    `<tg-emoji emoji-id="5080291685137647196">🪧</tg-emoji> <b>¡Tu configuración está lista!</b>\n\n` +
+    `<tg-emoji emoji-id="5082827219080840950">✔️</tg-emoji> <b>VPN CUBA</b>\n` +
+    `Tu acceso ha sido generado correctamente y ya puedes comenzar a utilizar tu servicio.\n\n` +
+    `<tg-emoji emoji-id="5256113064821926998">©</tg-emoji> <b>Configuración:</b> "${req.file.originalname}"\n` +
+    `<tg-emoji emoji-id="5256182535917940722">⤵️</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n\n` +
+    `━━━━━━━━━━━━━━\n\n` +
+    `<tg-emoji emoji-id="5253952855185829086">⚙️</tg-emoji> <b>Cómo activarla</b>\n` +
+    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Descarga tu archivo ".conf"\n` +
+    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n` +
+    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Abre WireGuard y selecciona Importar túnel\n` +
+    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Selecciona tu archivo de configuración\n` +
+    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Activa la conexión\n` +
+    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> <tg-emoji emoji-id="5929216723088576715">🎁</tg-emoji> ¡Listo! Ya estás conectado.\n\n` +
+    `<tg-emoji emoji-id="5253780051471642059">🛡</tg-emoji> Conexión segura · Soporte · Servicio activo\n\n` +
+    `Gracias por confiar en VPN CUBA. <tg-emoji emoji-id="5080453055648892904">🏳️</tg-emoji>`,
+  parse_mode: 'HTML'
           }
         );
+        // Banner utilizado en /start, mostrado debajo de la configuración enviada.
+        try {
+          const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
+          await bot.telegram.sendPhoto(payment.telegram_id, { source: bannerPath });
+        } catch (bannerErr) {
+          console.warn('⚠️ No se pudo enviar el banner después de la configuración:', bannerErr.message);
+        }
         await db.markConfigFileAsUsed(configFile.id, payment.telegram_id);
         await db.updatePayment(payment.id, { config_sent: true, config_sent_at: new Date().toISOString(), config_sent_by: 'system' });
         configAutoSent = true;
@@ -1478,6 +1519,14 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
     }
 
     if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
+
+    // Banner utilizado en /start, mostrado debajo de la configuración enviada manualmente.
+    try {
+      const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
+      await bot.telegram.sendPhoto(chatId, { source: bannerPath });
+    } catch (bannerErr) {
+      console.warn('⚠️ No se pudo enviar el banner después de la configuración manual:', bannerErr.message);
+    }
 
     await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.originalname, config_sent_by: adminId });
     await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
