@@ -321,14 +321,24 @@ async function canSendMessageToUser(telegramId) {
 }
 
 const BUTTON_ICONS = {
-    'VER PLANES': '5312361253610475399',
-    'MI PERFIL': '5197269100878907942',
+    // Menú principal
+    'VER PLANES': '5255713220546538619',
+    'MI PERFIL': '5255835635704408236',
+    'SOPORTE': '5253780051471642059',
+    'REFERIDOS': '5255977030322760582',
+    'COMUNIDAD': '5253830568876977751',
+    'POLÍTICAS': '5256113064821926998',
+
+    // Comunidad
+    'CANAL OFICIAL': '5771868281212245617',
+    'WHATSAPP OFICIAL': '5253590213917158323',
+    'WHATSAPP #2': '5253590213917158323',
+    'GRUPO ABIERTO': '5915556996215476302',
+
     'DESCARGAR VPN': '5443127283898405358',
-    'SOPORTE': '5337080053119336309',
-    'REFERIDOS': '5332724926216428039',
     'CÓMO FUNCIONA': '5422439311196834318',
     'VPN CANAL': '5332455502917949981',
-    'POLÍTICAS': '5444856076954520455',
+    'POLÍTICAS': '5256113064821926998',
     'WHATSAPP': '5935973359480213803',
     'WHATSAPP G1': '5282843764451195532',
     'WHATSAPP G2': '5282843764451195532',   // Nuevo: emoji custom para Grupo 2
@@ -429,32 +439,31 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
     const webappUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}`;
     const plansUrl = `${webappUrl}/plans.html?userId=${userId}`;
     const adminUrl = `${webappUrl}/admin.html?userId=${userId}&admin=true`;
+
+    // Menú principal reestructurado por solicitud del administrador.
     const inlineKeyboard = [
         [
-            createButton("VER PLANES", isGroup ? { url: plansUrl, style: 'primary' } : { web_app: { url: plansUrl }, style: 'primary' }),
-            createButton("MI PERFIL", { callback_data: "check_status" })
+            createButton("VER PLANES", isGroup
+                ? { url: plansUrl, style: 'primary' }
+                : { web_app: { url: plansUrl }, style: 'primary' })
         ],
         [
-            createButton("DESCARGAR VPN", { callback_data: "download_wireguard" }),
-            createButton("SOPORTE", { callback_data: "show_support", style: 'danger' })
+            createButton("MI PERFIL", { callback_data: "check_status" }),
+            createButton("SOPORTE", { callback_data: "show_support" })
         ],
         [
-            createButton("REFERIDOS", { callback_data: "referral_info", style: 'success' }),
-            createButton("CÓMO FUNCIONA", { callback_data: "how_it_works" })
+            createButton("REFERIDOS", { callback_data: "referral_info" }),
+            createButton("COMUNIDAD", { callback_data: "show_community" })
         ],
         [
-            createButton("VPN CANAL", { url: "https://t.me/vpncubaw" }),
             createButton("POLÍTICAS", { callback_data: "politicas" })
-        ],
-        [
-            createButton("WHATSAPP G1", { url: WHATSAPP_GROUP_LINK }),
-            createButton("WHATSAPP G2", { url: WHATSAPP_GROUP2_LINK })
-        ],
-        [createButton("FAQ", { callback_data: "faq" })]
+        ]
     ];
+
     if (esAdmin && !isGroup) {
         inlineKeyboard.push([createButton("PANEL ADMIN", { web_app: { url: adminUrl } })]);
     }
+
     return { reply_markup: { inline_keyboard: inlineKeyboard } };
 }
 
@@ -2679,6 +2688,40 @@ bot.action('decline_terms', async (ctx) => {
     `❌ <b>Has rechazado los términos.</b>\n\nSin aceptar los Términos y Condiciones no puedes acceder a los servicios de VPN Cuba.\n\nSi cambias de opinión, usa /start en cualquier momento.`,
     { parse_mode: 'HTML' }
   ).catch(() => {});
+});
+
+// ==================== COMUNIDAD ====================
+bot.action('show_community', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    const communityText =
+      `<tg-emoji emoji-id="5080453055648892904">🏳️</tg-emoji> <b>COMUNIDAD VPN CUBA</b>\n\n` +
+      `Mantente conectado con nuestra comunidad y accede a todos nuestros canales oficiales. <tg-emoji emoji-id="5082827219080840950">✔️</tg-emoji>\n\n` +
+      `<tg-emoji emoji-id="5771868281212245617">📢</tg-emoji> <b>CANAL OFICIAL</b>\n` +
+      `Noticias, anuncios y novedades de VPN CUBA.\n\n` +
+      `<tg-emoji emoji-id="5253590213917158323">💬</tg-emoji> <b>WHATSAPP OFICIAL</b>\n` +
+      `Soporte, información y comunidad.\n\n` +
+      `<tg-emoji emoji-id="5253590213917158323">💬</tg-emoji> <b>WHATSAPP #2</b>\n` +
+      `Canal alternativo de nuestra comunidad.\n\n` +
+      `<tg-emoji emoji-id="5915556996215476302">👥</tg-emoji> <b>GRUPO ABIERTO</b>\n` +
+      `Comparte, pregunta y conecta con otros usuarios.\n\n` +
+      `━━━━━━━━━━━━━━\n\n` +
+      `<tg-emoji emoji-id="5253490441826870592">🔗</tg-emoji> Únete a nuestra comunidad y no te pierdas ninguna novedad.`;
+
+    const keyboard = { reply_markup: { inline_keyboard: [
+      [createButton("CANAL OFICIAL", { url: "https://t.me/vpncubaw" })],
+      [createButton("WHATSAPP OFICIAL", { url: "https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?s=cl&p=a&mlu=4" })],
+      [createButton("WHATSAPP #2", { url: "https://chat.whatsapp.com/CgejliuH5iXENrONFkx6Ah?s=cl&p=a&mlu=4" })],
+      [createButton("GRUPO ABIERTO", { url: "https://chat.whatsapp.com/JayjqdTvKjC8goV3ZBfYPc?s=cl&p=a&mlu=4" })],
+      [createButton("MENÚ PRINCIPAL", { callback_data: "main_menu" })]
+    ] } };
+
+    await ctx.reply(communityText, { parse_mode: 'HTML', ...keyboard });
+  } catch (error) {
+    console.error('❌ Error mostrando Comunidad:', error.message);
+    try { await ctx.answerCbQuery('❌ Error'); } catch (e) {}
+  }
 });
 
 bot.action('show_support', async (ctx) => {
