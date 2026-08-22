@@ -113,6 +113,8 @@ body::after {
   position:relative;
 }
 .step {
+      pointer-events: none;
+      cursor: default;
   display:flex; flex-direction:column; align-items:center; gap:5px;
   flex:1; position:relative; cursor:pointer;
 }
@@ -781,22 +783,22 @@ body::after {
   <!-- STEP PROGRESS -->
   <div class="progress-wrap">
     <div class="steps">
-      <div class="step active" id="step1" onclick="goToStep(1)">
+      <div class="step active" id="step1">
         <div class="step-circle" id="sc1">01</div>
         <div class="step-line" id="sl1"></div>
         <div class="step-lbl">RESUMEN</div>
       </div>
-      <div class="step" id="step2" onclick="goToStep(2)">
+      <div class="step" id="step2">
         <div class="step-circle" id="sc2">02</div>
         <div class="step-line" id="sl2"></div>
         <div class="step-lbl">PAGO</div>
       </div>
-      <div class="step" id="step3" onclick="goToStep(3)">
+      <div class="step" id="step3">
         <div class="step-circle" id="sc3">03</div>
         <div class="step-line" id="sl3"></div>
         <div class="step-lbl">ENVIAR</div>
       </div>
-      <div class="step" id="step4" onclick="goToStep(4)">
+      <div class="step" id="step4">
         <div class="step-circle" id="sc4">04</div>
         <div class="step-lbl">LISTO</div>
       </div>
@@ -1063,10 +1065,10 @@ body::after {
       <div class="tl-item"><div class="tl-dot-wrap"><div class="tl-dot"></div></div><div class="tl-content"><div class="tl-label">¡Conectado!</div><div class="tl-sub">Importa el .conf en WireGuard y listo.</div><div class="tl-time">MTU 1280 · UDP:80</div></div></div>
     </div>
     <div class="confirm-btns">
-      <button class="cb-primary" onclick="openTelegram()">Ir al canal @rov3r777</button>
+      <button class="cb-primary" onclick="window.open('https://t.me/vpncubaw', '_blank')">Ir al canal</button>
       <button class="cb-secondary" onclick="goToStep(1)">↺ HACER OTRO PEDIDO</button>
     </div>
-    <div class="footer-note">© 2025 VPN CUBA · @rov3r777 · PAGO SEGURO<br>Los archivos de configuración se envían manualmente tras la verificación.</div>
+    <div class="footer-note">© 2025 VPN CUBA · PAGO SEGURO<br>Los archivos de configuración se envían manualmente tras la verificación.</div>
   </div>
 
 </div><!-- /app -->
