@@ -776,6 +776,7 @@ async function initializeStorageBuckets() {
                  `<b>Instrucciones de instalación:</b>\n` +
                  `1. Descarga este archivo\n` +
                  `2. Importa el archivo .conf en tu cliente WireGuard\n` +
+                 `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n` +
                  `3. Activa la conexión\n` +
                  `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
                  `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
@@ -2781,7 +2782,7 @@ bot.action('show_support', async (ctx) => {
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     const keyboard = { reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/L0quen2', icon_custom_emoji_id: '5253742260054409879' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("CEO", { url: 'https://t.me/L0quen2', icon_custom_emoji_id: '5253742260054409879' }), createButton("WHATSAPP", { url: 'https://wa.me//+1478263-8903', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
     ] } };
