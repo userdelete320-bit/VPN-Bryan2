@@ -3219,8 +3219,13 @@ app.post('/api/support/tickets/:id/reply', async (req, res) => {
 
     try {
       const { ticket } = await db.getTicketWithMessages(req.params.id);
+      const webappBase = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
+      const myTicketUrl = `${webappBase}/app.html?userId=${ticket.telegram_id}&myTicket=${ticket.id}`;
       await bot.telegram.sendMessage(ticket.telegram_id,
-        `💬 *Respuesta de soporte* (ticket #${ticket.id})\n\n${message}`, { parse_mode: 'Markdown' });
+        `💬 *Respuesta de soporte* (ticket #${ticket.id})\n\n${message}`, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[{ text: '🎫 Ver mis tickets', web_app: { url: myTicketUrl } }]] },
+        });
     } catch (e) {}
 
     res.json({ success: true, message: msg });
