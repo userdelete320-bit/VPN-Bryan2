@@ -469,7 +469,7 @@ function getFaqHtml() {
 
 function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
     const webappUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}`;
-    const plansUrl = `${webappUrl}/plans.html?userId=${userId}`;
+    const plansUrl = `${webappUrl}/app.html?userId=${userId}`;
     const adminUrl = `${webappUrl}/admin.html?userId=${userId}&admin=true`;
 
     // Menú principal reestructurado por solicitud del administrador.
@@ -776,7 +776,6 @@ async function initializeStorageBuckets() {
                  `<b>Instrucciones de instalación:</b>\n` +
                  `1. Descarga este archivo\n` +
                  `2. Importa el archivo .conf en tu cliente WireGuard\n` +
-                 `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n` +
                  `3. Activa la conexión\n` +
                  `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
                  `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
@@ -1366,7 +1365,13 @@ app.post('/api/payments/:id/approve', async (req, res) => {
   parse_mode: 'HTML'
           }
         );
-        
+        // Banner utilizado en /start, mostrado debajo de la configuración enviada.
+        try {
+          const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
+          await bot.telegram.sendPhoto(payment.telegram_id, { source: bannerPath });
+        } catch (bannerErr) {
+          console.warn('⚠️ No se pudo enviar el banner después de la configuración:', bannerErr.message);
+        }
         await db.markConfigFileAsUsed(configFile.id, payment.telegram_id);
         await db.updatePayment(payment.id, { config_sent: true, config_sent_at: new Date().toISOString(), config_sent_by: 'system' });
         configAutoSent = true;
@@ -1488,21 +1493,19 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
       try {
         await bot.telegram.sendDocument(chatId, { source: req.file.path, filename: req.file.originalname }, {
   caption:
-   `<tg-emoji emoji-id="5080291685137647196">🪧</tg-emoji> <b>¡Tu configuración está lista!</b>\n\n` +
-    `<tg-emoji emoji-id="5082827219080840950">✔️</tg-emoji> <b>VPN CUBA</b>\n` +
+    `<tg-emoji emoji-id="5064672027248427816">🎆</tg-emoji> <b>¡Tu configuración está lista!</b>\n\n` +
+    `<tg-emoji emoji-id="5890882606668452641">🔓</tg-emoji> <b>VPN CUBA</b>\n` +
     `Tu acceso ha sido generado correctamente y ya puedes comenzar a utilizar tu servicio.\n\n` +
-    `<tg-emoji emoji-id="5256113064821926998">©</tg-emoji> <b>Configuración:</b> "${req.file.originalname}"\n` +
-    `<tg-emoji emoji-id="5256182535917940722">⤵️</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n\n` +
+    `<tg-emoji emoji-id="6021672250686576456">📁</tg-emoji> <b>Configuración:</b> "${req.file.originalname}"\n` +
+    `<tg-emoji emoji-id="5197269100878907942">✍️</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n\n` +
     `━━━━━━━━━━━━━━\n\n` +
-    `<tg-emoji emoji-id="5253952855185829086">⚙️</tg-emoji> <b>Cómo activarla</b>\n` +
-    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Descarga tu archivo ".conf"\n` +
-    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n` +
-    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Abre WireGuard y selecciona Importar túnel\n` +
-    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Selecciona tu archivo de configuración\n` +
-    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Activa la conexión\n` +
-    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> <tg-emoji emoji-id="5929216723088576715">🎁</tg-emoji> ¡Listo! Ya estás conectado.\n\n` +
-    `<tg-emoji emoji-id="5253780051471642059">🛡</tg-emoji> Conexión segura · Soporte · Servicio activo\n\n` +
-    `Gracias por confiar en VPN CUBA. <tg-emoji emoji-id="5080453055648892904">🏳️</tg-emoji>`,
+    `<tg-emoji emoji-id="5019413195186504264">⚙️</tg-emoji> <b>Cómo activarla</b>\n` +
+    `<tg-emoji emoji-id="5794182096603847292">1⃣</tg-emoji> Descarga el archivo ".conf"\n` +
+    `<tg-emoji emoji-id="5794303034292968945">2⃣</tg-emoji> Ábrelo desde WireGuard y selecciona <b>Importar túnel</b>\n` +
+    `<tg-emoji emoji-id="5794031944547178894">3⃣</tg-emoji> Activa la conexión\n` +
+    `<tg-emoji emoji-id="5793901252987330401">4⃣</tg-emoji> <tg-emoji emoji-id="5195033767969839232">🚀</tg-emoji> <b>¡Listo! Ya estás conectado.</b>\n\n` +
+    `<tg-emoji emoji-id="5197288647275071607">🛡</tg-emoji> Conexión segura · Soporte · Servicio activo\n\n` +
+    `Gracias por confiar en VPN CUBA. <tg-emoji emoji-id="5199814019325646173">🇨🇺</tg-emoji>`,
   parse_mode: 'HTML'
 });
         sent = true; break;
@@ -1517,7 +1520,13 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
 
     if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
 
-    
+    // Banner utilizado en /start, mostrado debajo de la configuración enviada manualmente.
+    try {
+      const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
+      await bot.telegram.sendPhoto(chatId, { source: bannerPath });
+    } catch (bannerErr) {
+      console.warn('⚠️ No se pudo enviar el banner después de la configuración manual:', bannerErr.message);
+    }
 
     await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.originalname, config_sent_by: adminId });
     await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
@@ -1572,7 +1581,7 @@ app.post('/api/user/:userId/remove-vip', async (req, res) => {
 });
 
 app.get('/api/check-trial-eligibility/:telegramId', async (req, res) => {
-  try { res.json(await db.checkTrialEligibility(req.params.telegramId)); } catch (error) { res.json({ eligible: true, reason: 'Error verificando' }); }
+  try { res.json(await db.checkTrialEligibility(req.params.telegramId, req.query.plan)); } catch (error) { res.json({ eligible: true, reason: 'Error verificando' }); }
 });
 
 // ==================== SOLICITUD DE PRUEBA ====================
@@ -1639,7 +1648,7 @@ app.post('/api/request-trial', async (req, res) => {
     if (autoSent) {
       try {
         await bot.telegram.sendMessage(telegramId,
-          `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu prueba gratuita ya está aquí!</b>\n\nAcabo de enviarte el archivo de configuración para el plan <b>${selectedPlan}</b>.\nRevísalo en este mismo chat y actívalo en WireGuard.\n\n<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Plan probado:</b> ${selectedPlan}\n¡Disfruta de baja latencia! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>` + `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n`,
+          `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu prueba gratuita ya está aquí!</b>\n\nAcabo de enviarte el archivo de configuración para el plan <b>${selectedPlan}</b>.\nRevísalo en este mismo chat y actívalo en WireGuard.\n\n<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Plan probado:</b> ${selectedPlan}\n¡Disfruta de baja latencia! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
           { parse_mode: 'HTML' }
         );
       } catch (e) { console.warn(`⚠️ No se pudo notificar al usuario ${telegramId}:`, e.message); }
@@ -2343,6 +2352,7 @@ app.get('/api/coupons/history/:code', async (req, res) => { try { res.json(await
 
 // ==================== HTML ESTÁTICO ====================
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'public/index.html')); });
+app.get('/app.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/app.html')); });
 app.get('/plans.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/plans.html')); });
 app.get('/payment.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/payment.html')); });
 app.get('/admin.html', (req, res) => { res.sendFile(path.join(__dirname, 'public/admin.html')); });
@@ -2770,7 +2780,7 @@ bot.action('show_support', async (ctx) => {
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     const keyboard = { reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/L0quen2', icon_custom_emoji_id: '5253742260054409879' }), createButton("WHATSAPP", { url: 'https://wa.me//+1478263-8903', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("CEO", { url: 'https://t.me/L0quen2', icon_custom_emoji_id: '5253742260054409879' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
     ] } };
@@ -2799,7 +2809,7 @@ bot.action('check_status', async (ctx) => {
       }
     };
     if (!user) { await sendImg('❌ *NO ESTÁS REGISTRADO*\n\nUsa "VER PLANES" para comenzar.', {}); return; }
-    const webappUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}/plans.html?userId=${userId}`;
+    const webappUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}/app.html?userId=${userId}`;
     if (user?.vip) {
       const diasRestantes = calcularDiasRestantes(user);
       if (diasRestantes <= 0) {
@@ -3119,8 +3129,117 @@ bot.on('text', async (ctx) => {
   const userId = ctx.from.id.toString();
   const esAdmin = isAdmin(userId);
   const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
-  if (text === '📁 VER PLANES') { await ctx.reply('📋 *NUESTROS PLANES*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR WEB DE PLANES", wa(`${webappUrl}/plans.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
+  if (text === '📁 VER PLANES') { await ctx.reply('📋 *NUESTROS PLANES*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR WEB DE PLANES", wa(`${webappUrl}/app.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
   else if (text === '⌨ PANEL ADMIN' && esAdmin) { await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(`${webappUrl}/admin.html?userId=${userId}&admin=true`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
+});
+
+// ==================== SOPORTE (TICKETS) ====================
+
+// Usuario: crear ticket nuevo
+app.post('/api/support/tickets', async (req, res) => {
+  try {
+    const { telegramId, username, category, subject, message } = req.body;
+    if (!telegramId || !category || !subject || !message) {
+      return res.status(400).json({ error: 'Datos incompletos: telegramId, category, subject y message son obligatorios.' });
+    }
+    const ticket = await db.createTicket({ telegram_id: telegramId, username, category, subject, message });
+
+    try {
+      const adminMessage = `🆘 *NUEVO TICKET DE SOPORTE*\n\n🆔 *Ticket:* #${ticket.id}\n👤 *Usuario:* ${username || 'Sin usuario'}\n🏷️ *ID:* ${telegramId}\n📂 *Categoría:* ${category}\n📋 *Asunto:* ${subject}\n\n${message}`;
+      const webappBase = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
+      for (const adminId of ADMIN_IDS) {
+        try {
+          const replyUrl = `${webappBase}/app.html?userId=${adminId}&openTicket=${ticket.id}`;
+          await bot.telegram.sendMessage(adminId, adminMessage, {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: [[{ text: '💬 Responder', web_app: { url: replyUrl } }]] },
+          });
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('❌ Error creando ticket:', error);
+    res.status(500).json({ error: 'Error creando el ticket: ' + error.message });
+  }
+});
+
+// Usuario: lista de sus propios tickets
+app.get('/api/support/tickets/user/:telegramId', async (req, res) => {
+  try {
+    const tickets = await db.getUserTickets(req.params.telegramId);
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ error: 'Error obteniendo tus tickets: ' + error.message });
+  }
+});
+
+// Admin: lista de todos los tickets (?status=open|in_progress|resolved|all)
+app.get('/api/support/tickets', async (req, res) => {
+  try {
+    const { requesterId, status } = req.query;
+    if (!isAdmin(requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const tickets = await db.getAllTickets(status);
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ error: 'Error obteniendo tickets: ' + error.message });
+  }
+});
+
+// Usuario o Admin: ver un ticket con su hilo de mensajes
+app.get('/api/support/tickets/:id', async (req, res) => {
+  try {
+    const data = await db.getTicketWithMessages(req.params.id);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: 'Error obteniendo el ticket: ' + error.message });
+  }
+});
+
+// Usuario: responder dentro de su ticket
+app.post('/api/support/tickets/:id/messages', async (req, res) => {
+  try {
+    const { telegramId, message } = req.body;
+    if (!telegramId || !message) return res.status(400).json({ error: 'Faltan datos.' });
+    const msg = await db.addTicketMessage(req.params.id, 'user', telegramId, message);
+    res.json({ success: true, message: msg });
+  } catch (error) {
+    res.status(500).json({ error: 'Error enviando el mensaje: ' + error.message });
+  }
+});
+
+// Admin: responder dentro de un ticket (pasa el ticket a "en progreso")
+app.post('/api/support/tickets/:id/reply', async (req, res) => {
+  try {
+    const { requesterId, message } = req.body;
+    if (!isAdmin(requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    if (!message) return res.status(400).json({ error: 'Falta el mensaje.' });
+    const msg = await db.addTicketMessage(req.params.id, 'admin', requesterId, message);
+
+    try {
+      const { ticket } = await db.getTicketWithMessages(req.params.id);
+      await bot.telegram.sendMessage(ticket.telegram_id,
+        `💬 *Respuesta de soporte* (ticket #${ticket.id})\n\n${message}`, { parse_mode: 'Markdown' });
+    } catch (e) {}
+
+    res.json({ success: true, message: msg });
+  } catch (error) {
+    res.status(500).json({ error: 'Error respondiendo el ticket: ' + error.message });
+  }
+});
+
+// Admin: cambiar estado del ticket (open | in_progress | resolved)
+app.post('/api/support/tickets/:id/status', async (req, res) => {
+  try {
+    const { requesterId, status } = req.body;
+    if (!isAdmin(requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    if (!['open', 'in_progress', 'resolved'].includes(status)) return res.status(400).json({ error: 'Estado inválido.' });
+    const ticket = await db.updateTicketStatus(req.params.id, status);
+    res.json({ success: true, ticket });
+  } catch (error) {
+    res.status(500).json({ error: 'Error actualizando el estado: ' + error.message });
+  }
 });
 
 app.post('/webhook', (req, res) => { bot.handleUpdate(req.body, res); });

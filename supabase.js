@@ -1743,7 +1743,122 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
       console.error('❌ Error en claimReward:', error);
       throw error;
     }
-  }
+  },
+
+  // ========== SOPORTE (TICKETS) ==========
+  async createTicket(ticketData) {
+    try {
+      const telegramId = String(ticketData.telegram_id).trim();
+      const { data, error } = await dbClient
+        .from('support_tickets')
+        .insert([{
+          telegram_id: telegramId,
+          username: ticketData.username || null,
+          category: ticketData.category,
+          subject: ticketData.subject,
+          status: 'open',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+
+      await dbClient.from('support_messages').insert([{
+        ticket_id: data.id,
+        sender_type: 'user',
+        sender_id: telegramId,
+        message: ticketData.message,
+        created_at: new Date().toISOString(),
+      }]);
+
+      return data;
+    } catch (error) {
+      console.error('❌ Error en createTicket:', error);
+      throw error;
+    }
+  },
+
+  async getUserTickets(telegramId) {
+    try {
+      const { data, error } = await dbClient
+        .from('support_tickets')
+        .select('*')
+        .eq('telegram_id', String(telegramId).trim())
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error en getUserTickets:', error);
+      throw error;
+    }
+  },
+
+  async getAllTickets(status) {
+    try {
+      let query = dbClient.from('support_tickets').select('*').order('updated_at', { ascending: false });
+      if (status && status !== 'all') query = query.eq('status', status);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error en getAllTickets:', error);
+      throw error;
+    }
+  },
+
+  async getTicketWithMessages(ticketId) {
+    try {
+      const { data: ticket, error: tErr } = await dbClient.from('support_tickets').select('*').eq('id', ticketId).single();
+      if (tErr) throw tErr;
+      const { data: messages, error: mErr } = await dbClient
+        .from('support_messages')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .order('created_at', { ascending: true });
+      if (mErr) throw mErr;
+      return { ticket, messages: messages || [] };
+    } catch (error) {
+      console.error('❌ Error en getTicketWithMessages:', error);
+      throw error;
+    }
+  },
+
+  async addTicketMessage(ticketId, senderType, senderId, message) {
+    try {
+      const { data, error } = await dbClient
+        .from('support_messages')
+        .insert([{ ticket_id: ticketId, sender_type: senderType, sender_id: String(senderId), message, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+      if (error) throw error;
+
+      const newStatus = senderType === 'admin' ? 'in_progress' : 'open';
+      await dbClient.from('support_tickets').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', ticketId);
+
+      return data;
+    } catch (error) {
+      console.error('❌ Error en addTicketMessage:', error);
+      throw error;
+    }
+  },
+
+  async updateTicketStatus(ticketId, status) {
+    try {
+      const { data, error } = await dbClient
+        .from('support_tickets')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', ticketId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Error en updateTicketStatus:', error);
+      throw error;
+    }
+  },
+
 };
 
 module.exports = db;
