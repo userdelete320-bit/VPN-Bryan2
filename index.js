@@ -1365,13 +1365,7 @@ app.post('/api/payments/:id/approve', async (req, res) => {
   parse_mode: 'HTML'
           }
         );
-        // Banner utilizado en /start, mostrado debajo de la configuración enviada.
-        try {
-          const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
-          await bot.telegram.sendPhoto(payment.telegram_id, { source: bannerPath });
-        } catch (bannerErr) {
-          console.warn('⚠️ No se pudo enviar el banner después de la configuración:', bannerErr.message);
-        }
+        
         await db.markConfigFileAsUsed(configFile.id, payment.telegram_id);
         await db.updatePayment(payment.id, { config_sent: true, config_sent_at: new Date().toISOString(), config_sent_by: 'system' });
         configAutoSent = true;
@@ -1520,13 +1514,7 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
 
     if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
 
-    // Banner utilizado en /start, mostrado debajo de la configuración enviada manualmente.
-    try {
-      const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
-      await bot.telegram.sendPhoto(chatId, { source: bannerPath });
-    } catch (bannerErr) {
-      console.warn('⚠️ No se pudo enviar el banner después de la configuración manual:', bannerErr.message);
-    }
+    
 
     await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.originalname, config_sent_by: adminId });
     await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
