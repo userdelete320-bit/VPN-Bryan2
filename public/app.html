@@ -2202,6 +2202,10 @@
         if (isAdminUser) openAdminTicketDetail(openTicketId);
         else showToast('No tienes permisos de administrador para ver ese ticket.');
       }
+
+      // Deep-link: si el usuario llegó desde el botón "Ver mis tickets" de una respuesta de soporte
+      const myTicketId = urlParamsInit.get('myTicket');
+      if (myTicketId) openTicketDetail(myTicketId);
     }, 400);
   }
   setTimeout(completeSplash, 2400);
