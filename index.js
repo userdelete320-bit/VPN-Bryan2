@@ -1280,6 +1280,7 @@ app.delete('/api/config-files/:id', async (req, res) => {
 
 app.get('/api/payments/pending', async (req, res) => {
   try {
+    if (!isAdmin(req.query.requesterId || req.query.adminId)) return res.status(403).json({ error: 'No autorizado' });
     const payments = await db.getPendingPayments();
     if (!payments || payments.length === 0) return res.json([]);
     const uniqueIds = [...new Set(payments.map(p => p.telegram_id).filter(Boolean))];
@@ -1304,6 +1305,7 @@ app.get('/api/payments/approved', async (req, res) => {
 
 app.post('/api/payments/:id/approve', async (req, res) => {
   try {
+    if (!isAdmin(req.body.requesterId || req.body.adminId)) return res.status(403).json({ error: 'No autorizado' });
     const payment = await db.approvePayment(req.params.id);
     if (!payment) return res.status(404).json({ error: 'Pago no encontrado' });
     if (!payment.telegram_id) return res.status(400).json({ error: 'El pago no tiene un usuario asociado' });
@@ -1350,7 +1352,7 @@ app.post('/api/payments/:id/approve', async (req, res) => {
     `<tg-emoji emoji-id="5080291685137647196">🪧</tg-emoji> <b>¡Tu configuración está lista!</b>\n\n` +
     `<tg-emoji emoji-id="5082827219080840950">✔️</tg-emoji> <b>VPN CUBA</b>\n` +
     `Tu acceso ha sido generado correctamente y ya puedes comenzar a utilizar tu servicio.\n\n` +
-    `<tg-emoji emoji-id="5256113064821926998">©</tg-emoji> <b>Configuración:</b> "${req.file.originalname}"\n` +
+    `<tg-emoji emoji-id="5256113064821926998">©</tg-emoji> <b>Configuración:</b> "${configFile.name}"\n` +
     `<tg-emoji emoji-id="5256182535917940722">⤵️</tg-emoji> <b>Plan:</b> ${getPlanName(payment.plan)}\n\n` +
     `━━━━━━━━━━━━━━\n\n` +
     `<tg-emoji emoji-id="5253952855185829086">⚙️</tg-emoji> <b>Cómo activarla</b>\n` +
@@ -1365,7 +1367,13 @@ app.post('/api/payments/:id/approve', async (req, res) => {
   parse_mode: 'HTML'
           }
         );
-        
+        // Banner utilizado en /start, mostrado debajo de la configuración enviada.
+        try {
+          const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
+          await bot.telegram.sendPhoto(payment.telegram_id, { source: bannerPath });
+        } catch (bannerErr) {
+          console.warn('⚠️ No se pudo enviar el banner después de la configuración:', bannerErr.message);
+        }
         await db.markConfigFileAsUsed(configFile.id, payment.telegram_id);
         await db.updatePayment(payment.id, { config_sent: true, config_sent_at: new Date().toISOString(), config_sent_by: 'system' });
         configAutoSent = true;
@@ -1414,6 +1422,7 @@ app.post('/api/payments/:id/approve', async (req, res) => {
 
 app.post('/api/payments/:id/reject', async (req, res) => {
   try {
+    if (!isAdmin(req.body.requesterId || req.body.adminId)) return res.status(403).json({ error: 'No autorizado' });
     const { reason } = req.body;
     if (!reason) return res.status(400).json({ error: 'Se requiere un motivo de rechazo' });
     const payment = await db.rejectPayment(req.params.id, reason);
@@ -1514,7 +1523,13 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
 
     if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
 
-    
+    // Banner utilizado en /start, mostrado debajo de la configuración enviada manualmente.
+    try {
+      const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
+      await bot.telegram.sendPhoto(chatId, { source: bannerPath });
+    } catch (bannerErr) {
+      console.warn('⚠️ No se pudo enviar el banner después de la configuración manual:', bannerErr.message);
+    }
 
     await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.originalname, config_sent_by: adminId });
     await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
@@ -1665,6 +1680,7 @@ app.get('/api/trial-stats', async (req, res) => {
 
 app.get('/api/trials/pending', async (req, res) => {
   try {
+    if (!isAdmin(req.query.requesterId || req.query.adminId)) return res.status(403).json({ error: 'No autorizado' });
     const trials = await db.getPendingTrials();
     const trialsWithUsers = trials.map(t => ({
       ...t,
