@@ -1754,6 +1754,11 @@
     'vip-cuba': 'cuba_vip',
     express: 'express',
   };
+  const UI_KEY_FROM_BACKEND = Object.fromEntries(Object.entries(PLAN_BACKEND_KEY).map(([ui, be]) => [be, ui]));
+  function planNameFromBackend(backendKey){
+    const uiKey = UI_KEY_FROM_BACKEND[backendKey];
+    return (PLANS[uiKey] || {}).name || backendKey;
+  }
 
   // Precios reales por método de pago (según tarifario del bot)
   const PRICES = {
@@ -3323,8 +3328,8 @@ PersistentKeepalive = 25`;
     const br = document.getElementById('badgeRefunds');
     const bw = document.getElementById('badgeWithdrawals');
     const bwi = document.getElementById('badgeWithdrawalsInner');
-    if (bp) bp.textContent = pendingPayments.filter(x => x.status === 'pending').length;
-    if (bt) bt.textContent = trialRequestsAdmin.filter(x => x.status === 'pending').length;
+    if (bp) bp.textContent = pendingPayments.length;
+    if (bt) bt.textContent = trialRequestsAdmin.length;
     if (br) br.textContent = refundRequestsAdmin.filter(x => x.status === 'pending').length;
     const pendingWithdrawCount = resellerWithdrawals.filter(x => x.status === 'pending').length;
     if (bw) bw.textContent = pendingWithdrawCount;
@@ -3332,83 +3337,107 @@ PersistentKeepalive = 25`;
     // El contador de tickets (badgeTickets) se actualiza en renderAdminTicketsList() con datos reales del backend.
   }
 
-  // ==================== ADMIN: pagos nuevos recibidos ====================
-  function renderAdminPayments(){
+  // ==================== ADMIN: pagos nuevos recibidos (real) ====================
+  async function renderAdminPayments(){
     const list = document.getElementById('paymentsList');
     if (!list) return;
+    list.innerHTML = '<div class="admin-empty">Cargando pagos…</div>';
+    try {
+      pendingPayments = await (await fetch(`/api/payments/pending?requesterId=${encodeURIComponent(currentUser.id)}`)).json();
+    } catch (e) { pendingPayments = []; }
+
     if (!pendingPayments.length){
       list.innerHTML = '<div class="admin-empty">No hay pagos nuevos por revisar.</div>';
-      return;
+    } else {
+      list.innerHTML = pendingPayments.map(pay => `
+        <div class="req-card">
+          <div class="req-top">
+            <div><div class="rq-name">#${pay.id} · ${pay.user?.username || pay.telegram_id}</div><div class="rq-meta">${planNameFromBackend(pay.plan)} · ${pay.method} · ${timeAgo(new Date(pay.created_at).getTime())}</div></div>
+            <div class="rq-amount">${pay.price}</div>
+          </div>
+          ${pay.notes ? `<div class="req-detail">${pay.notes}</div>` : ''}
+          ${pay.screenshot_url ? `<div class="req-detail"><a href="${pay.screenshot_url}" target="_blank" style="color:var(--blue-2)">Ver comprobante ↗</a></div>` : ''}
+          <div class="req-actions">
+            <button class="reject-btn" onclick="rejectPayment(${pay.id})">Rechazar</button>
+            <button class="approve-btn" onclick="approvePayment(${pay.id})">Aprobar y activar</button>
+          </div>
+        </div>`).join('');
     }
-    list.innerHTML = pendingPayments.map(pay => `
-      <div class="req-card">
-        <div class="req-top">
-          <div><div class="rq-name">${pay.id}</div><div class="rq-meta">${(PLANS[pay.plan]||{}).name || pay.planName} · ${METHODS[pay.method]?.name || pay.method} · ${timeAgo(pay.ts)}</div></div>
-          <div class="rq-amount">${pay.methodLabel}</div>
-        </div>
-        ${pay.reference ? `<div class="req-detail">N° de referencia: ${pay.reference}</div>` : ''}
-        ${pay.status === 'pending'
-          ? `<div class="req-actions">
-               <button class="reject-btn" onclick="rejectPayment('${pay.id}')">Rechazar</button>
-               <button class="approve-btn" onclick="approvePayment('${pay.id}')">Aprobar y activar</button>
-             </div>`
-          : `<div class="req-status ${pay.status === 'approved' ? 'approved' : 'rejected'}">${pay.status === 'approved' ? '✓ Aprobado' : '✕ Rechazado'}</div>`}
-      </div>`).join('');
-  }
-  function approvePayment(id){
-    const pay = pendingPayments.find(x => x.id === id);
-    if (!pay) return;
-    pay.status = 'approved';
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_approve_payment', order_id:id })); } catch(e) {}
-    if (id === state.lastOrderId){
-      state.paymentApproved = true;
-      renderConfigAccessUI();
-    }
-    renderAdminPayments();
     renderAdminBadges();
-    showToast('Pago ' + id + ' aprobado, VPN activada');
-    try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
   }
-  function rejectPayment(id){
-    const pay = pendingPayments.find(x => x.id === id);
-    if (!pay) return;
-    pay.status = 'rejected';
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_reject_payment', order_id:id })); } catch(e) {}
-    renderAdminPayments();
-    renderAdminBadges();
-    showToast('Pago ' + id + ' rechazado');
-    try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('warning'); } catch(e) {}
+  async function approvePayment(id){
+    try {
+      const res = await fetch(`/api/payments/${id}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requesterId: currentUser.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo aprobar el pago.');
+      if (String(id) === String(state.lastOrderId?.replace('#',''))) { state.paymentApproved = true; renderConfigAccessUI(); }
+      showToast('Pago #' + id + ' aprobado, VPN activada');
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
+      await renderAdminPayments();
+    } catch (err) { showToast(err.message); }
+  }
+  async function rejectPayment(id){
+    const reason = prompt('Motivo del rechazo (se le mostrará al usuario):');
+    if (!reason) return;
+    try {
+      const res = await fetch(`/api/payments/${id}/reject`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason, requesterId: currentUser.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo rechazar el pago.');
+      showToast('Pago #' + id + ' rechazado');
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('warning'); } catch(e) {}
+      await renderAdminPayments();
+    } catch (err) { showToast(err.message); }
   }
 
-  // ==================== ADMIN: solicitudes de prueba ====================
-  function renderAdminTrialsReq(){
+  // ==================== ADMIN: solicitudes de prueba (real) ====================
+  async function renderAdminTrialsReq(){
     const list = document.getElementById('trialsReqList');
     if (!list) return;
+    list.innerHTML = '<div class="admin-empty">Cargando solicitudes…</div>';
+    try {
+      trialRequestsAdmin = await (await fetch(`/api/trials/pending?requesterId=${encodeURIComponent(currentUser.id)}`)).json();
+    } catch (e) { trialRequestsAdmin = []; }
+
     if (!trialRequestsAdmin.length){ list.innerHTML = '<div class="admin-empty">No hay solicitudes de prueba pendientes.</div>'; return; }
     list.innerHTML = trialRequestsAdmin.map(r => `
       <div class="req-card">
         <div class="req-top">
-          <div><div class="rq-name">${r.user}</div><div class="rq-meta">ID ${r.userId} · ${(PLANS[r.plan]||{}).name || r.plan} · ${timeAgo(r.ts)}</div></div>
+          <div><div class="rq-name">${r.username ? '@' + r.username : r.telegram_id}</div><div class="rq-meta">ID ${r.telegram_id} · ${planNameFromBackend(r.trial_info.plan_type)} · hace ${r.trial_info.days_ago} día(s)</div></div>
         </div>
-        ${r.status === 'pending'
-          ? `<div class="req-actions">
-               <button class="reject-btn" onclick="rejectTrialReq('${r.id}')">Rechazar</button>
-               <button class="approve-btn" onclick="approveTrialReq('${r.id}')">Activar prueba</button>
-             </div>`
-          : `<div class="req-status ${r.status === 'approved' ? 'approved' : 'rejected'}">${r.status === 'approved' ? '✓ Activada' : '✕ Rechazada'}</div>`}
+        <div class="req-actions">
+          <button class="reject-btn" onclick="rejectTrialReq('${r.telegram_id}')">Rechazar</button>
+          <button class="approve-btn" onclick="approveTrialReq('${r.telegram_id}')">Activar prueba</button>
+        </div>
       </div>`).join('');
+    renderAdminBadges();
   }
-  function approveTrialReq(id){
-    const r = trialRequestsAdmin.find(x => x.id === id); if (!r) return;
-    r.status = 'approved';
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_approve_trial', request_id:id })); } catch(e) {}
-    renderAdminTrialsReq(); renderAdminBadges(); showToast('Prueba activada para ' + r.user);
+  async function approveTrialReq(telegramId){
+    try {
+      const res = await fetch('/api/send-trial-config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId, adminId: currentUser.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo enviar la prueba.');
+      showToast('Prueba activada y enviada por el bot.');
+      await renderAdminTrialsReq();
+    } catch (err) { showToast(err.message); }
   }
-  function rejectTrialReq(id){
-    const r = trialRequestsAdmin.find(x => x.id === id); if (!r) return;
-    r.status = 'rejected';
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_reject_trial', request_id:id })); } catch(e) {}
-    renderAdminTrialsReq(); renderAdminBadges();
+  async function rejectTrialReq(telegramId){
+    try {
+      const res = await fetch(`/api/trials/${encodeURIComponent(telegramId)}/cancel`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: currentUser.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo cancelar la solicitud.');
+      showToast('Solicitud rechazada.');
+      await renderAdminTrialsReq();
+    } catch (err) { showToast(err.message); }
   }
 
   // ==================== ADMIN: solicitudes de reembolso ====================

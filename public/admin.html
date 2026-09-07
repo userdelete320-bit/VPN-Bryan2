@@ -761,7 +761,7 @@ async function loadPendingPayments() {
   document.getElementById('pendingTableWrap').style.display = 'none';
   document.getElementById('pendingNoData').style.display = 'none';
   try {
-    const payments = await (await fetch('/api/payments/pending')).json();
+    const payments = await (await fetch(`/api/payments/pending?adminId=${encodeURIComponent(currentUserId)}`)).json();
     document.getElementById('pendingLoading').style.display = 'none';
     if (!payments?.length) { document.getElementById('pendingNoData').style.display = 'block'; return; }
     const tb = document.getElementById('pendingTableBody'); tb.innerHTML = '';
@@ -1184,7 +1184,7 @@ async function loadPendingTrials() {
   document.getElementById('trialTableWrap').style.display = 'none';
   document.getElementById('trialNoData').style.display = 'none';
   try {
-    const trials = await (await fetch('/api/trials/pending')).json();
+    const trials = await (await fetch(`/api/trials/pending?adminId=${encodeURIComponent(currentUserId)}`)).json();
     document.getElementById('trialLoading').style.display = 'none';
     if (!trials?.length) { document.getElementById('trialNoData').style.display = 'block'; document.getElementById('badge-trial').textContent = '0'; return; }
     document.getElementById('badge-trial').textContent = trials.length;
