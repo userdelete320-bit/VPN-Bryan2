@@ -776,6 +776,7 @@ async function initializeStorageBuckets() {
                  `<b>Instrucciones de instalación:</b>\n` +
                  `1. Descarga este archivo\n` +
                  `2. Importa el archivo .conf en tu cliente WireGuard\n` +
+                 `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n` +
                  `3. Activa la conexión\n` +
                  `4. ¡Disfruta de 1 hora de prueba gratis! <tg-emoji emoji-id="4978747001718966118">🎉</tg-emoji>\n\n` +
                  `<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Duración:</b> 1 hora\n` +
