@@ -1762,12 +1762,12 @@
 
   // Precios reales por método de pago (según tarifario del bot)
   const PRICES = {
-    basico:      { cup:1300, saldo:900,  bpa:1300, metro:1300, usdt:2,    stars:170,  paypal:2 },
-    avanzado:    { cup:2600, saldo:1700, bpa:2600, metro:2600, usdt:4,    stars:280,  paypal:4 },
-    'vip-cuba':  { cup:2500, saldo:1700, bpa:2500, metro:2500, usdt:4,    stars:250,  paypal:4 },
-    gaming:      { cup:1600, saldo:1200, bpa:1600, metro:1600, usdt:1.5,  stars:210,  paypal:1.5 },
-    'gaming-pro':{ cup:3200, saldo:2400, bpa:3200, metro:3200, usdt:3,    stars:420,  paypal:3 }, // estimado — confirma precio real
-    anual:       { cup:20000,saldo:15000,bpa:20000,metro:20000,usdt:35,   stars:2100, paypal:35, zelle:35 },
+    basico:      { cup:1300, saldo:900,  bpa:1300, metro:1300, usdt:2,    stars:170,  paypal:3 },
+    avanzado:    { cup:2600, saldo:1700, bpa:2600, metro:2600, usdt:4,    stars:280,  paypal:7 },
+    'vip-cuba':  { cup:2500, saldo:1700, bpa:2500, metro:2500, usdt:4,    stars:250,  paypal:7 }, // tu sistema original no traía un precio de PayPal definido para este plan — ajusta este número si quieres otro
+    gaming:      { cup:1600, saldo:1200, bpa:1600, metro:1600, usdt:1.5,  stars:210,  paypal:5 },
+    'gaming-pro':{ cup:3200, saldo:2400, bpa:3200, metro:3200, usdt:3,    stars:420,  paypal:8 },
+    anual:       { cup:20000,saldo:15000,bpa:20000,metro:20000,usdt:35,   stars:2100, paypal:40, zelle:35 },
     express: {
       '24h': { cup:300, saldo:150, bpa:300, metro:300, usdt:1,   stars:100, paypal:1 },
       '3dias':  { cup:500, saldo:240, bpa:500, metro:500, usdt:2.3, stars:150, paypal:2 },
@@ -2163,13 +2163,15 @@
   }
   // ==================== VERIFICACIÓN DE ADMIN (real, contra tu backend) ====================
   let isAdminUser = false;
+  let isSuperAdminUser = false;
   async function checkAdminStatus(){
     if (!currentUser.id) return;
     try {
       const res = await fetch(`/api/check-admin/${encodeURIComponent(currentUser.id)}`);
       const data = await res.json();
       isAdminUser = !!data.isAdmin;
-    } catch (e) { isAdminUser = false; }
+      isSuperAdminUser = !!data.isSuperAdmin;
+    } catch (e) { isAdminUser = false; isSuperAdminUser = false; }
     const item = document.getElementById('menuAdminItem');
     if (item) item.style.display = isAdminUser ? '' : 'none';
   }
@@ -2270,7 +2272,7 @@
   function priceFor(planKey, method){
     const table = basePriceTable(planKey);
     let amount = table[method];
-    if (amount === undefined) return null;
+    if (amount === undefined || amount === null) return null;
     if (state.discountPercent > 0) amount = Math.round(amount * (1 - state.discountPercent) * 100) / 100;
     return amount;
   }
@@ -2295,6 +2297,24 @@
     closeDetailsModal();
     renderCheckout();
     goTo('screen-checkout');
+
+    // Notifica el perfil del jugador al admin de inmediato (no espera a que se complete el pago)
+    const p = PLANS[state.plan];
+    if (p?.isGaming && currentUser.id && (state.gameInfo.game || state.gameInfo.connection || state.gameInfo.device || state.gameInfo.details)) {
+      fetch('/api/player-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: currentUser.id,
+          plan: PLAN_BACKEND_KEY[state.plan] || state.plan,
+          planName: p.name,
+          games: state.gameInfo.game,
+          connection: state.gameInfo.connection,
+          device: state.gameInfo.device,
+          notes: state.gameInfo.details,
+        }),
+      }).catch(() => {});
+    }
   }
 
   // ==================== CHECKOUT render ====================
@@ -2325,8 +2345,8 @@
     list.innerHTML = '';
     Object.keys(METHODS).forEach((key) => {
       const m = METHODS[key];
-      const locked = m.onlyFor && m.onlyFor !== state.plan;
       const price = priceFor(state.plan, key);
+      const locked = (m.onlyFor && m.onlyFor !== state.plan) || price === null;
       const isRecommended = key === recommendMethod(state.plan);
       const row = document.createElement('div');
       row.className = 'pay-row' + (key === state.method ? ' selected' : '') + (locked ? ' locked' : '');
@@ -2597,11 +2617,15 @@
       }
 
       // Métodos manuales (Saldo Móvil, BPA, Metropolitano, USDT, PayPal, Zelle): requieren comprobante
+      const gi = state.gameInfo || {};
+      const gameNotes = (p.isGaming && (gi.game || gi.connection || gi.device || gi.details))
+        ? `Juego: ${gi.game || '-'} | Conexión: ${gi.connection || '-'} | Dispositivo: ${gi.device || '-'} | Detalles: ${gi.details || '-'}`
+        : '';
       const form = new FormData();
       form.append('telegramId', String(currentUser.id));
       form.append('plan', backendPlan);
       form.append('price', String(price));
-      form.append('notes', '');
+      form.append('notes', gameNotes);
       form.append('method', backendMethod);
       form.append('couponCode', state.discountCode || '');
       form.append('referralDiscount', String(state.discountPercent || 0));
@@ -2767,15 +2791,17 @@ PersistentKeepalive = 25`;
     Object.keys(PLANS).forEach(key => {
       const p = PLANS[key];
       const elig = trialEligibilityCache[key];
-      const blocked = elig && elig.eligible === false;
+      const soldOut = !!state.soldOut[key];
+      const blocked = soldOut || (elig && elig.eligible === false);
+      const reasonText = soldOut ? 'Plan agotado por ahora' : (blocked ? elig.reason : ('Prueba de 24h · ' + p.desc + ' · el staff la activa manualmente'));
       const row = document.createElement('div');
       row.className = 'trial-row';
       row.innerHTML = `
         <div class="trial-info">
           <div class="tr-name">${p.name}</div>
-          <div class="tr-sub">${blocked ? elig.reason : ('Prueba de 24h · ' + p.desc + ' · el staff la activa manualmente')}</div>
+          <div class="tr-sub">${reasonText}</div>
         </div>
-        <button class="trial-btn ${blocked ? 'done' : 'primary'}" id="trialBtn-${key}" onclick="requestTrial('${key}')" ${blocked ? 'disabled' : ''}>${blocked ? '✓ No disponible' : 'Solicitar'}</button>`;
+        <button class="trial-btn ${blocked ? 'done' : 'primary'}" id="trialBtn-${key}" onclick="requestTrial('${key}')" ${blocked ? 'disabled' : ''}>${soldOut ? '🔴 Agotado' : (blocked ? '✓ No disponible' : 'Solicitar')}</button>`;
       list.appendChild(row);
     });
   }
@@ -3214,7 +3240,7 @@ PersistentKeepalive = 25`;
     renderResellerHub();
   }
 
-  // ==================== ADMIN: disponibilidad de planes ====================
+  // ==================== ADMIN: disponibilidad de planes (real) ====================
   function renderAdminList(){
     const list = document.getElementById('adminList');
     if (!list) return;
@@ -3230,11 +3256,25 @@ PersistentKeepalive = 25`;
       list.appendChild(row);
     });
   }
-  function toggleSoldOut(key){
-    state.soldOut[key] = !state.soldOut[key];
-    renderAdminList();
-    renderPlanCardsSoldOut();
-    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light'); } catch(e) {}
+  async function toggleSoldOut(key){
+    if (!isSuperAdminUser) { showToast('Solo el administrador principal puede cambiar la disponibilidad.'); return; }
+    const backendKey = PLAN_BACKEND_KEY[key] || key;
+    const nextValue = !state.soldOut[key];
+    try {
+      const res = await fetch('/api/plan-availability/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requesterId: currentUser.id, plan: backendKey, agotado: nextValue }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar la disponibilidad.');
+      state.soldOut[key] = nextValue;
+      renderAdminList();
+      renderPlanCardsSoldOut();
+      renderTrialList(); // el plan agotado también deja de ofrecerse como prueba
+      try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light'); } catch(e) {}
+    } catch (err) {
+      showToast(err.message);
+    }
   }
   function applyRealPricesToCards(){
     document.querySelectorAll('.plan-card[data-plan]').forEach(card => {
@@ -3268,7 +3308,9 @@ PersistentKeepalive = 25`;
         if (uiKey === 'express') return; // el express usa su propia tabla por duración (ver más abajo)
         const backendKey = PLAN_BACKEND_KEY[uiKey];
         const rp = remotePrices?.[backendKey];
-        if (rp) PRICES[uiKey] = { cup: rp.cup, saldo: rp.mobile, bpa: rp.cup, metro: rp.cup, usdt: rp.usdt, stars: rp.stars, paypal: rp.usdt, ...(uiKey === 'anual' ? { zelle: rp.usdt } : {}) };
+        // Solo se actualizan los campos que de verdad gestiona el admin desde el backend.
+        // paypal (y zelle, solo en anual) son precios fijos propios, no vienen de plan_prices.
+        if (rp && PRICES[uiKey]) Object.assign(PRICES[uiKey], { cup: rp.cup, saldo: rp.mobile, bpa: rp.cup, metro: rp.cup, usdt: rp.usdt, stars: rp.stars });
         const agotado = !!remoteAvail?.[backendKey];
         state.soldOut[uiKey] = agotado;
       });
@@ -3330,7 +3372,7 @@ PersistentKeepalive = 25`;
     const bwi = document.getElementById('badgeWithdrawalsInner');
     if (bp) bp.textContent = pendingPayments.length;
     if (bt) bt.textContent = trialRequestsAdmin.length;
-    if (br) br.textContent = refundRequestsAdmin.filter(x => x.status === 'pending').length;
+    if (br) br.textContent = refundRequestsAdmin.length;
     const pendingWithdrawCount = resellerWithdrawals.filter(x => x.status === 'pending').length;
     if (bw) bw.textContent = pendingWithdrawCount;
     if (bwi) bwi.textContent = pendingWithdrawCount;
@@ -3356,7 +3398,7 @@ PersistentKeepalive = 25`;
             <div class="rq-amount">${pay.price}</div>
           </div>
           ${pay.notes ? `<div class="req-detail">${pay.notes}</div>` : ''}
-          ${pay.screenshot_url ? `<div class="req-detail"><a href="${pay.screenshot_url}" target="_blank" style="color:var(--blue-2)">Ver comprobante ↗</a></div>` : ''}
+          ${pay.screenshot_url ? `<div class="req-detail"><a href="${pay.screenshot_url}" target="_blank"><img src="${pay.screenshot_url}" alt="Comprobante" style="max-width:100%; border-radius:10px; margin-top:6px; display:block; border:1px solid var(--border)"></a></div>` : ''}
           <div class="req-actions">
             <button class="reject-btn" onclick="rejectPayment(${pay.id})">Rechazar</button>
             <button class="approve-btn" onclick="approvePayment(${pay.id})">Aprobar y activar</button>
@@ -3441,35 +3483,48 @@ PersistentKeepalive = 25`;
   }
 
   // ==================== ADMIN: solicitudes de reembolso ====================
-  function renderAdminRefundsReq(){
+  async function renderAdminRefundsReq(){
     const list = document.getElementById('refundsReqList');
     if (!list) return;
-    if (!refundRequestsAdmin.length){ list.innerHTML = '<div class="admin-empty">No hay solicitudes de reembolso pendientes.</div>'; return; }
+    list.innerHTML = '<div class="admin-empty">Cargando solicitudes…</div>';
+    try {
+      refundRequestsAdmin = await (await fetch(`/api/refund-requests?requesterId=${encodeURIComponent(currentUser.id)}`)).json();
+    } catch (e) { refundRequestsAdmin = []; }
+
+    if (!refundRequestsAdmin.length){ list.innerHTML = '<div class="admin-empty">No hay solicitudes de reembolso pendientes.</div>'; renderAdminBadges(); return; }
     list.innerHTML = refundRequestsAdmin.map(r => `
       <div class="req-card">
         <div class="req-top">
-          <div><div class="rq-name">${r.user}</div><div class="rq-meta">Pedido ${r.order} · ${timeAgo(r.ts)}</div></div>
+          <div><div class="rq-name">${r.username ? '@' + r.username : r.first_name} (#${r.id})</div><div class="rq-meta">${planNameFromBackend(r.plan)} · ${timeAgo(new Date(r.refund_requested_at || r.created_at).getTime())}</div></div>
         </div>
-        <div class="req-detail"><b>Motivo:</b> ${r.reason} — ${r.details}</div>
-        ${r.status === 'pending'
-          ? `<div class="req-actions">
-               <button class="reject-btn" onclick="rejectRefundReq('${r.id}')">Rechazar</button>
-               <button class="approve-btn" onclick="approveRefundReq('${r.id}')">Aprobar reembolso</button>
-             </div>`
-          : `<div class="req-status ${r.status === 'approved' ? 'approved' : 'rejected'}">${r.status === 'approved' ? '✓ Reembolsado' : '✕ Rechazado'}</div>`}
+        <div class="req-detail"><b>Motivo:</b> ${REFUND_MOTIVOS_UI[r.refund_motivo] || r.refund_motivo || 'No especificado'}${r.refund_details ? ' — ' + r.refund_details : ''}</div>
+        <div class="req-actions">
+          <button class="reject-btn" onclick="respondRefundReq(${r.id}, 'reject')">Rechazar</button>
+          <button class="approve-btn" onclick="respondRefundReq(${r.id}, 'accept')">Aprobar reembolso</button>
+        </div>
       </div>`).join('');
+    renderAdminBadges();
   }
-  function approveRefundReq(id){
-    const r = refundRequestsAdmin.find(x => x.id === id); if (!r) return;
-    r.status = 'approved';
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_approve_refund', request_id:id })); } catch(e) {}
-    renderAdminRefundsReq(); renderAdminBadges(); showToast('Reembolso aprobado para ' + r.user);
-  }
-  function rejectRefundReq(id){
-    const r = refundRequestsAdmin.find(x => x.id === id); if (!r) return;
-    r.status = 'rejected';
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_reject_refund', request_id:id })); } catch(e) {}
-    renderAdminRefundsReq(); renderAdminBadges();
+  const REFUND_MOTIVOS_UI = {
+    incompatibilidad: 'Incompatibilidad con dispositivo',
+    conexion: 'Error de conexión persistente',
+    velocidad: 'Velocidad inferior a la prometida',
+    error_compra: 'Compra por error / plan equivocado',
+    otros: 'Otros motivos',
+  };
+  async function respondRefundReq(id, action){
+    const message = prompt(action === 'accept' ? 'Mensaje para el cliente (opcional, deja vacío para el mensaje por defecto):' : 'Motivo del rechazo (opcional, deja vacío para el mensaje por defecto):') || '';
+    try {
+      const form = new FormData();
+      form.append('adminId', currentUser.id);
+      form.append('action', action);
+      form.append('message', message);
+      const res = await fetch(`/api/refund-requests/${id}/respond`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo procesar la solicitud.');
+      showToast(action === 'accept' ? 'Reembolso aprobado' : 'Reembolso rechazado');
+      await renderAdminRefundsReq();
+    } catch (err) { showToast(err.message); }
   }
 
   // ==================== ADMIN: usuarios (base de datos del bot) ====================

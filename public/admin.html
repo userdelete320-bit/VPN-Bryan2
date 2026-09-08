@@ -751,7 +751,7 @@ async function loadStats() {
     document.getElementById('couponsCount').textContent = stats.coupons?.active ?? '—';
     document.getElementById('badge-pending').textContent = stats.payments?.pending || 0;
     document.getElementById('badge-trial').textContent = stats.users?.trial_pending || 0;
-    fetch('/api/refund-requests').then(r=>r.json()).then(reqs=>{ const b=document.getElementById('badge-refunds'); if(b) b.textContent = reqs?.length||0; }).catch(()=>{});
+    fetch(`/api/refund-requests?adminId=${encodeURIComponent(currentUserId)}`).then(r=>r.json()).then(reqs=>{ const b=document.getElementById('badge-refunds'); if(b) b.textContent = reqs?.length||0; }).catch(()=>{});
   } catch(e) { console.error('❌ Error loadStats:', e); showNotification('Error al cargar estadísticas: ' + e.message, 'error'); }
 }
 
@@ -805,7 +805,7 @@ async function loadRefundRequests() {
   document.getElementById('refundsTableWrap').style.display = 'none';
   document.getElementById('refundsNoData').style.display = 'none';
   try {
-    const requests = await (await fetch('/api/refund-requests')).json();
+    const requests = await (await fetch(`/api/refund-requests?adminId=${encodeURIComponent(currentUserId)}`)).json();
     document.getElementById('refundsLoading').style.display = 'none';
     const badge = document.getElementById('badge-refunds');
     if (badge) badge.textContent = requests?.length || 0;
