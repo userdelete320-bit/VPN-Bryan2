@@ -296,7 +296,7 @@ async function loadPlanPricesFromDb() {
   
 
 const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t';
-const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/CgejliuH5iXENrONFkx6Ah';
+const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/J0zs52uXjqTCVvC0X7oTJE?s=cl&p=a&mlu=4&ilr=4';
 
 function isAdmin(userId) {
     return ADMIN_IDS.includes(userId.toString());
@@ -1368,13 +1368,8 @@ app.post('/api/payments/:id/approve', async (req, res) => {
   parse_mode: 'HTML'
           }
         );
-        // Banner utilizado en /start, mostrado debajo de la configuración enviada.
-        try {
-          const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
-          await bot.telegram.sendPhoto(payment.telegram_id, { source: bannerPath });
-        } catch (bannerErr) {
-          console.warn('⚠️ No se pudo enviar el banner después de la configuración:', bannerErr.message);
-        }
+
+        
         await db.markConfigFileAsUsed(configFile.id, payment.telegram_id);
         await db.updatePayment(payment.id, { config_sent: true, config_sent_at: new Date().toISOString(), config_sent_by: 'system' });
         configAutoSent = true;
@@ -1507,6 +1502,7 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
     `<tg-emoji emoji-id="5794182096603847292">1⃣</tg-emoji> Descarga el archivo ".conf"\n` +
     `<tg-emoji emoji-id="5794303034292968945">2⃣</tg-emoji> Ábrelo desde WireGuard y selecciona <b>Importar túnel</b>\n` +
     `<tg-emoji emoji-id="5794031944547178894">3⃣</tg-emoji> Activa la conexión\n` +
+    `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n` +
     `<tg-emoji emoji-id="5793901252987330401">4⃣</tg-emoji> <tg-emoji emoji-id="5195033767969839232">🚀</tg-emoji> <b>¡Listo! Ya estás conectado.</b>\n\n` +
     `<tg-emoji emoji-id="5197288647275071607">🛡</tg-emoji> Conexión segura · Soporte · Servicio activo\n\n` +
     `Gracias por confiar en VPN CUBA. <tg-emoji emoji-id="5199814019325646173">🇨🇺</tg-emoji>`,
@@ -1524,13 +1520,7 @@ app.post('/api/send-config', upload.single('configFile'), async (req, res) => {
 
     if (!sent) { fs.unlink(req.file.path, () => {}); throw lastTelegramError || new Error('No se pudo enviar el archivo'); }
 
-    // Banner utilizado en /start, mostrado debajo de la configuración enviada manualmente.
-    try {
-      const bannerPath = path.join(__dirname, 'assets', 'vpncuba.jpg');
-      await bot.telegram.sendPhoto(chatId, { source: bannerPath });
-    } catch (bannerErr) {
-      console.warn('⚠️ No se pudo enviar el banner después de la configuración manual:', bannerErr.message);
-    }
+    
 
     await db.updatePayment(paymentId, { config_sent: true, config_sent_at: new Date().toISOString(), config_file: req.file.originalname, config_sent_by: adminId });
     await db.makeUserVIP(chatId, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
@@ -1652,7 +1642,8 @@ app.post('/api/request-trial', async (req, res) => {
     if (autoSent) {
       try {
         await bot.telegram.sendMessage(telegramId,
-          `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu prueba gratuita ya está aquí!</b>\n\nAcabo de enviarte el archivo de configuración para el plan <b>${selectedPlan}</b>.\nRevísalo en este mismo chat y actívalo en WireGuard.\n\n<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Plan probado:</b> ${selectedPlan}\n¡Disfruta de baja latencia! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>`,
+          `<tg-emoji emoji-id="5875465628285931233">🎉</tg-emoji> <b>¡Tu prueba gratuita ya está aquí!</b>\n\nAcabo de enviarte el archivo de configuración para el plan <b>${selectedPlan}</b>.\nRevísalo en este mismo chat y actívalo en WireGuard.\n\n<tg-emoji emoji-id="5778202206922608769">⏰</tg-emoji> <b>Plan probado:</b> ${selectedPlan}\n¡Disfruta de baja latencia! <tg-emoji emoji-id="4978747001718966118">🚀</tg-emoji>` +
+          `<tg-emoji emoji-id="5454156248813432363">🎥</tg-emoji> Si no tienes WireGuard, <a href="https://www.wireguard.com/install/">descárgalo aquí</a>\n`,
           { parse_mode: 'HTML' }
         );
       } catch (e) { console.warn(`⚠️ No se pudo notificar al usuario ${telegramId}:`, e.message); }
