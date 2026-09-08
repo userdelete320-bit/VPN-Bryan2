@@ -1593,6 +1593,12 @@ app.post('/api/request-trial', async (req, res) => {
   pendingTrialLocks.set(telegramId, now);
 
   try {
+    // 0. Si el plan está marcado como agotado, tampoco se puede pedir prueba de él
+    if (trialPlanType && PLAN_AVAILABILITY[trialPlanType]) {
+      pendingTrialLocks.delete(telegramId);
+      return res.status(409).json({ error: 'Este plan está agotado por ahora, no se pueden generar pruebas.' });
+    }
+
     // 1. Verificar elegibilidad por plan específico
     const eligibility = await db.checkTrialEligibility(telegramId, trialPlanType || 'basico');
     if (!eligibility.eligible) {
@@ -2560,6 +2566,7 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
 // Listar solicitudes de reembolso pendientes (panel admin)
 app.get('/api/refund-requests', async (req, res) => {
   try {
+    if (!isAdmin(req.query.requesterId || req.query.adminId)) return res.status(403).json({ error: 'No autorizado' });
     const requests = await db.getRefundRequests();
     // Enriquecer con datos de usuario
     const enriched = await Promise.all(requests.map(async (r) => {
