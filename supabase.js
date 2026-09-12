@@ -1955,6 +1955,12 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     return data || [];
   },
 
+  async getResellerClients(resellerId) {
+    const { data, error } = await dbClient.from('reseller_clients').select('*').eq('reseller_id', resellerId).order('linked_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
   async requestWithdrawal(resellerId, amount) {
     const reseller = await this.getResellerById(resellerId);
     const { error: insErr } = await dbClient.from('reseller_withdrawals').insert([{ reseller_id: resellerId, amount, status: 'pending' }]);

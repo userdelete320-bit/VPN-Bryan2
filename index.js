@@ -3229,6 +3229,14 @@ app.get('/api/resellers/me/:telegramId/history', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
 });
 
+app.get('/api/resellers/me/:telegramId/clients', async (req, res) => {
+  try {
+    const reseller = await db.getReseller(req.params.telegramId);
+    if (!reseller) return res.json([]);
+    res.json(await db.getResellerClients(reseller.id));
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
 // Config pública del programa (para mostrar niveles/comisiones/mínimo de retiro en la app)
 app.get('/api/resellers/config', async (req, res) => {
   try { res.json(await db.getResellerConfig()); } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
