@@ -1869,7 +1869,7 @@
   const urlParamsInit = new URLSearchParams(window.location.search);
   const currentUser = {
     id: urlParamsInit.get('userId') || tgUser.id || '',
-    username: tgUser.username ? '@' + tgUser.username : '',
+    username: tgUser.username || '',
   };
   const TICKET_CATEGORIES = [
     { key:'no-conecta', label:'No conecta', icon:'🔌' },
@@ -3077,11 +3077,22 @@ PersistentKeepalive = 25`;
       </div>`).join('');
   }
 
-  function renderResellerLink(){
+  async function renderResellerLink(){
     if (!currentUser.id) return;
     document.getElementById('resellerLinkValue').textContent = 't.me/vpncubaw_bot?start=reseller_' + currentUser.id;
     const list = document.getElementById('resellerClientsList');
-    list.innerHTML = '<div class="reseller-clients-empty">Comparte tu enlace para que tus clientes queden ligados a ti automáticamente.</div>';
+    list.innerHTML = '<div class="admin-empty">Cargando…</div>';
+    let clients = [];
+    try { clients = await (await fetch(`/api/resellers/me/${encodeURIComponent(currentUser.id)}/clients`)).json(); } catch (e) {}
+    if (!clients.length){
+      list.innerHTML = '<div class="reseller-clients-empty">Comparte tu enlace para que tus clientes queden ligados a ti automáticamente.</div>';
+      return;
+    }
+    list.innerHTML = clients.map(c => `
+      <div class="exp-user-row">
+        <div class="eu-avatar">${(c.client_username || c.client_telegram_id).slice(0,1).toUpperCase()}</div>
+        <div class="eu-info"><div class="eu-name">${c.client_username ? '@' + c.client_username : c.client_telegram_id}</div><div class="eu-sub">ID ${c.client_telegram_id} · ligado ${timeAgo(new Date(c.linked_at).getTime())}</div></div>
+      </div>`).join('');
   }
   function copyResellerLink(){
     const link = 'https://t.me/vpncubaw_bot?start=reseller_' + currentUser.id;
