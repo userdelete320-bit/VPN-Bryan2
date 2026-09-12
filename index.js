@@ -564,6 +564,15 @@ if (!fs.existsSync('public')) fs.mkdirSync('public', { recursive: true });
 // Ruta de fallback (archivo de plan individual para trial legacy)
 const TRIAL_CURRENT_FILE = path.join(UPLOADS_DIR, 'trial_files_basico', 'trial_current');
 
+// Determina el nivel de un revendedor según sus ventas acumuladas y los umbrales configurables
+function getResellerLevel(salesCount, thresholds) {
+  const order = ['elite', 'oro', 'plata', 'bronce'];
+  for (const level of order) {
+    if (salesCount >= (thresholds[level] ?? Infinity)) return level;
+  }
+  return 'bronce';
+}
+
 function getPlanName(planType) {
   const plans = {
     'basico': 'Básico (1 mes)',
@@ -1151,9 +1160,23 @@ app.get('/api/check-terms/:telegramId', async (req, res) => {
 
 app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
   try {
-    const { telegramId, plan, price, notes, method, couponCode, upgrade_to, from_plan, duration, ip_choice } = req.body;
+    const { telegramId, plan, price, notes, method, couponCode, upgrade_to, from_plan, duration, ip_choice, resellerId, resellerClientUsername } = req.body;
     if (!telegramId || !plan || !price) return res.status(400).json({ error: 'Datos incompletos' });
     if (!req.file) return res.status(400).json({ error: 'Captura de pantalla requerida' });
+
+    // Si un revendedor está registrando esta venta, liga (o confirma el vínculo) del cliente
+    let linkedResellerId = null;
+    if (resellerId) {
+      try {
+        const link = await db.linkClientToReseller(telegramId, resellerClientUsername || null, Number(resellerId));
+        if (Number(link.reseller_id) !== Number(resellerId)) {
+          return res.status(409).json({ error: 'Este cliente ya está ligado a otro revendedor, no puedes registrar esta venta.' });
+        }
+        linkedResellerId = Number(resellerId);
+      } catch (linkErr) {
+        return res.status(500).json({ error: 'Error ligando cliente al revendedor: ' + linkErr.message });
+      }
+    }
 
     let screenshotUrl = '';
     try {
@@ -1196,7 +1219,7 @@ app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
       status: 'pending', created_at: new Date().toISOString(),
       coupon_used: couponUsed, coupon_code: couponUsed ? couponCode?.toUpperCase() : null, coupon_discount: couponDiscount,
       payment_type: isUpgrade ? 'upgrade' : 'purchase', upgrade_to: upgrade_to || null, from_plan: from_plan || null,
-      duration: duration || null, ip_choice: ip_choice || null
+      duration: duration || null, ip_choice: ip_choice || null, reseller_id: linkedResellerId
     });
     if (!payment) throw new Error('No se pudo crear el pago en la base de datos');
 
@@ -1385,6 +1408,30 @@ app.post('/api/payments/:id/approve', async (req, res) => {
       console.error('❌ Error en auto-envío de config:', cfgErr.message);
       configWarning = 'Error al enviar la configuración automáticamente. Envía manualmente.';
     }
+
+    // Comisión de revendedor: aplica a CUALQUIER pago aprobado de un cliente ligado,
+    // sin importar si la compra la hizo el propio cliente o el revendedor por él.
+    try {
+      const link = await db.getResellerForClient(payment.telegram_id);
+      if (link) {
+        const reseller = await db.getResellerById(link.reseller_id);
+        if (reseller && reseller.status === 'active') {
+          const cfg = await db.getResellerConfig();
+          const level = getResellerLevel(reseller.sales_count, cfg.level_thresholds);
+          const commission = Number(cfg.level_commissions[level] || 0);
+          await db.recordResellerSale({
+            reseller_id: reseller.id, payment_id: payment.id,
+            client_telegram_id: payment.telegram_id, client_username: link.client_username,
+            plan: payment.plan, commission,
+          });
+          try {
+            await bot.telegram.sendMessage(reseller.telegram_id,
+              `💰 <b>¡Nueva comisión!</b>\n\nUn cliente tuyo pagó el plan ${getPlanName(payment.plan)}.\nGanaste <b>${commission} CUP</b> de comisión.`,
+              { parse_mode: 'HTML' });
+          } catch (e) {}
+        }
+      }
+    } catch (resellerErr) { console.error('❌ Error acreditando comisión de revendedor:', resellerErr.message); }
 
     try {
       await db.markReferralAsPaid(payment.telegram_id);
@@ -2966,6 +3013,16 @@ bot.start(async (ctx) => {
         referrerId = startPayload.replace('ref', '');
         try { const referrer = await db.getUser(referrerId); if (referrer) referrerUsername = referrer.username; } catch (e) {}
     }
+    // Vínculo permanente cliente → revendedor (no se pisa si el cliente ya estaba ligado a otro)
+    if (startPayload && startPayload.startsWith('reseller_') && !isGroup) {
+        try {
+            const resellerTelegramId = startPayload.replace('reseller_', '');
+            const reseller = await db.getReseller(resellerTelegramId);
+            if (reseller && reseller.status === 'active') {
+                await db.linkClientToReseller(userId.toString(), ctx.from.username, reseller.id);
+            }
+        } catch (e) { console.error('❌ Error enlazando cliente a revendedor (start):', e.message); }
+    }
     try {
         const userData = { telegram_id: userId.toString(), username: ctx.from.username, first_name: firstName, last_name: ctx.from.last_name, created_at: new Date().toISOString(), is_active: true };
         if (referrerId) { userData.referrer_id = referrerId; userData.referrer_username = referrerUsername; }
@@ -3134,6 +3191,159 @@ bot.on('text', async (ctx) => {
   const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
   if (text === '📁 VER PLANES') { await ctx.reply('📋 *NUESTROS PLANES*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR WEB DE PLANES", wa(`${webappUrl}/app.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
   else if (text === '⌨ PANEL ADMIN' && esAdmin) { await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(`${webappUrl}/admin.html?userId=${userId}&admin=true`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
+});
+
+// ==================== REVENDEDORES ====================
+
+// Usuario: solicitar ser revendedor
+app.post('/api/resellers/request', async (req, res) => {
+  try {
+    const { telegramId, username, name } = req.body;
+    if (!telegramId) return res.status(400).json({ error: 'Falta telegramId' });
+    const existing = await db.getReseller(telegramId);
+    if (existing) return res.status(409).json({ error: `Ya tienes una solicitud (estado: ${existing.status}).` });
+    const reseller = await db.requestReseller(telegramId, username, name);
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, `🧑‍💼 Nueva solicitud de revendedor: ${username ? '@' + username : telegramId}`); } catch (e) {}
+    }
+    res.json({ success: true, reseller });
+  } catch (error) { res.status(500).json({ error: 'Error solicitando: ' + error.message }); }
+});
+
+// Ver mi propio estado de revendedor (o null si nunca solicitó)
+app.get('/api/resellers/me/:telegramId', async (req, res) => {
+  try {
+    const reseller = await db.getReseller(req.params.telegramId);
+    if (!reseller) return res.json(null);
+    const cfg = await db.getResellerConfig();
+    const level = getResellerLevel(reseller.sales_count, cfg.level_thresholds);
+    res.json({ ...reseller, level, commission_per_sale: cfg.level_commissions[level] });
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
+app.get('/api/resellers/me/:telegramId/history', async (req, res) => {
+  try {
+    const reseller = await db.getReseller(req.params.telegramId);
+    if (!reseller) return res.json([]);
+    res.json(await db.getResellerSales(reseller.id));
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
+// Config pública del programa (para mostrar niveles/comisiones/mínimo de retiro en la app)
+app.get('/api/resellers/config', async (req, res) => {
+  try { res.json(await db.getResellerConfig()); } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
+app.post('/api/resellers/config/update', async (req, res) => {
+  try {
+    if (!isSuperAdmin(req.body.requesterId)) return res.status(403).json({ error: 'Solo el administrador principal puede cambiar esto.' });
+    const { active, level_commissions, level_thresholds, min_withdraw, monthly_bonuses } = req.body;
+    const patch = {};
+    if (active !== undefined) patch.active = active;
+    if (level_commissions) patch.level_commissions = level_commissions;
+    if (level_thresholds) patch.level_thresholds = level_thresholds;
+    if (min_withdraw !== undefined) patch.min_withdraw = min_withdraw;
+    if (monthly_bonuses) patch.monthly_bonuses = monthly_bonuses;
+    res.json({ success: true, config: await db.updateResellerConfig(patch) });
+  } catch (error) { res.status(500).json({ error: 'Error guardando configuración: ' + error.message }); }
+});
+
+// Admin: solicitudes pendientes y lista completa
+app.get('/api/resellers/pending', async (req, res) => {
+  try {
+    if (!isAdmin(req.query.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    res.json(await db.getPendingResellers());
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+app.get('/api/resellers', async (req, res) => {
+  try {
+    if (!isAdmin(req.query.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    res.json(await db.getAllResellers());
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+app.post('/api/resellers/:id/approve', async (req, res) => {
+  try {
+    if (!isAdmin(req.body.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const reseller = await db.setResellerStatus(req.params.id, 'active');
+    try { await bot.telegram.sendMessage(reseller.telegram_id, '✅ ¡Felicidades! Ya eres revendedor autorizado de VPN Cuba.'); } catch (e) {}
+    res.json({ success: true, reseller });
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+app.post('/api/resellers/:id/reject', async (req, res) => {
+  try {
+    if (!isAdmin(req.body.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const reseller = await db.setResellerStatus(req.params.id, 'rejected');
+    try { await bot.telegram.sendMessage(reseller.telegram_id, '❌ Tu solicitud para ser revendedor no fue aprobada.'); } catch (e) {}
+    res.json({ success: true, reseller });
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+app.post('/api/resellers/:id/toggle-status', async (req, res) => {
+  try {
+    if (!isAdmin(req.body.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const current = await db.getResellerById(req.params.id);
+    if (!current) return res.status(404).json({ error: 'No encontrado' });
+    const reseller = await db.setResellerStatus(req.params.id, current.status === 'active' ? 'suspended' : 'active');
+    res.json({ success: true, reseller });
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
+// Retiros
+app.post('/api/resellers/withdraw', async (req, res) => {
+  try {
+    const { telegramId, amount } = req.body;
+    const reseller = await db.getReseller(telegramId);
+    if (!reseller || reseller.status !== 'active') return res.status(403).json({ error: 'No eres un revendedor activo.' });
+    const cfg = await db.getResellerConfig();
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return res.status(400).json({ error: 'Monto inválido.' });
+    if (amt < Number(cfg.min_withdraw)) return res.status(400).json({ error: `El retiro mínimo es ${cfg.min_withdraw} CUP.` });
+    if (amt > Number(reseller.earnings_available)) return res.status(400).json({ error: 'No tienes suficiente ganancia disponible.' });
+    await db.requestWithdrawal(reseller.id, amt);
+    for (const adminId of ADMIN_IDS) {
+      try { await bot.telegram.sendMessage(adminId, `💸 Solicitud de retiro: ${reseller.username ? '@' + reseller.username : telegramId} pide ${amt} CUP.`); } catch (e) {}
+    }
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: 'Error solicitando retiro: ' + error.message }); }
+});
+app.get('/api/resellers/withdrawals', async (req, res) => {
+  try {
+    if (!isAdmin(req.query.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    res.json(await db.getPendingWithdrawals());
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+app.post('/api/resellers/withdrawals/:id/resolve', async (req, res) => {
+  try {
+    if (!isAdmin(req.body.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const { action, note } = req.body;
+    if (!['pay', 'reject'].includes(action)) return res.status(400).json({ error: 'Acción inválida' });
+    const result = await db.resolveWithdrawal(req.params.id, action, note || '');
+    try {
+      await bot.telegram.sendMessage(result.reseller_telegram_id,
+        action === 'pay' ? `✅ Tu retiro de ${result.amount} CUP fue pagado.` : `❌ Tu retiro de ${result.amount} CUP fue rechazado.${note ? ' Motivo: ' + note : ''}`);
+    } catch (e) {}
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
+// Ranking mensual (público, sin datos sensibles)
+app.get('/api/resellers/ranking', async (req, res) => {
+  try { res.json(await db.getResellerRanking()); } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
+// Finanzas del programa (admin)
+app.get('/api/resellers/finance', async (req, res) => {
+  try {
+    if (!isAdmin(req.query.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const all = await db.getAllResellers();
+    const withdrawals = await db.getPendingWithdrawals();
+    res.json({
+      total_resellers: all.filter(r => r.status === 'active').length,
+      total_earnings_available: all.reduce((s, r) => s + Number(r.earnings_available || 0), 0),
+      total_pending_withdrawals: withdrawals.reduce((s, w) => s + Number(w.amount || 0), 0),
+      total_withdrawn: all.reduce((s, r) => s + Number(r.total_withdrawn || 0), 0),
+      top_resellers: all.slice(0, 10),
+    });
+  } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
 });
 
 // ==================== SOPORTE (TICKETS) ====================

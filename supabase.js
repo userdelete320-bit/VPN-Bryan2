@@ -547,6 +547,7 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
           coupon_code: paymentData.coupon_code || null,
           coupon_discount: paymentData.coupon_discount || 0,
           referral_discount: paymentData.referral_discount || 0,
+          reseller_id: paymentData.reseller_id || null,
           created_at: paymentData.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -1859,6 +1860,139 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     }
   },
 
+  // ========== REVENDEDORES ==========
+  async requestReseller(telegramId, username, name) {
+    const { data, error } = await dbClient
+      .from('resellers')
+      .insert([{ telegram_id: String(telegramId).trim(), username, name, status: 'pending' }])
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getReseller(telegramId) {
+    const { data, error } = await dbClient.from('resellers').select('*').eq('telegram_id', String(telegramId).trim()).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async getResellerById(id) {
+    const { data, error } = await dbClient.from('resellers').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async getPendingResellers() {
+    const { data, error } = await dbClient.from('resellers').select('*').eq('status', 'pending').order('requested_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getAllResellers() {
+    const { data, error } = await dbClient.from('resellers').select('*').order('earnings_available', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async setResellerStatus(id, status) {
+    const patch = { status, updated_at: new Date().toISOString() };
+    if (status === 'active') patch.approved_at = new Date().toISOString();
+    const { data, error } = await dbClient.from('resellers').update(patch).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  // Vínculo permanente cliente → revendedor. Devuelve el vínculo existente si ya
+  // había uno (de cualquier revendedor), o crea uno nuevo si el cliente está libre.
+  async linkClientToReseller(clientTelegramId, clientUsername, resellerId) {
+    const existing = await dbClient.from('reseller_clients').select('*').eq('client_telegram_id', String(clientTelegramId).trim()).maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data) return existing.data; // ya ligado (a este mismo u otro revendedor)
+    const { data, error } = await dbClient
+      .from('reseller_clients')
+      .insert([{ client_telegram_id: String(clientTelegramId).trim(), client_username: clientUsername, reseller_id: resellerId }])
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getResellerForClient(clientTelegramId) {
+    const { data, error } = await dbClient.from('reseller_clients').select('*').eq('client_telegram_id', String(clientTelegramId).trim()).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async getResellerConfig() {
+    const { data, error } = await dbClient.from('reseller_config').select('*').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateResellerConfig(patch) {
+    const { data, error } = await dbClient.from('reseller_config').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  // Registra la venta + acredita comisión (llamado al aprobar un pago de un cliente ligado)
+  async recordResellerSale({ reseller_id, payment_id, client_telegram_id, client_username, plan, commission }) {
+    const { error: insErr } = await dbClient.from('reseller_sales').insert([{ reseller_id, payment_id, client_telegram_id, client_username, plan, commission }]);
+    if (insErr) throw insErr;
+
+    const reseller = await this.getResellerById(reseller_id);
+    const { error: updErr } = await dbClient.from('resellers').update({
+      sales_count: (reseller.sales_count || 0) + 1,
+      month_sales: (reseller.month_sales || 0) + 1,
+      earnings_available: Number(reseller.earnings_available || 0) + Number(commission),
+      updated_at: new Date().toISOString(),
+    }).eq('id', reseller_id);
+    if (updErr) throw updErr;
+  },
+
+  async getResellerSales(resellerId) {
+    const { data, error } = await dbClient.from('reseller_sales').select('*').eq('reseller_id', resellerId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async requestWithdrawal(resellerId, amount) {
+    const reseller = await this.getResellerById(resellerId);
+    const { error: insErr } = await dbClient.from('reseller_withdrawals').insert([{ reseller_id: resellerId, amount, status: 'pending' }]);
+    if (insErr) throw insErr;
+    const { error: updErr } = await dbClient.from('resellers').update({
+      earnings_available: Number(reseller.earnings_available) - Number(amount),
+      pending_withdraw: Number(reseller.pending_withdraw || 0) + Number(amount),
+      updated_at: new Date().toISOString(),
+    }).eq('id', resellerId);
+    if (updErr) throw updErr;
+  },
+
+  async getPendingWithdrawals() {
+    const { data, error } = await dbClient.from('reseller_withdrawals').select('*, resellers(username, telegram_id)').eq('status', 'pending').order('requested_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async resolveWithdrawal(withdrawalId, action, note) {
+    const { data: w, error: wErr } = await dbClient.from('reseller_withdrawals').select('*').eq('id', withdrawalId).single();
+    if (wErr) throw wErr;
+    const reseller = await this.getResellerById(w.reseller_id);
+
+    await dbClient.from('reseller_withdrawals').update({ status: action === 'pay' ? 'paid' : 'rejected', note, resolved_at: new Date().toISOString() }).eq('id', withdrawalId);
+
+    const patch = { pending_withdraw: Math.max(0, Number(reseller.pending_withdraw || 0) - Number(w.amount)), updated_at: new Date().toISOString() };
+    if (action === 'pay') patch.total_withdrawn = Number(reseller.total_withdrawn || 0) + Number(w.amount);
+    else patch.earnings_available = Number(reseller.earnings_available || 0) + Number(w.amount); // se devuelve si se rechaza
+    await dbClient.from('resellers').update(patch).eq('id', w.reseller_id);
+
+    return { ...w, reseller_telegram_id: reseller.telegram_id };
+  },
+
+  async getResellerRanking() {
+    const { data, error } = await dbClient.from('resellers').select('username, telegram_id, month_sales').eq('status', 'active').order('month_sales', { ascending: false }).limit(10);
+    if (error) throw error;
+    return data || [];
+  }
 };
 
 module.exports = db;
