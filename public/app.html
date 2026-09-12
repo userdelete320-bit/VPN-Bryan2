@@ -760,8 +760,8 @@
 
     <div class="section-label">Código de descuento</div>
     <div class="discount-row">
-      <input type="text" id="discountInput" placeholder="Ej. VPNCUBA10" maxlength="20">
-      <button class="discount-apply" onclick="applyDiscount()">Aplicar</button>
+      <input type="text" id="discountInput" placeholder="Código de cupón" maxlength="20">
+      <button class="discount-apply" id="applyDiscountBtn" onclick="applyDiscount()">Aplicar</button>
     </div>
     <div class="discount-applied" id="discountApplied">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
@@ -1155,7 +1155,8 @@
     <div class="topbar-title">🏪 Panel del revendedor</div>
     <div style="width:38px"></div>
   </div>
-  <div class="wrap">
+  <div id="resellerGate" style="display:none; padding:16px"></div>
+  <div class="wrap" id="resellerWrap">
     <div class="reseller-level-banner" id="resellerLevelBanner"></div>
     <div class="resell-stats-grid" id="resellerStatsGrid"></div>
 
@@ -1202,7 +1203,7 @@
 
     <div class="field" id="sellDurationField" style="display:none">
       <label>Duración (Plan Express)</label>
-      <select id="sellDuration" onchange="updateSellCost()">
+      <select id="sellDuration" onchange="checkSellEnabled()">
         <option value="24h">24 horas</option>
         <option value="3dias">3 días</option>
         <option value="7dias">7 días</option>
@@ -1210,19 +1211,22 @@
     </div>
 
     <div class="field">
-      <label>Telegram / ID del cliente</label>
-      <input type="text" id="sellClient" placeholder="@usuario o ID de Telegram" oninput="checkSellEnabled()">
+      <label>Telegram ID del cliente</label>
+      <input type="text" id="sellClient" placeholder="ID numérico de Telegram del cliente" oninput="checkSellEnabled()">
+    </div>
+    <div class="field">
+      <label>Usuario del cliente (opcional)</label>
+      <input type="text" id="sellClientUsername" placeholder="@usuario">
     </div>
 
     <div class="summary-card">
-      <div class="summary-row"><span>Costo de la configuración</span><span id="sellCost">Elige un plan</span></div>
-      <div class="summary-row"><span>Tu saldo disponible</span><span id="sellBalance">—</span></div>
       <div class="summary-row total"><span>Comisión que ganarás</span><span id="sellCommission" style="color:var(--teal-2); font-size:16px">—</span></div>
     </div>
     <div class="foot-note" id="sellWarning" style="display:none; color:var(--red-2)"></div>
+    <div class="foot-note">Se te pedirá pagar el precio normal del plan (igual que a cualquier cliente). Al aprobarse el pago, la comisión se te acredita automáticamente.</div>
 
     <button class="plan-cta primary" id="confirmSellBtn" disabled onclick="confirmSale()" style="margin-top:14px">
-      Confirmar venta
+      Continuar al pago
     </button>
   </div>
 </div>
@@ -1793,7 +1797,7 @@
     paypal: { label:'PayPal', value:'paypal.me/vpncubaw' },
     zelle:  { label:'Zelle', value:null, note:'Escríbenos por el bot para recibir los datos de Zelle' },
   };
-  const DISCOUNTS = { 'VPNCUBA10': 0.10, 'BIENVENIDO15': 0.15 };
+  // Los cupones ya se validan contra el backend real (/api/coupons/verify) — ver applyDiscount()
   const DEVICE_STEPS = {
     android: ['Instala <b>WireGuard</b> desde Google Play Store.', 'Abre la app, toca <b>"+"</b> y elige <b>"Escanear código QR"</b>.', 'Apunta la cámara al código de arriba y activa el interruptor para conectar.'],
     ios: ['Instala <b>WireGuard</b> desde el App Store.', 'Abre la app, toca <b>"+"</b> → <b>"Crear desde código QR"</b>.', 'Escanea el código y activa el túnel desde la app.'],
@@ -1806,6 +1810,7 @@
     expressDuration: '24h', expressRegion: 'cuba',
     gameInfo: { game:'', connection:'app', device:'android', details:'' },
     discountCode: null, discountPercent: 0, levelDiscountPercent: 0,
+    resellerSaleClient: null,
     proofFile: null,
     soldOut: {},
     triedPlans: new Set(),
@@ -1838,51 +1843,25 @@
     oro:    { name:'Oro',    icon:'🥇' },
     elite:  { name:'Élite',  icon:'👑' },
   };
-  let resellerConfig = {
-    active: true,
-    levelCommissions: { bronce:500, plata:520, oro:560, elite:600 },
-    levelThresholds:  { bronce:0,   plata:20,  oro:50,  elite:100 },
-    minWithdraw: 2000,
-    monthlyBonuses: { 1:3000, 2:1500, 3:800 },
-  };
+  // ==================== REVENDEDORES (real) ====================
+  let myReseller = null;          // null = nunca solicitó; si no, trae status: pending|active|rejected|suspended
+  let realResellerConfig = null;  // se carga de /api/resellers/config
+  let resellerHistoryCache = [];
+  let adminResellersCache = [];
+  let adminWithdrawalsCache = [];
+  let sellClientLink = null;      // { telegramId, username } confirmado antes de ir al checkout real
+
   function resellerLevelFor(sales){
-    const t = resellerConfig.levelThresholds;
+    if (!realResellerConfig) return 'bronce';
+    const t = realResellerConfig.level_thresholds;
     if (sales >= t.elite) return 'elite';
     if (sales >= t.oro) return 'oro';
     if (sales >= t.plata) return 'plata';
     return 'bronce';
   }
-  function resellerCommissionFor(reseller){
-    return resellerConfig.levelCommissions[resellerLevelFor(reseller.salesCount)];
+  function resellerCommissionForLevel(level){
+    return realResellerConfig ? (realResellerConfig.level_commissions[level] || 0) : 0;
   }
-  function resellerCostFor(planKey, duration){
-    if (planKey === 'express') return PRICES.express[duration].cup;
-    return PRICES[planKey].cup;
-  }
-
-  let resellers = [
-    { id:'RS-1001', code:'reseller_123', name:'Carlos M.', username:'@carlosm', active:true,
-      balance:5200, earnings:2500, pendingWithdraw:0, totalWithdrawn:1000, salesCount:63, monthSales:11,
-      clients:[{ id:'900112233', username:'@yunieski', plan:'basico', date:Date.now()-86400e3*4 },
-               { id:'900112244', username:'@lisandra', plan:'gaming', date:Date.now()-86400e3*1 }],
-      history:[
-        { id:'#VC-10482', client:'@yunieski', clientId:'900112233', plan:'basico', durLabel:'30 días', price:1300, status:'completed', commission:500, ts:Date.now()-86400e3*4 },
-        { id:'#VC-10501', client:'@lisandra', clientId:'900112244', plan:'gaming', durLabel:'30 días', price:1600, status:'completed', commission:500, ts:Date.now()-86400e3*1 },
-      ] },
-    { id:'RS-1002', code:'reseller_205', name:'Yeni R.', username:'@yenir', active:true,
-      balance:1800, earnings:900, pendingWithdraw:0, totalWithdrawn:0, salesCount:35, monthSales:6, clients:[], history:[] },
-    { id:'RS-1003', code:'reseller_310', name:'Osmany P.', username:'@osmanyp', active:true,
-      balance:9100, earnings:5200, pendingWithdraw:0, totalWithdrawn:3000, salesCount:112, monthSales:18, clients:[], history:[] },
-    { id:'RS-1004', code:'reseller_118', name:'Diosmel T.', username:'@diosmelt', active:false,
-      balance:300, earnings:0, pendingWithdraw:0, totalWithdrawn:0, salesCount:8, monthSales:1, clients:[], history:[] },
-  ];
-  // El "revendedor actual" (usuario de esta sesión). En producción esto vendría del ID de Telegram autenticado.
-  let currentReseller = resellers[0];
-
-  let resellerWithdrawals = [
-    { id:'RW-501', resellerId:'RS-1003', amount:3000, method:'bpa', status:'paid', ts:Date.now()-86400e3*10 },
-    { id:'RW-502', resellerId:'RS-1001', amount:1000, method:'saldo', status:'pending', ts:Date.now()-3600e3*5 },
-  ];
 
   // ==================== CENTRO DE SOPORTE (demo en sesión — conectar a backend real) ====================
   const tgWebApp = window.Telegram?.WebApp || null;
@@ -2059,6 +2038,10 @@
         </div>
         <div class="faq-answer">${f.a}</div>
       </div>`).join('');
+  }
+  function toggleFaqItem(i){
+    const el = document.getElementById('faqItem' + i);
+    if (el) el.classList.toggle('open');
   }
 
   // ==================== ADMIN: centro de soporte (solo administradores) ====================
@@ -2482,24 +2465,40 @@
   }
 
   // ==================== DISCOUNT ====================
-  function applyDiscount(){
+  async function applyDiscount(){
     const input = document.getElementById('discountInput');
     const code = input.value.trim().toUpperCase();
     if (!code) return;
-    if (DISCOUNTS[code]){
-      state.discountCode = code;
-      state.discountPercent = DISCOUNTS[code];
+    if (!currentUser.id) { showToast('No se pudo identificar tu usuario. Abre la app desde el bot de Telegram.'); return; }
+
+    const btn = document.getElementById('applyDiscountBtn');
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch(`/api/coupons/verify/${encodeURIComponent(code)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId: currentUser.id }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error'); } catch(e) {}
+        input.style.borderColor = 'rgba(246,104,92,0.7)';
+        showToast(data.error || 'Cupón inválido.');
+        setTimeout(() => { input.style.borderColor = ''; }, 900);
+        return;
+      }
+      state.discountCode = data.coupon.code;
+      state.discountPercent = data.coupon.discount / 100;
       document.getElementById('discountApplied').classList.add('show');
-      document.getElementById('discountText').textContent = `Código "${code}" aplicado: -${state.discountPercent*100}%`;
+      document.getElementById('discountText').textContent = `Código "${state.discountCode}" aplicado: -${data.coupon.discount}%`;
       input.disabled = true;
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
-    } else {
-      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error'); } catch(e) {}
-      input.style.borderColor = 'rgba(246,104,92,0.7)';
-      setTimeout(() => { input.style.borderColor = ''; }, 900);
+    } catch (err) {
+      showToast('No se pudo verificar el cupón: ' + err.message);
+    } finally {
+      if (btn) btn.disabled = false;
+      renderPaymentMethods();
+      updateTotals();
     }
-    renderPaymentMethods();
-    updateTotals();
   }
   function removeDiscount(){
     state.discountCode = null; state.discountPercent = state.levelDiscountPercent;
@@ -2599,6 +2598,8 @@
     const period = currentPeriod(state.plan);
     const backendPlan = PLAN_BACKEND_KEY[state.plan] || state.plan;
     const backendMethod = backendMethodFor(state.method);
+    const isResellerSale = !!state.resellerSaleClient;
+    const payTelegramId = isResellerSale ? state.resellerSaleClient.telegramId : currentUser.id;
 
     try {
       // Telegram Stars: se paga con factura nativa del bot, no requiere comprobante
@@ -2606,11 +2607,11 @@
         const res = await fetch('/api/initiate-stars-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId: String(currentUser.id), plan: backendPlan }),
+          body: JSON.stringify({ telegramId: String(payTelegramId), plan: backendPlan }),
         });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo iniciar el pago con Stars.');
-        showToast('Te enviamos la factura de Telegram Stars por el chat del bot. Complétala ahí para activar tu plan.');
+        showToast('Se envió la factura de Telegram Stars al chat del cliente con el bot.');
         btn.removeAttribute('disabled');
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Confirmar y pagar <span id="btnAmount">' + label + '</span>';
         return;
@@ -2622,13 +2623,17 @@
         ? `Juego: ${gi.game || '-'} | Conexión: ${gi.connection || '-'} | Dispositivo: ${gi.device || '-'} | Detalles: ${gi.details || '-'}`
         : '';
       const form = new FormData();
-      form.append('telegramId', String(currentUser.id));
+      form.append('telegramId', String(payTelegramId));
       form.append('plan', backendPlan);
       form.append('price', String(price));
       form.append('notes', gameNotes);
       form.append('method', backendMethod);
       form.append('couponCode', state.discountCode || '');
       form.append('referralDiscount', String(state.discountPercent || 0));
+      if (isResellerSale) {
+        form.append('resellerId', String(myReseller.id));
+        form.append('resellerClientUsername', state.resellerSaleClient.username || '');
+      }
       if (p.isExpress) {
         form.append('duration', state.expressDuration);
         form.append('ip_choice', state.expressRegion);
@@ -2648,14 +2653,22 @@
 
       // El pago queda pendiente de aprobación del staff: "Mi config" se bloquea
       // hasta que se apruebe desde tu panel de administración real.
-      state.lastOrderId = orderId;
-      state.paymentApproved = false;
-      renderConfigAccessUI();
+      if (!isResellerSale) {
+        state.lastOrderId = orderId;
+        state.paymentApproved = false;
+        renderConfigAccessUI();
+      }
 
       btn.removeAttribute('disabled');
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Confirmar y pagar <span id="btnAmount">' + label + '</span>';
 
-      goTo('screen-success');
+      if (isResellerSale) {
+        showToast('Venta registrada. Se acreditará tu comisión cuando el staff apruebe el pago.');
+        state.resellerSaleClient = null;
+        goTo('screen-reseller-history');
+      } else {
+        goTo('screen-success');
+      }
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
     } catch (err) {
       showToast(err.message || 'No se pudo procesar tu pago. Intenta de nuevo.');
@@ -2907,15 +2920,61 @@ PersistentKeepalive = 25`;
   // ==================== PANEL DEL REVENDEDOR ====================
   function fmtCUP(n){ return Math.round(n).toLocaleString('es-CU') + ' CUP'; }
 
-  function renderResellerHub(){
-    const r = currentReseller;
-    const level = resellerLevelFor(r.salesCount);
+  async function renderResellerHub(){
+    const gate = document.getElementById('resellerGate');
+    const wrap = document.getElementById('resellerWrap');
+    if (!currentUser.id) { showToast('No se pudo identificar tu usuario.'); return; }
+
+    try {
+      const [meRes, cfgRes] = await Promise.all([
+        fetch(`/api/resellers/me/${encodeURIComponent(currentUser.id)}`),
+        fetch('/api/resellers/config'),
+      ]);
+      myReseller = await meRes.json();
+      realResellerConfig = await cfgRes.json();
+    } catch (e) {
+      gate.style.display = 'block'; wrap.style.display = 'none';
+      gate.innerHTML = `<div class="admin-empty">No se pudo cargar tu información. Intenta de nuevo.</div>`;
+      return;
+    }
+
+    if (!myReseller){
+      gate.style.display = 'block'; wrap.style.display = 'none';
+      gate.innerHTML = `
+        <div class="summary-card" style="text-align:center; padding:24px 16px">
+          <div style="font-size:32px; margin-bottom:10px">🏪</div>
+          <div style="font-weight:700; font-size:15px; margin-bottom:6px">Todavía no eres revendedor</div>
+          <div class="foot-note" style="margin:0 0 16px 0">Vende configuraciones a tus clientes y gana comisión por cada una. Tu solicitud la revisa el staff.</div>
+          <button class="plan-cta primary" onclick="requestReseller()">Solicitar ser revendedor</button>
+        </div>`;
+      return;
+    }
+    if (myReseller.status === 'pending'){
+      gate.style.display = 'block'; wrap.style.display = 'none';
+      gate.innerHTML = `<div class="summary-card" style="text-align:center; padding:24px 16px"><div style="font-size:32px; margin-bottom:10px">⏳</div><div style="font-weight:700; font-size:15px">Tu solicitud está en revisión</div><div class="foot-note" style="margin-top:6px">El staff te avisará por el bot en cuanto la revise.</div></div>`;
+      return;
+    }
+    if (myReseller.status === 'rejected'){
+      gate.style.display = 'block'; wrap.style.display = 'none';
+      gate.innerHTML = `<div class="summary-card" style="text-align:center; padding:24px 16px"><div style="font-size:32px; margin-bottom:10px">❌</div><div style="font-weight:700; font-size:15px">Tu solicitud no fue aprobada</div></div>`;
+      return;
+    }
+    if (myReseller.status === 'suspended'){
+      gate.style.display = 'block'; wrap.style.display = 'none';
+      gate.innerHTML = `<div class="summary-card" style="text-align:center; padding:24px 16px"><div style="font-size:32px; margin-bottom:10px">🚫</div><div style="font-weight:700; font-size:15px">Tu cuenta de revendedor está suspendida</div></div>`;
+      return;
+    }
+
+    // status === 'active'
+    gate.style.display = 'none'; wrap.style.display = '';
+    const r = myReseller;
+    const level = r.level;
     const meta = LEVEL_META[level];
-    const commission = resellerCommissionFor(r);
+    const commission = r.commission_per_sale;
     const order = ['bronce','plata','oro','elite'];
     const nextLevel = order[order.indexOf(level) + 1];
     const nextNote = nextLevel
-      ? `Te faltan ${resellerConfig.levelThresholds[nextLevel] - r.salesCount} ventas para subir a ${LEVEL_META[nextLevel].name} (${resellerConfig.levelCommissions[nextLevel]} CUP/config)`
+      ? `Te faltan ${realResellerConfig.level_thresholds[nextLevel] - r.sales_count} ventas para subir a ${LEVEL_META[nextLevel].name} (${realResellerConfig.level_commissions[nextLevel]} CUP/config)`
       : 'Ya tienes el nivel máximo disponible';
 
     document.getElementById('resellerLevelBanner').innerHTML = `
@@ -2923,24 +2982,37 @@ PersistentKeepalive = 25`;
       <div class="rl-text"><div class="rl-title">Nivel ${meta.name}</div><div class="rl-sub">${nextNote}</div></div>
       <div class="rl-commission"><b>+${commission}</b><span>CUP / config</span></div>`;
 
-    const sorted = [...resellers].sort((a,b) => b.salesCount - a.salesCount);
-    const position = sorted.findIndex(x => x.id === r.id) + 1;
-    const monthEarnings = r.monthSales * commission;
-    const pendingBonus = position <= 3 ? resellerConfig.monthlyBonuses[position] : 0;
+    let ranking = [];
+    try { ranking = await (await fetch('/api/resellers/ranking')).json(); } catch (e) {}
+    const position = ranking.findIndex(x => x.telegram_id === String(currentUser.id)) + 1;
+    const monthEarnings = r.month_sales * commission;
+    const pendingBonus = (position >= 1 && position <= 3) ? (realResellerConfig.monthly_bonuses[position] || 0) : 0;
 
     const stats = [
-      { icon:'💰', value: fmtCUP(r.balance), label:'Saldo disponible' },
+      { icon:'💰', value: fmtCUP(r.earnings_available), label:'Ganancia disponible' },
       { icon:'📈', value: fmtCUP(monthEarnings), label:'Ganancias del mes' },
-      { icon:'📦', value: r.salesCount, label:'Configuraciones vendidas' },
-      { icon:'👥', value: r.clients.length, label:'Clientes registrados' },
-      { icon:'🏆', value: '#' + position, label:'Posición en el ranking' },
+      { icon:'📦', value: r.sales_count, label:'Configuraciones vendidas' },
+      { icon:'⏳', value: fmtCUP(r.pending_withdraw), label:'Retiro en proceso' },
+      { icon:'🏆', value: position > 0 ? '#' + position : '—', label:'Posición en el ranking' },
       { icon:'🎁', value: pendingBonus ? fmtCUP(pendingBonus) : '—', label:'Bonificación pendiente' },
     ];
     document.getElementById('resellerStatsGrid').innerHTML = stats.map(s => `
       <div class="resell-stat-card"><div class="rs-icon">${s.icon}</div><div class="rs-value">${s.value}</div><div class="rs-label">${s.label}</div></div>`).join('');
 
     const sub = document.getElementById('menuResellerSub');
-    if (sub) sub.textContent = `Nivel ${meta.name} · Saldo ${fmtCUP(r.balance)}`;
+    if (sub) sub.textContent = `Nivel ${meta.name} · Ganancia ${fmtCUP(r.earnings_available)}`;
+  }
+  async function requestReseller(){
+    try {
+      const res = await fetch('/api/resellers/request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId: currentUser.id, username: currentUser.username, name: currentUser.username }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo enviar la solicitud.');
+      showToast('Solicitud enviada. El staff la revisará pronto.');
+      await renderResellerHub();
+    } catch (err) { showToast(err.message); }
   }
 
   let sellPlan = null;
@@ -2949,10 +3021,10 @@ PersistentKeepalive = 25`;
     if (!grid) return;
     grid.innerHTML = Object.keys(PLANS).map(key => {
       const p = PLANS[key];
-      const cost = p.isExpress ? resellerCostFor('express', document.getElementById('sellDuration')?.value || '24h') : resellerCostFor(key);
+      const price = p.isExpress ? PRICES.express[document.getElementById('sellDuration')?.value || '24h'].cup : PRICES[key].cup;
       return `<div class="sell-plan-chip ${key === sellPlan ? 'active' : ''}" data-plan="${key}" onclick="selectSellPlan('${key}')">
         <div><div class="sp-name">${p.name}</div><div class="sp-period">${p.period}</div></div>
-        <div class="sp-cost">${fmtCUP(cost)}</div>
+        <div class="sp-cost">${fmtCUP(price)}</div>
       </div>`;
     }).join('');
   }
@@ -2960,284 +3032,268 @@ PersistentKeepalive = 25`;
     sellPlan = key;
     document.getElementById('sellDurationField').style.display = PLANS[key].isExpress ? 'block' : 'none';
     renderSellPlanGrid();
-    updateSellCost();
-  }
-  function updateSellCost(){
-    if (!sellPlan){ document.getElementById('sellCost').textContent = 'Elige un plan'; return; }
-    const duration = document.getElementById('sellDuration').value;
-    const cost = resellerCostFor(sellPlan, duration);
-    const commission = resellerCommissionFor(currentReseller);
-    document.getElementById('sellCost').textContent = fmtCUP(cost);
-    document.getElementById('sellBalance').textContent = fmtCUP(currentReseller.balance);
-    document.getElementById('sellCommission').textContent = '+' + fmtCUP(commission);
-    renderSellPlanGrid();
     checkSellEnabled();
   }
   function checkSellEnabled(){
     const btn = document.getElementById('confirmSellBtn');
     const warn = document.getElementById('sellWarning');
     const client = document.getElementById('sellClient').value.trim();
-    if (!sellPlan || !client){ btn.setAttribute('disabled','true'); warn.style.display = 'none'; return; }
-    const duration = document.getElementById('sellDuration').value;
-    const cost = resellerCostFor(sellPlan, duration);
-    if (cost > currentReseller.balance){
+    const commissionEl = document.getElementById('sellCommission');
+    if (myReseller) commissionEl.textContent = '+' + fmtCUP(myReseller.commission_per_sale);
+    if (!sellPlan || !client || !/^\d+$/.test(client)){
       btn.setAttribute('disabled','true');
-      warn.style.display = 'block';
-      warn.textContent = 'Saldo insuficiente. Recarga tu saldo de revendedor para poder vender esta configuración.';
-    } else {
-      btn.removeAttribute('disabled');
-      warn.style.display = 'none';
+      warn.style.display = client && !/^\d+$/.test(client) ? 'block' : 'none';
+      warn.textContent = 'El ID de Telegram debe ser numérico (pídeselo a tu cliente, o que use @userinfobot).';
+      return;
     }
+    warn.style.display = 'none';
+    btn.removeAttribute('disabled');
   }
   function confirmSale(){
     if (!sellPlan) return;
     const client = document.getElementById('sellClient').value.trim();
-    if (!client) return;
-    const duration = document.getElementById('sellDuration').value;
-    const cost = resellerCostFor(sellPlan, duration);
-    if (cost > currentReseller.balance){ showToast('Saldo insuficiente para esta venta'); return; }
+    const username = document.getElementById('sellClientUsername').value.trim();
+    if (!client || !/^\d+$/.test(client)) { showToast('Ingresa un ID de Telegram numérico válido.'); return; }
 
-    const btn = document.getElementById('confirmSellBtn');
-    btn.setAttribute('disabled','true');
-    btn.textContent = 'Generando configuración...';
-
-    setTimeout(() => {
-      const commission = resellerCommissionFor(currentReseller);
-      const orderId = '#VC-' + Math.floor(10000 + Math.random()*89999);
-      const durLabel = PLANS[sellPlan].isExpress ? PERIOD_LABEL[duration] : PLANS[sellPlan].period;
-
-      currentReseller.balance -= cost;
-      currentReseller.earnings += commission;
-      currentReseller.salesCount += 1;
-      currentReseller.monthSales += 1;
-
-      const clientId = client.replace('@','');
-      if (!currentReseller.clients.find(c => c.id === clientId || c.username === client)){
-        currentReseller.clients.unshift({ id: clientId, username: client.startsWith('@') ? client : '@'+client, plan: sellPlan, date: Date.now() });
-      }
-      currentReseller.history.unshift({
-        id: orderId, client: client.startsWith('@') ? client : '@'+client, clientId, plan: sellPlan,
-        durLabel, price: cost, status: 'completed', commission, ts: Date.now(),
-      });
-
-      try {
-        window.Telegram?.WebApp?.sendData?.(JSON.stringify({
-          type:'reseller_sale', reseller_id: currentReseller.id, order_id: orderId, plan: sellPlan,
-          duration: PLANS[sellPlan].isExpress ? duration : undefined, client, cost, commission,
-        }));
-      } catch(e) {}
-
-      btn.removeAttribute('disabled');
-      btn.textContent = 'Confirmar venta';
-      showToast('✅ Configuración vendida · Comisión +' + fmtCUP(commission));
-      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
-
-      sellPlan = null;
-      document.getElementById('sellClient').value = '';
-      document.getElementById('sellDurationField').style.display = 'none';
-      renderSellPlanGrid();
-      updateSellCost();
-      renderResellerHub();
-      goTo('screen-reseller-history');
-    }, 900);
+    state.resellerSaleClient = { telegramId: client, username: username || null };
+    if (PLANS[sellPlan].isExpress) state.expressDuration = document.getElementById('sellDuration').value;
+    openDetailsModal(sellPlan);
   }
 
-  function renderResellerHistory(){
+  async function renderResellerHistory(){
     const list = document.getElementById('resellerHistoryList');
-    if (!list) return;
-    const r = currentReseller;
-    if (!r.history.length){ list.innerHTML = '<div class="reseller-history-empty">Todavía no has vendido ninguna configuración.</div>'; return; }
-    list.innerHTML = r.history.map(h => `
+    if (!list || !myReseller) return;
+    list.innerHTML = '<div class="admin-empty">Cargando…</div>';
+    try {
+      resellerHistoryCache = await (await fetch(`/api/resellers/me/${encodeURIComponent(currentUser.id)}/history`)).json();
+    } catch (e) { resellerHistoryCache = []; }
+    if (!resellerHistoryCache.length){ list.innerHTML = '<div class="reseller-history-empty">Todavía no has vendido ninguna configuración.</div>'; return; }
+    list.innerHTML = resellerHistoryCache.map(h => `
       <div class="req-card">
         <div class="req-top">
-          <div><div class="rq-name">${h.id}</div><div class="rq-meta">${h.client} · ${(PLANS[h.plan]||{}).name || h.plan} · ${h.durLabel} · ${timeAgo(h.ts)}</div></div>
-          <div class="rq-amount">${fmtCUP(h.price)}</div>
+          <div><div class="rq-name">${h.client_username ? '@' + h.client_username : h.client_telegram_id}</div><div class="rq-meta">${planNameFromBackend(h.plan)} · ${timeAgo(new Date(h.created_at).getTime())}</div></div>
         </div>
-        <div class="req-status approved">✅ ${h.status === 'completed' ? 'Completada' : h.status}</div>
         <div class="req-detail">Comisión: <b style="color:var(--teal-2)">+${fmtCUP(h.commission)}</b></div>
       </div>`).join('');
   }
 
   function renderResellerLink(){
-    document.getElementById('resellerLinkValue').textContent = 't.me/vpncubaw_bot?start=' + currentReseller.code;
+    if (!currentUser.id) return;
+    document.getElementById('resellerLinkValue').textContent = 't.me/vpncubaw_bot?start=reseller_' + currentUser.id;
     const list = document.getElementById('resellerClientsList');
-    if (!currentReseller.clients.length){ list.innerHTML = '<div class="reseller-clients-empty">Aún no tienes clientes registrados por tu enlace.</div>'; return; }
-    list.innerHTML = currentReseller.clients.map(c => `
-      <div class="exp-user-row">
-        <div class="eu-avatar">${c.username.replace('@','').slice(0,1).toUpperCase()}</div>
-        <div class="eu-info"><div class="eu-name">${c.username}</div><div class="eu-sub">ID ${c.id} · ${(PLANS[c.plan]||{}).name || c.plan} · ${timeAgo(c.date)}</div></div>
-      </div>`).join('');
+    list.innerHTML = '<div class="reseller-clients-empty">Comparte tu enlace para que tus clientes queden ligados a ti automáticamente.</div>';
   }
   function copyResellerLink(){
-    const link = 'https://t.me/vpncubaw_bot?start=' + currentReseller.code;
+    const link = 'https://t.me/vpncubaw_bot?start=reseller_' + currentUser.id;
     if (navigator.clipboard) navigator.clipboard.writeText(link).catch(()=>{});
     showToast('Enlace de revendedor copiado');
     try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
   }
 
-  function renderResellerRanking(){
+  async function renderResellerRanking(){
     const list = document.getElementById('resellerRankingList');
     if (!list) return;
-    const sorted = [...resellers].filter(r => r.active).sort((a,b) => b.salesCount - a.salesCount);
+    list.innerHTML = '<div class="admin-empty">Cargando…</div>';
+    let ranking = [];
+    try { ranking = await (await fetch('/api/resellers/ranking')).json(); } catch (e) {}
+    if (!ranking.length){ list.innerHTML = '<div class="admin-empty">Todavía no hay ventas este mes.</div>'; return; }
     const medals = ['🥇','🥈','🥉'];
-    list.innerHTML = sorted.map((r, i) => `
-      <div class="ranking-row ${r.id === currentReseller.id ? 'me' : ''}">
+    list.innerHTML = ranking.map((r, i) => `
+      <div class="ranking-row ${r.telegram_id === String(currentUser.id) ? 'me' : ''}">
         <div class="rk-medal">${medals[i] || (i+1)}</div>
-        <div class="rk-info"><div class="rk-name">${r.name} ${r.id === currentReseller.id ? '(tú)' : ''}</div><div class="rk-sub">Nivel ${LEVEL_META[resellerLevelFor(r.salesCount)].name} · ${r.username}</div></div>
-        <div class="rk-sales">${r.salesCount} ventas</div>
+        <div class="rk-info"><div class="rk-name">${r.username ? '@' + r.username : r.telegram_id} ${r.telegram_id === String(currentUser.id) ? '(tú)' : ''}</div></div>
+        <div class="rk-sales">${r.month_sales} ventas</div>
       </div>`).join('');
   }
 
-  function renderWithdrawScreen(){
-    document.getElementById('withdrawEarnings').textContent = fmtCUP(currentReseller.earnings);
-    document.getElementById('withdrawMinNote').textContent = 'Retiro mínimo: ' + fmtCUP(resellerConfig.minWithdraw);
+  async function renderWithdrawScreen(){
+    if (!myReseller) return;
+    document.getElementById('withdrawEarnings').textContent = fmtCUP(myReseller.earnings_available);
+    document.getElementById('withdrawMinNote').textContent = 'Retiro mínimo: ' + fmtCUP(realResellerConfig.min_withdraw);
     document.getElementById('withdrawAmount').value = '';
     checkWithdrawEnabled();
+    // No hay historial de retiros propio expuesto todavía en un endpoint dedicado al usuario;
+    // se puede seguir el estado por los avisos que manda el bot al resolverse.
     const list = document.getElementById('withdrawHistoryList');
-    const mine = resellerWithdrawals.filter(w => w.resellerId === currentReseller.id);
-    if (!mine.length){ list.innerHTML = '<div class="reseller-history-empty">No has solicitado retiros todavía.</div>'; return; }
-    list.innerHTML = mine.map(w => `
-      <div class="req-card">
-        <div class="req-top"><div><div class="rq-name">${w.id}</div><div class="rq-meta">${METHODS[w.method]?.name || w.method} · ${timeAgo(w.ts)}</div></div><div class="rq-amount">${fmtCUP(w.amount)}</div></div>
-        <div class="req-status ${w.status === 'paid' ? 'approved' : w.status === 'rejected' ? 'rejected' : ''}" ${w.status === 'pending' ? 'style="background:rgba(245,185,66,0.14); color:var(--gold)"' : ''}>
-          ${w.status === 'paid' ? '✓ Pagado' : w.status === 'rejected' ? '✕ Rechazado' : '⏳ Pendiente'}
-        </div>
-      </div>`).join('');
+    list.innerHTML = myReseller.pending_withdraw > 0
+      ? `<div class="req-card"><div class="req-top"><div><div class="rq-name">Retiro en proceso</div></div><div class="rq-amount">${fmtCUP(myReseller.pending_withdraw)}</div></div><div class="req-status" style="background:rgba(245,185,66,0.14); color:var(--gold)">⏳ Pendiente de aprobación</div></div>`
+      : '<div class="reseller-history-empty">No tienes retiros en proceso.</div>';
   }
   function checkWithdrawEnabled(){
     const btn = document.getElementById('confirmWithdrawBtn');
     const amount = parseFloat(document.getElementById('withdrawAmount').value);
-    if (!amount || amount < resellerConfig.minWithdraw || amount > currentReseller.earnings){
+    if (!myReseller || !realResellerConfig || !amount || amount < realResellerConfig.min_withdraw || amount > myReseller.earnings_available){
       btn.setAttribute('disabled','true');
     } else {
       btn.removeAttribute('disabled');
     }
   }
-  function requestWithdraw(){
+  async function requestWithdraw(){
     const amount = parseFloat(document.getElementById('withdrawAmount').value);
-    const method = document.getElementById('withdrawMethod').value;
-    if (!amount || amount < resellerConfig.minWithdraw){ showToast('El retiro mínimo es ' + fmtCUP(resellerConfig.minWithdraw)); return; }
-    if (amount > currentReseller.earnings){ showToast('No tienes suficientes ganancias acumuladas'); return; }
-
-    currentReseller.earnings -= amount;
-    currentReseller.pendingWithdraw += amount;
-    const id = 'RW-' + Math.floor(500 + Math.random()*499);
-    resellerWithdrawals.unshift({ id, resellerId: currentReseller.id, amount, method, status:'pending', ts: Date.now() });
-
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'reseller_withdraw_request', reseller_id: currentReseller.id, amount, method })); } catch(e) {}
-    showToast('Solicitud de retiro enviada · ' + fmtCUP(amount));
-    try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
-    renderResellerHub();
-    renderWithdrawScreen();
+    try {
+      const res = await fetch('/api/resellers/withdraw', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId: currentUser.id, amount }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo solicitar el retiro.');
+      showToast('Solicitud de retiro enviada · ' + fmtCUP(amount));
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
+      await renderResellerHub();
+      await renderWithdrawScreen();
+    } catch (err) { showToast(err.message); }
   }
 
   // ==================== ADMIN: programa de revendedores ====================
-  function renderAdminResellersList(){
+  async function renderAdminResellersList(){
     const list = document.getElementById('adminResellersList');
-    if (!list) return;
-    list.innerHTML = resellers.map(r => `
-      <div class="req-card">
-        <div class="req-top">
-          <div><div class="rq-name">${r.name} <span style="color:var(--muted-2); font-weight:500">${r.username}</span></div>
-            <div class="rq-meta">${LEVEL_META[resellerLevelFor(r.salesCount)].icon} ${LEVEL_META[resellerLevelFor(r.salesCount)].name} · ${r.salesCount} ventas · ${r.clients.length} clientes</div></div>
-          <div class="rq-amount">${fmtCUP(r.earnings)}</div>
-        </div>
-        <div class="req-detail">Saldo: ${fmtCUP(r.balance)} &nbsp;·&nbsp; Retirado: ${fmtCUP(r.totalWithdrawn)} &nbsp;·&nbsp; Código: <code>${r.code}</code></div>
-        <div class="req-actions">
-          <button class="${r.active ? 'reject-btn' : 'approve-btn'}" onclick="toggleResellerActive('${r.id}')">${r.active ? 'Desactivar' : 'Activar'}</button>
-        </div>
-      </div>`).join('');
-  }
-  function toggleResellerActive(id){
-    const r = resellers.find(x => x.id === id); if (!r) return;
-    r.active = !r.active;
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_toggle_reseller', reseller_id:id, active:r.active })); } catch(e) {}
-    renderAdminResellersList();
-    showToast(r.active ? 'Revendedor activado' : 'Revendedor desactivado');
-  }
+    if (!list || !currentUser.id) return;
+    list.innerHTML = '<div class="admin-empty">Cargando…</div>';
+    try {
+      adminResellersCache = await (await fetch(`/api/resellers?requesterId=${encodeURIComponent(currentUser.id)}`)).json();
+    } catch (e) { adminResellersCache = []; }
+    if (!adminResellersCache.length){ list.innerHTML = '<div class="admin-empty">No hay revendedores todavía.</div>'; return; }
 
-  function renderAdminWithdrawals(){
-    const list = document.getElementById('adminWithdrawalsList');
-    if (!list) return;
-    if (!resellerWithdrawals.length){ list.innerHTML = '<div class="admin-empty">No hay retiros registrados.</div>'; return; }
-    list.innerHTML = resellerWithdrawals.map(w => {
-      const r = resellers.find(x => x.id === w.resellerId);
-      return `
-      <div class="req-card">
+    list.innerHTML = adminResellersCache.map(r => {
+      const level = resellerLevelFor(r.sales_count);
+      const meta = LEVEL_META[level];
+      let actions = '';
+      if (r.status === 'pending') {
+        actions = `<div class="req-actions"><button class="reject-btn" onclick="rejectResellerReq(${r.id})">Rechazar</button><button class="approve-btn" onclick="approveResellerReq(${r.id})">Aprobar</button></div>`;
+      } else if (r.status === 'active' || r.status === 'suspended') {
+        actions = `<div class="req-actions"><button class="${r.status === 'active' ? 'reject-btn' : 'approve-btn'}" onclick="toggleResellerActive(${r.id})">${r.status === 'active' ? 'Suspender' : 'Reactivar'}</button></div>`;
+      }
+      return `<div class="req-card">
         <div class="req-top">
-          <div><div class="rq-name">${w.id}</div><div class="rq-meta">${r ? r.name + ' ' + r.username : w.resellerId} · ${METHODS[w.method]?.name || w.method} · ${timeAgo(w.ts)}</div></div>
-          <div class="rq-amount">${fmtCUP(w.amount)}</div>
+          <div><div class="rq-name">${r.username ? '@' + r.username : r.telegram_id} <span style="color:var(--muted-2); font-weight:500; font-size:11px">${r.status}</span></div>
+            <div class="rq-meta">${meta.icon} ${meta.name} · ${r.sales_count} ventas</div></div>
+          <div class="rq-amount">${fmtCUP(r.earnings_available)}</div>
         </div>
-        ${w.status === 'pending'
-          ? `<div class="req-actions">
-               <button class="reject-btn" onclick="rejectWithdrawal('${w.id}')">Rechazar</button>
-               <button class="approve-btn" onclick="approveWithdrawal('${w.id}')">Marcar como pagado</button>
-             </div>`
-          : `<div class="req-status ${w.status === 'paid' ? 'approved' : 'rejected'}">${w.status === 'paid' ? '✓ Pagado' : '✕ Rechazado'}</div>`}
+        <div class="req-detail">Retirado: ${fmtCUP(r.total_withdrawn)} &nbsp;·&nbsp; En proceso: ${fmtCUP(r.pending_withdraw)} &nbsp;·&nbsp; ID: <code>${r.telegram_id}</code></div>
+        ${actions}
       </div>`;
     }).join('');
+    renderAdminBadges();
   }
-  function approveWithdrawal(id){
-    const w = resellerWithdrawals.find(x => x.id === id); if (!w) return;
-    const r = resellers.find(x => x.id === w.resellerId);
-    w.status = 'paid';
-    if (r){ r.pendingWithdraw -= w.amount; r.totalWithdrawn += w.amount; }
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_pay_withdrawal', withdrawal_id:id })); } catch(e) {}
-    renderAdminWithdrawals(); renderAdminBadges();
-    showToast('Retiro ' + id + ' marcado como pagado');
+  async function approveResellerReq(id){
+    try {
+      const res = await fetch(`/api/resellers/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requesterId: currentUser.id }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo aprobar.');
+      showToast('Revendedor aprobado');
+      await renderAdminResellersList();
+    } catch (err) { showToast(err.message); }
   }
-  function rejectWithdrawal(id){
-    const w = resellerWithdrawals.find(x => x.id === id); if (!w) return;
-    const r = resellers.find(x => x.id === w.resellerId);
-    w.status = 'rejected';
-    if (r){ r.pendingWithdraw -= w.amount; r.earnings += w.amount; }
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_reject_withdrawal', withdrawal_id:id })); } catch(e) {}
-    renderAdminWithdrawals(); renderAdminBadges();
-    showToast('Retiro ' + id + ' rechazado y devuelto a sus ganancias');
+  async function rejectResellerReq(id){
+    try {
+      const res = await fetch(`/api/resellers/${id}/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requesterId: currentUser.id }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo rechazar.');
+      showToast('Solicitud rechazada');
+      await renderAdminResellersList();
+    } catch (err) { showToast(err.message); }
+  }
+  async function toggleResellerActive(id){
+    try {
+      const res = await fetch(`/api/resellers/${id}/toggle-status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requesterId: currentUser.id }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar.');
+      showToast(data.reseller.status === 'active' ? 'Revendedor reactivado' : 'Revendedor suspendido');
+      await renderAdminResellersList();
+    } catch (err) { showToast(err.message); }
   }
 
-  function renderAdminFinance(){
+  async function renderAdminWithdrawals(){
+    const list = document.getElementById('adminWithdrawalsList');
+    if (!list || !currentUser.id) return;
+    list.innerHTML = '<div class="admin-empty">Cargando…</div>';
+    try {
+      adminWithdrawalsCache = await (await fetch(`/api/resellers/withdrawals?requesterId=${encodeURIComponent(currentUser.id)}`)).json();
+    } catch (e) { adminWithdrawalsCache = []; }
+    if (!adminWithdrawalsCache.length){ list.innerHTML = '<div class="admin-empty">No hay retiros pendientes.</div>'; renderAdminBadges(); return; }
+    list.innerHTML = adminWithdrawalsCache.map(w => `
+      <div class="req-card">
+        <div class="req-top">
+          <div><div class="rq-name">#${w.id} · ${w.resellers?.username ? '@' + w.resellers.username : w.resellers?.telegram_id}</div><div class="rq-meta">${timeAgo(new Date(w.requested_at).getTime())}</div></div>
+          <div class="rq-amount">${fmtCUP(w.amount)}</div>
+        </div>
+        <div class="req-actions">
+          <button class="reject-btn" onclick="resolveWithdrawalReq(${w.id}, 'reject')">Rechazar</button>
+          <button class="approve-btn" onclick="resolveWithdrawalReq(${w.id}, 'pay')">Marcar como pagado</button>
+        </div>
+      </div>`).join('');
+    renderAdminBadges();
+  }
+  async function resolveWithdrawalReq(id, action){
+    const note = action === 'reject' ? (prompt('Motivo del rechazo (opcional):') || '') : '';
+    try {
+      const res = await fetch(`/api/resellers/withdrawals/${id}/resolve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requesterId: currentUser.id, action, note }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo procesar.');
+      showToast(action === 'pay' ? 'Retiro marcado como pagado' : 'Retiro rechazado y devuelto');
+      await renderAdminWithdrawals();
+    } catch (err) { showToast(err.message); }
+  }
+
+  async function renderAdminFinance(){
     const grid = document.getElementById('adminFinanceGrid');
-    if (!grid) return;
-    const totalCommissions = resellers.reduce((s,r) => s + r.earnings + r.pendingWithdraw + r.totalWithdrawn, 0);
-    const pendingW = resellerWithdrawals.filter(w => w.status === 'pending').reduce((s,w) => s + w.amount, 0);
-    const paidW = resellerWithdrawals.filter(w => w.status === 'paid').reduce((s,w) => s + w.amount, 0);
-    const balanceProgram = resellers.reduce((s,r) => s + r.balance, 0);
+    if (!grid || !currentUser.id) return;
+    grid.innerHTML = '<div class="admin-empty">Cargando…</div>';
+    let f;
+    try { f = await (await fetch(`/api/resellers/finance?requesterId=${encodeURIComponent(currentUser.id)}`)).json(); }
+    catch (e) { grid.innerHTML = '<div class="admin-empty">No se pudo cargar.</div>'; return; }
     const stats = [
-      { icon:'📊', value: fmtCUP(totalCommissions), label:'Comisiones generadas (total)' },
-      { icon:'⏳', value: fmtCUP(pendingW), label:'Retiros pendientes' },
-      { icon:'✅', value: fmtCUP(paidW), label:'Retiros pagados' },
-      { icon:'🏦', value: fmtCUP(balanceProgram), label:'Saldo total de revendedores' },
+      { icon:'👥', value: f.total_resellers, label:'Revendedores activos' },
+      { icon:'💰', value: fmtCUP(f.total_earnings_available), label:'Ganancia disponible (total)' },
+      { icon:'⏳', value: fmtCUP(f.total_pending_withdrawals), label:'Retiros pendientes' },
+      { icon:'✅', value: fmtCUP(f.total_withdrawn), label:'Retiros pagados (histórico)' },
     ];
     grid.innerHTML = stats.map(s => `<div class="resell-stat-card"><div class="rs-icon">${s.icon}</div><div class="rs-value">${s.value}</div><div class="rs-label">${s.label}</div></div>`).join('');
   }
 
-  function renderResellerConfigScreen(){
-    document.getElementById('resellerProgramToggle').classList.toggle('on', resellerConfig.active);
-    document.getElementById('minWithdrawField').value = resellerConfig.minWithdraw;
-    document.getElementById('bonus1Field').value = resellerConfig.monthlyBonuses[1];
-    document.getElementById('bonus2Field').value = resellerConfig.monthlyBonuses[2];
-    document.getElementById('bonus3Field').value = resellerConfig.monthlyBonuses[3];
+  async function renderResellerConfigScreen(){
+    let cfg;
+    try { cfg = await (await fetch('/api/resellers/config')).json(); } catch (e) { showToast('No se pudo cargar la configuración.'); return; }
+    realResellerConfig = cfg;
+    document.getElementById('resellerProgramToggle').classList.toggle('on', cfg.active);
+    document.getElementById('minWithdrawField').value = cfg.min_withdraw;
+    document.getElementById('bonus1Field').value = cfg.monthly_bonuses['1'] ?? cfg.monthly_bonuses[1];
+    document.getElementById('bonus2Field').value = cfg.monthly_bonuses['2'] ?? cfg.monthly_bonuses[2];
+    document.getElementById('bonus3Field').value = cfg.monthly_bonuses['3'] ?? cfg.monthly_bonuses[3];
     document.getElementById('levelCommissionFields').innerHTML = Object.keys(LEVEL_META).map(lvl => `
-      <div class="price-field"><label>${LEVEL_META[lvl].icon} ${LEVEL_META[lvl].name}</label><input type="number" data-level="${lvl}" class="rlc-input" value="${resellerConfig.levelCommissions[lvl]}"></div>`).join('');
+      <div class="price-field"><label>${LEVEL_META[lvl].icon} ${LEVEL_META[lvl].name}</label><input type="number" data-level="${lvl}" class="rlc-input" value="${cfg.level_commissions[lvl]}"></div>`).join('');
     document.getElementById('levelThresholdFields').innerHTML = Object.keys(LEVEL_META).map(lvl => `
-      <div class="price-field"><label>${LEVEL_META[lvl].icon} ${LEVEL_META[lvl].name}</label><input type="number" data-level="${lvl}" class="rlt-input" value="${resellerConfig.levelThresholds[lvl]}"></div>`).join('');
+      <div class="price-field"><label>${LEVEL_META[lvl].icon} ${LEVEL_META[lvl].name}</label><input type="number" data-level="${lvl}" class="rlt-input" value="${cfg.level_thresholds[lvl]}"></div>`).join('');
   }
   function toggleResellerProgram(){
-    resellerConfig.active = !resellerConfig.active;
-    document.getElementById('resellerProgramToggle').classList.toggle('on', resellerConfig.active);
+    document.getElementById('resellerProgramToggle').classList.toggle('on');
   }
-  function saveResellerConfig(){
-    document.querySelectorAll('.rlc-input').forEach(inp => { resellerConfig.levelCommissions[inp.dataset.level] = parseFloat(inp.value) || 0; });
-    document.querySelectorAll('.rlt-input').forEach(inp => { resellerConfig.levelThresholds[inp.dataset.level] = parseFloat(inp.value) || 0; });
-    resellerConfig.minWithdraw = parseFloat(document.getElementById('minWithdrawField').value) || 2000;
-    resellerConfig.monthlyBonuses[1] = parseFloat(document.getElementById('bonus1Field').value) || 0;
-    resellerConfig.monthlyBonuses[2] = parseFloat(document.getElementById('bonus2Field').value) || 0;
-    resellerConfig.monthlyBonuses[3] = parseFloat(document.getElementById('bonus3Field').value) || 0;
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_update_reseller_config', config: resellerConfig })); } catch(e) {}
-    showToast('Configuración del programa guardada');
-    try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
-    renderResellerHub();
+  async function saveResellerConfig(){
+    if (!isSuperAdminUser) { showToast('Solo el administrador principal puede cambiar esto.'); return; }
+    const level_commissions = {}, level_thresholds = {};
+    document.querySelectorAll('.rlc-input').forEach(inp => { level_commissions[inp.dataset.level] = parseFloat(inp.value) || 0; });
+    document.querySelectorAll('.rlt-input').forEach(inp => { level_thresholds[inp.dataset.level] = parseFloat(inp.value) || 0; });
+    const active = document.getElementById('resellerProgramToggle').classList.contains('on');
+    const min_withdraw = parseFloat(document.getElementById('minWithdrawField').value) || 2000;
+    const monthly_bonuses = {
+      1: parseFloat(document.getElementById('bonus1Field').value) || 0,
+      2: parseFloat(document.getElementById('bonus2Field').value) || 0,
+      3: parseFloat(document.getElementById('bonus3Field').value) || 0,
+    };
+    try {
+      const res = await fetch('/api/resellers/config/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requesterId: currentUser.id, active, level_commissions, level_thresholds, min_withdraw, monthly_bonuses }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo guardar.');
+      realResellerConfig = data.config;
+      showToast('Configuración del programa guardada');
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
+    } catch (err) { showToast(err.message); }
   }
 
   // ==================== ADMIN: disponibilidad de planes (real) ====================
@@ -3373,7 +3429,7 @@ PersistentKeepalive = 25`;
     if (bp) bp.textContent = pendingPayments.length;
     if (bt) bt.textContent = trialRequestsAdmin.length;
     if (br) br.textContent = refundRequestsAdmin.length;
-    const pendingWithdrawCount = resellerWithdrawals.filter(x => x.status === 'pending').length;
+    const pendingWithdrawCount = adminWithdrawalsCache.length;
     if (bw) bw.textContent = pendingWithdrawCount;
     if (bwi) bwi.textContent = pendingWithdrawCount;
     // El contador de tickets (badgeTickets) se actualiza en renderAdminTicketsList() con datos reales del backend.
@@ -3559,44 +3615,56 @@ PersistentKeepalive = 25`;
   }
 
   // ==================== ADMIN: modificar precios ====================
-  function renderPriceEditor(){
+  // ==================== ADMIN: editor de precios (real, 5 campos por plan) ====================
+  const PRICE_FIELD_LABELS = { cup: 'CUP', mobile: 'Saldo móvil', usdt: 'USDT', stars: 'Stars', ton: 'TON' };
+  let realPlanPricesCache = {};
+  async function renderPriceEditor(){
     const box = document.getElementById('priceEditor');
     if (!box) return;
+    box.innerHTML = '<div class="admin-empty">Cargando precios…</div>';
+    try {
+      realPlanPricesCache = await (await fetch('/api/plan-prices')).json();
+    } catch (e) { box.innerHTML = '<div class="admin-empty">No se pudieron cargar los precios.</div>'; return; }
+
     let html = '';
-    Object.keys(PLANS).forEach(key => {
-      if (key === 'express') return;
-      const p = PLANS[key];
-      const table = PRICES[key];
+    Object.entries(PLAN_BACKEND_KEY).forEach(([uiKey, backendKey]) => {
+      const p = PLANS[uiKey];
+      const row = realPlanPricesCache[backendKey] || {};
       html += `<div class="price-plan-block"><div class="pp-title">${p.name}</div><div class="price-grid">`;
-      Object.keys(table).forEach(unit => {
-        html += `<div class="price-field"><label>${unit}</label><input type="number" step="0.01" data-plan="${key}" data-unit="${unit}" value="${table[unit]}"></div>`;
+      Object.keys(PRICE_FIELD_LABELS).forEach(unit => {
+        html += `<div class="price-field"><label>${PRICE_FIELD_LABELS[unit]}</label><input type="number" step="0.01" data-plan="${backendKey}" data-unit="${unit}" value="${row[unit] ?? 0}"></div>`;
       });
       html += `</div></div>`;
     });
-    html += `<div class="price-plan-block"><div class="pp-title">Plan Express</div>`;
-    Object.keys(PRICES.express).forEach(dur => {
-      html += `<div style="font-size:11px; color:var(--muted-2); font-weight:700; margin:8px 0 6px 0; text-transform:uppercase">${PERIOD_LABEL[dur]}</div><div class="price-grid">`;
-      Object.keys(PRICES.express[dur]).forEach(unit => {
-        html += `<div class="price-field"><label>${unit}</label><input type="number" step="0.01" data-plan="express" data-dur="${dur}" data-unit="${unit}" value="${PRICES.express[dur][unit]}"></div>`;
-      });
-      html += `</div>`;
-    });
-    html += `</div>`;
     box.innerHTML = html;
   }
-  function savePrices(){
+  async function savePrices(){
+    if (!isSuperAdminUser) { showToast('Solo el administrador principal puede modificar precios.'); return; }
+    const prices = {};
+    let invalid = false;
     document.querySelectorAll('#priceEditor input').forEach(inp => {
       const val = parseFloat(inp.value);
-      if (isNaN(val)) return;
-      if (inp.dataset.plan === 'express'){
-        PRICES.express[inp.dataset.dur][inp.dataset.unit] = val;
-      } else {
-        PRICES[inp.dataset.plan][inp.dataset.unit] = val;
-      }
+      if (isNaN(val) || val < 0) { invalid = true; return; }
+      const plan = inp.dataset.plan;
+      prices[plan] = prices[plan] || {};
+      prices[plan][inp.dataset.unit] = val;
     });
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_update_prices', prices: PRICES })); } catch(e) {}
-    showToast('Precios actualizados');
-    try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
+    if (invalid) { showToast('Hay valores inválidos, revisa los campos en rojo.'); return; }
+
+    try {
+      const res = await fetch('/api/plan-prices/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requesterId: currentUser.id, prices }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudieron guardar los precios.');
+      showToast('Precios actualizados');
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
+      await loadRealPricesAndAvailability(); // refresca las tarjetas del catálogo con los nuevos precios
+      await renderPriceEditor();
+    } catch (err) {
+      showToast(err.message);
+    }
   }
 
   // ==================== ADMIN: anuncio popup en la web ====================
@@ -3713,7 +3781,7 @@ PersistentKeepalive = 25`;
     if (id === 'screen-admin-referrals') renderAdminReferrals();
     if (id === 'screen-plans') maybeShowSitePopup();
     if (id === 'screen-reseller') renderResellerHub();
-    if (id === 'screen-reseller-sell'){ sellPlan = null; document.getElementById('sellClient').value=''; document.getElementById('sellDurationField').style.display='none'; renderSellPlanGrid(); updateSellCost(); }
+    if (id === 'screen-reseller-sell'){ sellPlan = null; document.getElementById('sellClient').value=''; document.getElementById('sellClientUsername').value=''; document.getElementById('sellDurationField').style.display='none'; renderSellPlanGrid(); checkSellEnabled(); }
     if (id === 'screen-reseller-history') renderResellerHistory();
     if (id === 'screen-reseller-link') renderResellerLink();
     if (id === 'screen-reseller-ranking') renderResellerRanking();
