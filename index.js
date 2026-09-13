@@ -2709,6 +2709,35 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
+// Modo mantenimiento: /mantenimiento-on y /mantenimiento-off (solo admins).
+// Mientras está activo, bloquea CUALQUIER interacción de usuarios no admin
+// (mensajes, comandos, botones) con un aviso apropiado, antes de cualquier otra lógica.
+let maintenanceMode = false;
+bot.use(async (ctx, next) => {
+  if (!maintenanceMode) return next();
+  if (!ctx.from) return next();
+  const userId = ctx.from.id.toString();
+  if (isAdmin(userId)) return next(); // los admins siguen usando el bot con normalidad (para poder desactivarlo, etc.)
+
+  const maintenanceMsg = '🛠 <b>VPN Cuba está en mantenimiento</b>\n\nEstamos realizando mejoras en el servicio. Por favor, intenta de nuevo en unos minutos. Disculpa las molestias.';
+  try {
+    if (ctx.callbackQuery) await ctx.answerCbQuery('🛠 En mantenimiento, intenta más tarde.', { show_alert: true }).catch(() => {});
+    else await ctx.reply(maintenanceMsg, { parse_mode: 'HTML' }).catch(() => {});
+  } catch (e) {}
+  return; // bloquea todo lo demás mientras dure el mantenimiento
+});
+
+bot.command('mantenimiento-on', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return;
+  maintenanceMode = true;
+  await ctx.reply('🛠 Modo mantenimiento ACTIVADO. Los usuarios verán un aviso al intentar usar el bot.');
+});
+bot.command('mantenimiento-off', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return;
+  maintenanceMode = false;
+  await ctx.reply('✅ Modo mantenimiento DESACTIVADO. El bot vuelve a funcionar con normalidad.');
+});
+
 // Middleware: bloquear usuarios baneados
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
@@ -2725,69 +2754,65 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
-// Middleware: verificar aceptación de Términos y Servicios
-const TERMS_EXEMPT_ACTIONS = new Set(['accept_terms', 'decline_terms', 'politicas']);
-const TERMS_EXEMPT_COMMANDS = new Set(['start']);
+// Middleware: verificar que el usuario esté unido al canal obligatorio
+const REQUIRED_CHANNEL = '@vpncubaw';
+const REQUIRED_CHANNEL_LINK = 'https://t.me/vpncubaw';
+const CHANNEL_EXEMPT_ACTIONS = new Set(['check_channel_membership', 'politicas']);
+const CHANNEL_EXEMPT_COMMANDS = new Set(['start']);
+
+async function isChannelMember(userId) {
+  try {
+    const member = await bot.telegram.getChatMember(REQUIRED_CHANNEL, userId);
+    return ['member', 'administrator', 'creator'].includes(member.status);
+  } catch (e) {
+    console.error('❌ Error verificando membresía del canal:', e.message);
+    return false;
+  }
+}
+function channelGateMessage() {
+  return {
+    text: `📢 <b>Únete a nuestro canal para continuar</b>\n\nPara usar VPN Cuba es obligatorio estar en nuestro canal oficial — ahí publicamos avisos importantes, promociones y el estado del servicio.\n\n👉 ${REQUIRED_CHANNEL_LINK}\n\nUna vez te unas, pulsa el botón de abajo para verificar.`,
+    keyboard: { reply_markup: { inline_keyboard: [
+      [{ text: '📢 Unirme al canal', url: REQUIRED_CHANNEL_LINK }],
+      [createButton('✅ Ya me uní, verificar', { callback_data: 'check_channel_membership' })],
+    ] } },
+  };
+}
 
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
   const userId = ctx.from.id.toString();
   if (isAdmin(userId)) return next();
 
-  // Exempts: /start y las acciones de aceptar/rechazar
   const command = ctx.message?.text?.match(/^\/(\w+)/)?.[1];
   const action = ctx.callbackQuery?.data;
-  if (command && TERMS_EXEMPT_COMMANDS.has(command)) return next();
-  if (action && TERMS_EXEMPT_ACTIONS.has(action)) return next();
+  if (command && CHANNEL_EXEMPT_COMMANDS.has(command)) return next();
+  if (action && CHANNEL_EXEMPT_ACTIONS.has(action)) return next();
 
   try {
-    const user = await db.getUser(userId);
-    if (user?.accepted_terms) return next();
+    if (await isChannelMember(userId)) return next();
 
-    // El usuario no ha aceptado los términos — mostrar gate
-    const termsMsg =
-      `📋 <b>Términos y Condiciones de VPN Cuba</b>\n\n` +
-      `Antes de continuar, debes leer y aceptar nuestros términos de servicio.\n\n` +
-      `<b>Al aceptar confirmas que:</b>\n` +
-      `• Usarás el servicio de forma legal y responsable\n` +
-      `• No realizarás actividades ilegales a través de la VPN\n` +
-      `• Aceptas nuestra política de privacidad y reembolso\n` +
-      `• Entiendes que el servicio puede tener interrupciones ocasionales\n\n` +
-      `📄 Puedes leer los términos completos en el menú <b>POLÍTICAS</b>.`;
-
-    const keyboard = { reply_markup: { inline_keyboard: [
-      [createButton('📄 Leer términos completos', { callback_data: 'politicas' })],
-      [createButton('✅ Acepto los términos', { callback_data: 'accept_terms' })],
-      [createButton('❌ No acepto', { callback_data: 'decline_terms' })]
-    ] } };
-
-    if (ctx.callbackQuery) await ctx.answerCbQuery('⚠️ Debes aceptar los términos primero.', { show_alert: true }).catch(() => {});
-    await ctx.reply(termsMsg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    const { text, keyboard } = channelGateMessage();
+    if (ctx.callbackQuery) await ctx.answerCbQuery('⚠️ Debes unirte al canal primero.', { show_alert: true }).catch(() => {});
+    await ctx.reply(text, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
     return; // Bloquear la acción original
   } catch (e) { return next(); }
 });
 
 bot.catch((err, ctx) => { console.error('❌ Error en el bot:', err); });
 
-// ── ACEPTAR / RECHAZAR TÉRMINOS ───────────────────────
-bot.action('accept_terms', async (ctx) => {
+// ── VERIFICAR MEMBRESÍA DEL CANAL (botón "Ya me uní") ───────────────────────
+bot.action('check_channel_membership', async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
-  try {
-    await db.acceptTerms(userId);
+  if (await isChannelMember(userId)) {
     await ctx.editMessageText(
-      `✅ <b>¡Términos aceptados!</b>\n\nBienvenido a VPN Cuba. Ya puedes usar todos los servicios del bot.\n\nUsa /start para ver el menú principal.`,
+      `✅ <b>¡Listo!</b>\n\nBienvenido a VPN Cuba. Ya puedes usar todos los servicios del bot.\n\nUsa /start para ver el menú principal.`,
       { parse_mode: 'HTML' }
     ).catch(() => {});
-  } catch (e) { await ctx.reply('❌ Error al registrar la aceptación. Intenta de nuevo.'); }
-});
-
-bot.action('decline_terms', async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(
-    `❌ <b>Has rechazado los términos.</b>\n\nSin aceptar los Términos y Condiciones no puedes acceder a los servicios de VPN Cuba.\n\nSi cambias de opinión, usa /start en cualquier momento.`,
-    { parse_mode: 'HTML' }
-  ).catch(() => {});
+  } else {
+    await ctx.answerCbQuery('❌ Todavía no detectamos tu membresía en el canal. Únete y vuelve a intentar.', { show_alert: true }).catch(() => {});
+  }
 });
 
 // ==================== COMUNIDAD ====================
@@ -3033,23 +3058,10 @@ bot.start(async (ctx) => {
         catch (e) { console.error('❌ Error creando referido (start):', e.message); }
     }
 
-    // Verificar si ya aceptó los términos
-    const userRecord = await db.getUser(userId.toString()).catch(() => null);
-    if (!userRecord?.accepted_terms && !esAdmin) {
-      const termsMsg =
-        `📋 <b>Términos y Condiciones de VPN Cuba</b>\n\n` +
-        `Antes de continuar, debes leer y aceptar nuestros términos de servicio.\n\n` +
-        `<b>Al aceptar confirmas que:</b>\n` +
-        `• Usarás el servicio de forma legal y responsable\n` +
-        `• No realizarás actividades ilegales a través de la VPN\n` +
-        `• Aceptas nuestra política de privacidad y reembolso\n` +
-        `• Entiendes que el servicio puede tener interrupciones ocasionales\n\n` +
-        `📄 Puedes leer los términos completos en el menú <b>POLÍTICAS</b>.`;
-      await ctx.reply(termsMsg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-        [createButton('📄 Leer términos completos', { callback_data: 'politicas' })],
-        [createButton('✅ Acepto los términos', { callback_data: 'accept_terms' })],
-        [createButton('❌ No acepto', { callback_data: 'decline_terms' })]
-      ] } });
+    // Verificar que esté unido al canal obligatorio
+    if (!esAdmin && !(await isChannelMember(userId.toString()))) {
+      const { text, keyboard } = channelGateMessage();
+      await ctx.reply(text, { parse_mode: 'HTML', ...keyboard });
       return;
     }
     const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
@@ -3181,6 +3193,87 @@ bot.command('botstatus', async (ctx) => {
     `_Versión: 2.0 | Servidor: ${process.env.WEBAPP_URL || 'localhost'}_`;
 
   await ctx.reply(mensajeAdmin, { parse_mode: 'Markdown' });
+});
+
+// ── BROADCAST CONVERSACIONAL (el admin lo escribe directo en el chat del bot) ──
+// Así puede usar emojis premium, fotos, formato, etc. tal cual los escriba —
+// se copia el mensaje original con copyMessage(), sin reconstruir el texto.
+const broadcastState = new Map(); // adminId -> { stage: 'target'|'content'|'confirm', target?, pendingMessage? }
+
+bot.command('broadcast', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!isAdmin(adminId)) return;
+  broadcastState.set(adminId, { stage: 'target' });
+  await ctx.reply('📢 <b>Nuevo broadcast</b>\n\n¿A quién se lo envías?', {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [
+      [{ text: '👥 Todos los usuarios', callback_data: 'bc_target_all' }],
+      [{ text: '🟢 Solo activos (30 días)', callback_data: 'bc_target_active' }],
+      [{ text: '⭐ Solo VIP', callback_data: 'bc_target_vip' }],
+      [{ text: '❌ Cancelar', callback_data: 'bc_cancel' }],
+    ] },
+  });
+});
+
+bot.action(/^bc_target_(.+)$/, async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!isAdmin(adminId)) return ctx.answerCbQuery();
+  const target = ctx.match[1];
+  broadcastState.set(adminId, { stage: 'content', target });
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(
+    `✅ Destino: <b>${target}</b>\n\nAhora envíame el mensaje que quieres difundir — puede tener texto, emojis premium, fotos, lo que sea. En cuanto lo reciba te pido confirmación antes de enviarlo a nadie.`,
+    { parse_mode: 'HTML' }
+  ).catch(() => {});
+});
+
+bot.action('bc_cancel', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  broadcastState.delete(adminId);
+  await ctx.answerCbQuery('Cancelado');
+  await ctx.editMessageText('❌ Broadcast cancelado.').catch(() => {});
+});
+
+bot.action('bc_confirm_send', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!isAdmin(adminId)) return ctx.answerCbQuery();
+  const state = broadcastState.get(adminId);
+  await ctx.answerCbQuery();
+  if (!state || !state.pendingMessage) { await ctx.editMessageText('⚠️ No hay ningún broadcast pendiente.').catch(() => {}); return; }
+  broadcastState.delete(adminId);
+  await ctx.editMessageText('📤 Enviando difusión, te aviso cuando termine...').catch(() => {});
+
+  const users = await getAllUsersForBroadcast(state.target);
+  const fromChatId = state.pendingMessage.chat.id;
+  const messageId = state.pendingMessage.message_id;
+  let sent = 0, failed = 0;
+  for (const u of users) {
+    try {
+      await bot.telegram.copyMessage(u.telegram_id, fromChatId, messageId);
+      sent++;
+    } catch (e) { failed++; }
+    await new Promise(r => setTimeout(r, 40)); // evita saturar los límites de envío de Telegram
+  }
+  await ctx.reply(`✅ Difusión enviada.\n\nEnviados: ${sent}\nFallidos: ${failed}\nTotal: ${users.length}`);
+});
+
+// Captura el mensaje del admin como contenido del broadcast (cualquier tipo: texto, foto, etc.)
+bot.on('message', async (ctx, next) => {
+  const adminId = ctx.from?.id?.toString();
+  if (!adminId || !isAdmin(adminId)) return next();
+  const state = broadcastState.get(adminId);
+  if (!state || state.stage !== 'content') return next();
+
+  state.stage = 'confirm';
+  state.pendingMessage = ctx.message;
+  broadcastState.set(adminId, state);
+
+  await ctx.reply('👆 Así se verá tu mensaje. ¿Confirmas la difusión?', {
+    reply_markup: { inline_keyboard: [
+      [{ text: '✅ Confirmar y enviar', callback_data: 'bc_confirm_send' }],
+      [{ text: '❌ Cancelar', callback_data: 'bc_cancel' }],
+    ] },
+  });
 });
 
 bot.on('text', async (ctx) => {
