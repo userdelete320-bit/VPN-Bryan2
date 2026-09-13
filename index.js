@@ -2709,7 +2709,7 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
-// Modo mantenimiento: /mantenimiento-on y /mantenimiento-off (solo admins).
+// Modo mantenimiento: /mantenimiento_on y /mantenimiento_off (solo admins).
 // Mientras está activo, bloquea CUALQUIER interacción de usuarios no admin
 // (mensajes, comandos, botones) con un aviso apropiado, antes de cualquier otra lógica.
 let maintenanceMode = false;
@@ -2727,12 +2727,12 @@ bot.use(async (ctx, next) => {
   return; // bloquea todo lo demás mientras dure el mantenimiento
 });
 
-bot.command('mantenimiento-on', async (ctx) => {
+bot.command('mantenimiento_on', async (ctx) => {
   if (!isAdmin(ctx.from.id.toString())) return;
   maintenanceMode = true;
   await ctx.reply('🛠 Modo mantenimiento ACTIVADO. Los usuarios verán un aviso al intentar usar el bot.');
 });
-bot.command('mantenimiento-off', async (ctx) => {
+bot.command('mantenimiento_off', async (ctx) => {
   if (!isAdmin(ctx.from.id.toString())) return;
   maintenanceMode = false;
   await ctx.reply('✅ Modo mantenimiento DESACTIVADO. El bot vuelve a funcionar con normalidad.');
