@@ -166,6 +166,18 @@
   .selected-price .s-period{ font-size:10.5px; color:var(--muted-2); }
   .change-plan{ display:inline-flex; align-items:center; gap:5px; margin:10px 4px 0 4px; font-size:11.5px; font-weight:600; color:#8ea0ff; cursor:pointer; }
 
+  /* ---------- selector de velocidad ---------- */
+  .speed-card{ margin-top:0; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px; }
+  .speed-row{ margin-bottom:14px; }
+  .speed-row-label{ display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:9px; text-transform:uppercase; letter-spacing:.3px; }
+  .speed-chip-row{ display:flex; gap:7px; }
+  .speed-chip{ flex:1; text-align:center; padding:9px 4px; font-size:12px; font-weight:700; background:var(--card-2); border:1px solid var(--border); border-radius:9px; color:var(--muted); cursor:pointer; transition:.15s; }
+  .speed-chip.active{ background:rgba(91,98,234,0.18); border-color:rgba(91,98,234,0.5); color:#c2c8ff; }
+  .speed-total-row{ display:flex; align-items:center; justify-content:space-between; margin-top:2px; padding-top:14px; border-top:1px dashed var(--border); }
+  .speed-total-label{ font-size:11px; color:var(--muted-2); font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  .speed-total-sub{ font-size:11.5px; color:var(--muted); margin-top:3px; }
+  .speed-total-value{ font-size:17px; font-weight:800; font-family:'Sora',sans-serif; color:var(--teal-2); white-space:nowrap; }
+
   .discount-row{ display:flex; gap:8px; }
   .discount-row input{ flex:1; background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:11px; padding:12px 13px; font-size:13px; text-transform:uppercase; letter-spacing:.5px; }
   .discount-row input:focus{ border-color:rgba(52,211,153,0.5); }
@@ -758,6 +770,25 @@
       Cambiar plan
     </div>
 
+    <div class="section-label">Velocidad ⚡</div>
+    <div class="speed-card">
+      <div class="speed-row">
+        <div class="speed-row-label">📥 Velocidad de descarga</div>
+        <div class="speed-chip-row" id="speedDownloadRow"></div>
+      </div>
+      <div class="speed-row" style="margin-bottom:0">
+        <div class="speed-row-label">📤 Velocidad de subida</div>
+        <div class="speed-chip-row" id="speedUploadRow"></div>
+      </div>
+      <div class="speed-total-row">
+        <div>
+          <div class="speed-total-label">Precio del plan</div>
+          <div class="speed-total-sub" id="speedSummaryText">📥 4 Mbps · 📤 4 Mbps</div>
+        </div>
+        <div class="speed-total-value" id="speedPrice">—</div>
+      </div>
+    </div>
+
     <div class="section-label">Código de descuento</div>
     <div class="discount-row">
       <input type="text" id="discountInput" placeholder="Código de cupón" maxlength="20">
@@ -797,6 +828,7 @@
     <div class="summary-card">
       <div class="summary-row"><span>Plan</span><span id="sumPlan">Básico</span></div>
       <div class="summary-row"><span>Duración</span><span id="sumDuration">30 días</span></div>
+      <div class="summary-row"><span>Velocidad</span><span id="sumSpeed">📥 4 Mbps · 📤 4 Mbps</span></div>
       <div class="summary-row"><span>Método</span><span id="sumMethod">Saldo Móvil</span></div>
       <div class="summary-row discount" id="sumDiscountRow" style="display:none"><span>Descuento</span><span id="sumDiscount">-0</span></div>
       <div class="summary-row total"><span>Total</span><span id="sumTotal">$2</span></div>
@@ -808,7 +840,7 @@
 
     <div class="terms-row">
       <input type="checkbox" id="termsCheck" onchange="checkConfirmEnabled()">
-      <label for="termsCheck">Acepto los <b>términos de servicio</b> y la <b>política de no-logs</b> de VPN CUBA.</label>
+      <label for="termsCheck">Acepto los <a href="#" onclick="openTermsPage(event)" style="color:#8ea0ff; font-weight:700; text-decoration:underline">términos de servicio</a> y la <b>política de no-logs</b> de VPN CUBA.</label>
     </div>
 
     <div class="checkout-bar">
@@ -832,6 +864,7 @@
       <div class="receipt-row"><span>Pedido</span><span class="receipt-id" id="rcOrderId">#VC-000000</span></div>
       <div class="receipt-row"><span>Plan</span><span id="rcPlan">Básico</span></div>
       <div class="receipt-row"><span>Duración</span><span id="rcDuration">30 días</span></div>
+      <div class="receipt-row"><span>Velocidad</span><span id="rcSpeed">📥 4 Mbps · 📤 4 Mbps</span></div>
       <div class="receipt-row"><span>Método</span><span id="rcMethod">Saldo Móvil</span></div>
       <div class="receipt-row dashed"><span>Total pagado</span><span id="rcTotal">$2</span></div>
     </div>
@@ -1764,6 +1797,22 @@
     return (PLANS[uiKey] || {}).name || backendKey;
   }
 
+  // ==================== SISTEMA DE VELOCIDADES (modular / configurable) ====================
+  // baseMbps: velocidad a la que corresponde el precio base de cada plan (PRICES).
+  // availableMbps: velocidades entre las que puede elegir el cliente, tanto para
+  // descarga como para subida.
+  const SPEED_CONFIG = {
+    baseMbps: 4,
+    availableMbps: [4, 8, 12, 16, 20],
+  };
+  // El multiplicador se calcula sobre la MAYOR de descarga/subida, para no
+  // cobrar el multiplicador dos veces cuando ambas velocidades difieren
+  // (ej. 4 Mbps descarga + 8 Mbps subida = 2x, no 3x).
+  function speedMultiplier(downloadMbps, uploadMbps){
+    const maxMbps = Math.max(downloadMbps, uploadMbps);
+    return maxMbps / SPEED_CONFIG.baseMbps;
+  }
+
   // Precios reales por método de pago (según tarifario del bot)
   const PRICES = {
     basico:      { cup:1300, saldo:900,  bpa:1300, metro:1300, usdt:2,    stars:170,  paypal:3 },
@@ -1810,6 +1859,7 @@
     expressDuration: '24h', expressRegion: 'cuba',
     gameInfo: { game:'', connection:'app', device:'android', details:'' },
     discountCode: null, discountPercent: 0, levelDiscountPercent: 0,
+    speedDownload: SPEED_CONFIG.baseMbps, speedUpload: SPEED_CONFIG.baseMbps,
     resellerSaleClient: null,
     proofFile: null,
     soldOut: {},
@@ -2256,14 +2306,17 @@
     const table = basePriceTable(planKey);
     let amount = table[method];
     if (amount === undefined || amount === null) return null;
-    if (state.discountPercent > 0) amount = Math.round(amount * (1 - state.discountPercent) * 100) / 100;
-    return amount;
+    amount = amount * speedMultiplier(state.speedDownload, state.speedUpload);
+    if (state.discountPercent > 0) amount = amount * (1 - state.discountPercent);
+    return Math.round(amount * 100) / 100;
   }
 
   // ==================== MODAL: datos para el staff ====================
   function openDetailsModal(planKey){
     if (state.soldOut[planKey]) { showToast('Este plan está agotado por ahora'); return; }
     state.plan = planKey;
+    state.speedDownload = SPEED_CONFIG.baseMbps;
+    state.speedUpload = SPEED_CONFIG.baseMbps;
     const p = PLANS[planKey];
     document.getElementById('gameField').style.display = p.isGaming ? 'block' : 'none';
     document.getElementById('detailsModal').classList.add('active');
@@ -2426,6 +2479,7 @@
   function renderCheckout(){
     const p = PLANS[state.plan];
     const period = currentPeriod(state.plan);
+    renderSpeedSelector();
 
     document.getElementById('selTitle').textContent = p.name;
     let desc = p.desc;
@@ -2448,12 +2502,53 @@
     checkConfirmEnabled();
   }
 
+  // ==================== SELECTOR DE VELOCIDAD ====================
+  function renderSpeedSelector(){
+    const dlBox = document.getElementById('speedDownloadRow');
+    const upBox = document.getElementById('speedUploadRow');
+    if (!dlBox || !upBox) return;
+    // clamp por si el admin cambió las velocidades disponibles mientras había una selección previa
+    if (!SPEED_CONFIG.availableMbps.includes(state.speedDownload)) state.speedDownload = SPEED_CONFIG.baseMbps;
+    if (!SPEED_CONFIG.availableMbps.includes(state.speedUpload)) state.speedUpload = SPEED_CONFIG.baseMbps;
+    const chipsHtml = (selected) => SPEED_CONFIG.availableMbps.map(mbps =>
+      `<div class="speed-chip${mbps === selected ? ' active' : ''}" data-mbps="${mbps}">${mbps}</div>`
+    ).join('');
+    dlBox.innerHTML = chipsHtml(state.speedDownload);
+    upBox.innerHTML = chipsHtml(state.speedUpload);
+    dlBox.querySelectorAll('.speed-chip').forEach(chip => chip.addEventListener('click', () => {
+      state.speedDownload = parseFloat(chip.dataset.mbps);
+      renderSpeedSelector();
+      updateTotals();
+      try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch(e) {}
+    }));
+    upBox.querySelectorAll('.speed-chip').forEach(chip => chip.addEventListener('click', () => {
+      state.speedUpload = parseFloat(chip.dataset.mbps);
+      renderSpeedSelector();
+      updateTotals();
+      try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch(e) {}
+    }));
+    updateSpeedSummary();
+  }
+  function speedLabelText(){
+    return `📥 ${state.speedDownload} Mbps · 📤 ${state.speedUpload} Mbps`;
+  }
+  function updateSpeedSummary(){
+    const summary = document.getElementById('speedSummaryText');
+    const sumSpeed = document.getElementById('sumSpeed');
+    const label = speedLabelText();
+    if (summary) summary.textContent = label;
+    if (sumSpeed) sumSpeed.textContent = label;
+  }
+
   function updateTotals(){
     const price = priceFor(state.plan, state.method);
     const label = price !== null ? unitLabel(state.method, price) : '—';
     document.getElementById('selAmount').textContent = label;
     document.getElementById('sumTotal').textContent = label;
     document.getElementById('btnAmount').textContent = label;
+    const speedPriceEl = document.getElementById('speedPrice');
+    if (speedPriceEl) speedPriceEl.textContent = label;
+    updateSpeedSummary();
 
     const discountRow = document.getElementById('sumDiscountRow');
     if (state.discountPercent > 0){
@@ -2563,6 +2658,16 @@
   }
 
   // Reembolso: usa el mismo flujo/redirección que ya tenías desde el bot (garantias.html), no la pantalla simulada del mockup
+  // Abre los Términos de Servicio reales (politicas.html) sin perder el progreso del checkout.
+  // Usa Telegram.WebApp.openLink para abrirlo aparte (navegador externo / vista aparte),
+  // en vez de navegar la propia mini-app fuera de la pantalla de pago.
+  function openTermsPage(event){
+    if (event) event.preventDefault();
+    const url = window.location.origin + '/politicas.html?section=terminos';
+    if (window.Telegram?.WebApp?.openLink) window.Telegram.WebApp.openLink(url);
+    else window.open(url, '_blank');
+  }
+
   function goToRefund(){
     if (!currentUser.id) { showToast('No se pudo identificar tu usuario. Abre la app desde el bot de Telegram.'); return; }
     window.location.href = `garantias.html?userId=${encodeURIComponent(currentUser.id)}`;
@@ -2648,6 +2753,7 @@
       document.getElementById('rcOrderId').textContent = orderId;
       document.getElementById('rcPlan').textContent = p.name.replace('Plan ','');
       document.getElementById('rcDuration').textContent = period;
+      document.getElementById('rcSpeed').textContent = speedLabelText();
       document.getElementById('rcMethod').textContent = METHODS[state.method].name;
       document.getElementById('rcTotal').textContent = label;
 
