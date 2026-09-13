@@ -2722,7 +2722,10 @@ bot.use(async (ctx, next) => {
   const maintenanceMsg = '🛠 <b>VPN Cuba está en mantenimiento</b>\n\nEstamos realizando mejoras en el servicio. Por favor, intenta de nuevo en unos minutos. Disculpa las molestias.';
   try {
     if (ctx.callbackQuery) await ctx.answerCbQuery('🛠 En mantenimiento, intenta más tarde.', { show_alert: true }).catch(() => {});
-    else await ctx.reply(maintenanceMsg, { parse_mode: 'HTML' }).catch(() => {});
+    else await ctx.reply(maintenanceMsg, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: '💬 Contactar con soporte', url: 'https://t.me/L0quen2' }]] },
+    }).catch(() => {});
   } catch (e) {}
   return; // bloquea todo lo demás mientras dure el mantenimiento
 });
