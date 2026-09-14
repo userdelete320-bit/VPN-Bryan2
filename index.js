@@ -1094,14 +1094,19 @@ app.post('/api/plan-availability/update', async (req, res) => {
     if (!plan || typeof agotado !== 'boolean') return res.status(400).json({ error: 'Datos inválidos.' });
     if (!(plan in PLAN_AVAILABILITY)) return res.status(400).json({ error: `Plan desconocido: ${plan}` });
     PLAN_AVAILABILITY[plan] = agotado;
+    let persisted = true;
     try {
       const sb = getSbClient();
-      await sb.from('settings').upsert(
+      const { error: upsertErr } = await sb.from('settings').upsert(
         { key: 'plan_availability', value: JSON.stringify(PLAN_AVAILABILITY), updated_at: new Date().toISOString() },
         { onConflict: 'key' }
       );
-    } catch (dbErr) { console.warn('⚠️ No se pudo persistir disponibilidad en DB:', dbErr.message); }
-    res.json({ success: true, availability: PLAN_AVAILABILITY });
+      if (upsertErr) throw upsertErr;
+    } catch (dbErr) {
+      persisted = false;
+      console.error('❌ No se pudo persistir disponibilidad en DB (se perderá si el servidor reinicia):', dbErr.message);
+    }
+    res.json({ success: true, availability: PLAN_AVAILABILITY, persisted });
   } catch (error) {
     console.error('❌ Error actualizando disponibilidad:', error);
     res.status(500).json({ error: error.message });
@@ -1987,12 +1992,18 @@ app.post('/api/create-stars-invoice', async (req, res) => {
     }
 }); 
 
+// Debe coincidir con SPEED_CONFIG del frontend (app.html) — velocidad base a la que
+// corresponde el precio guardado en plan_prices/STARS_PRICES.
+const SPEED_BASE_MBPS = 4;
+
 app.post('/api/initiate-stars-payment', async (req, res) => {
   try {
-    const { telegramId, plan } = req.body;
+    const { telegramId, plan, speedDownload, speedUpload } = req.body;
     if (!telegramId || !plan) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
-    const starsAmount = STARS_PRICES[plan];
-    if (!starsAmount) return res.status(400).json({ success: false, error: 'Plan no soportado.' });
+    const baseStars = STARS_PRICES[plan];
+    if (!baseStars) return res.status(400).json({ success: false, error: 'Plan no soportado.' });
+    const maxMbps = Math.max(Number(speedDownload) || SPEED_BASE_MBPS, Number(speedUpload) || SPEED_BASE_MBPS);
+    const starsAmount = Math.max(1, Math.round(baseStars * (maxMbps / SPEED_BASE_MBPS)));
     const title = `Plan ${getPlanName(plan)}`;
     const payload = JSON.stringify({ userId: telegramId.toString(), planType: plan, method: 'stars' });
     await bot.telegram.sendInvoice(telegramId, {
@@ -3287,6 +3298,19 @@ bot.on('text', async (ctx) => {
   const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
   if (text === '📁 VER PLANES') { await ctx.reply('📋 *NUESTROS PLANES*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR WEB DE PLANES", wa(`${webappUrl}/app.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
   else if (text === '⌨ PANEL ADMIN' && esAdmin) { await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(`${webappUrl}/admin.html?userId=${userId}&admin=true`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
+});
+
+// ==================== ANUNCIO POP-UP DEL SITIO ====================
+app.get('/api/popup-announcement', async (req, res) => {
+  try { res.json(await db.getPopupAnnouncement()); } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+app.post('/api/popup-announcement/update', async (req, res) => {
+  try {
+    if (!isAdmin(req.body.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const { enabled, title, message } = req.body;
+    const announcement = await db.updatePopupAnnouncement({ enabled: !!enabled, title: title || '', message: message || '' });
+    res.json({ success: true, announcement });
+  } catch (error) { res.status(500).json({ error: 'Error guardando el anuncio: ' + error.message }); }
 });
 
 // ==================== REVENDEDORES ====================

@@ -1998,6 +1998,18 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     const { data, error } = await dbClient.from('resellers').select('username, telegram_id, month_sales').eq('status', 'active').order('month_sales', { ascending: false }).limit(10);
     if (error) throw error;
     return data || [];
+  },
+
+  // ========== ANUNCIO POP-UP DEL SITIO ==========
+  async getPopupAnnouncement() {
+    const { data, error } = await dbClient.from('popup_announcement').select('*').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    return data || { enabled: false, title: '', message: '' };
+  },
+  async updatePopupAnnouncement(patch) {
+    const { data, error } = await dbClient.from('popup_announcement').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1).select().single();
+    if (error) throw error;
+    return data;
   }
 };
 
