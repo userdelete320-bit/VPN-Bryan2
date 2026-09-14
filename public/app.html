@@ -361,7 +361,7 @@
   /* ---------- método de pago compacto ---------- */
   .method-select-card{ display:flex; align-items:center; gap:12px; background:var(--card); border:1.5px solid rgba(91,98,234,0.35); border-radius:var(--radius-md); padding:13px 14px; cursor:pointer; }
   .method-select-card .pay-icon{ background:rgba(91,98,234,0.14); }
-  .method-select-card .ms-arrow{ flex-shrink:0; color:#8ea0ff; }
+  .method-select-card .ms-arrow{ flex-shrink:0; color:#f6685c; }
   .method-modal-list{ display:flex; flex-direction:column; gap:10px; max-height:52vh; overflow-y:auto; }
   .recommended-tag{ display:inline-block; margin-top:4px; font-size:9.5px; font-weight:800; letter-spacing:.4px; color:var(--teal-2); background:rgba(52,211,153,0.12); padding:2px 7px; border-radius:6px; }
 
@@ -1883,7 +1883,7 @@
     { id:'690123845', username:'@yosvani', name:'Yosvani', plan:'VIP Cuba', status:'Vencido', exp:12, referredBy:null, referrals:1 },
     { id:'552198734', username:'@dianelis', name:'Dianelis', plan:'Anual', status:'Activo', exp:160, referredBy:null, referrals:5 },
   ];
-  let popupAnnouncement = { enabled:false, title:'', message:'' };
+  let popupAnnouncement = { enabled:false, title:'', message:'' }; // se sobreescribe con loadPopupAnnouncement() al iniciar
   const EXP_ID = id => botUsers.find(u => u.id === id);
 
   // ==================== PROGRAMA DE REVENDEDORES (demo en sesión — conectar a backend real) ====================
@@ -2359,20 +2359,15 @@
   // automáticos en caso de empate.
   function recommendMethod(planKey){
     const table = basePriceTable(planKey);
-    let best = null, bestScore = Infinity;
-    Object.keys(METHODS).forEach(key => {
+    // Método recomendado por defecto: transferencia bancaria (BPA, con Metropolitano como respaldo).
+    const preferredOrder = ['bpa', 'metro', 'saldo'];
+    for (const key of preferredOrder) {
       const m = METHODS[key];
-      if (m.onlyFor && m.onlyFor !== planKey) return;
-      const amount = table[key];
-      if (amount === undefined) return;
-      // normaliza aproximadamente a USD para poder comparar entre CUP/USDT/$/stars
-      let usdEquiv = amount;
-      if (key === 'saldo' || key === 'bpa' || key === 'metro') usdEquiv = amount / 650;
-      if (key === 'stars') usdEquiv = amount / 55;
-      const score = usdEquiv - (m.auto ? 0.01 : 0); // pequeño empate a favor de lo automático
-      if (score < bestScore){ bestScore = score; best = key; }
-    });
-    return best || 'saldo';
+      if (m.onlyFor && m.onlyFor !== planKey) continue;
+      if (table[key] === undefined || table[key] === null) continue;
+      return key;
+    }
+    return 'saldo';
   }
 
   function renderPaymentMethods(){
@@ -2712,7 +2707,7 @@
         const res = await fetch('/api/initiate-stars-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId: String(payTelegramId), plan: backendPlan }),
+          body: JSON.stringify({ telegramId: String(payTelegramId), plan: backendPlan, speedDownload: state.speedDownload, speedUpload: state.speedUpload }),
         });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo iniciar el pago con Stars.');
@@ -2724,14 +2719,16 @@
 
       // Métodos manuales (Saldo Móvil, BPA, Metropolitano, USDT, PayPal, Zelle): requieren comprobante
       const gi = state.gameInfo || {};
+      const speedNote = `Velocidad: ${state.speedDownload} Mbps ↓ / ${state.speedUpload} Mbps ↑`;
       const gameNotes = (p.isGaming && (gi.game || gi.connection || gi.device || gi.details))
         ? `Juego: ${gi.game || '-'} | Conexión: ${gi.connection || '-'} | Dispositivo: ${gi.device || '-'} | Detalles: ${gi.details || '-'}`
         : '';
+      const notes = [speedNote, gameNotes].filter(Boolean).join(' | ');
       const form = new FormData();
       form.append('telegramId', String(payTelegramId));
       form.append('plan', backendPlan);
       form.append('price', String(price));
-      form.append('notes', gameNotes);
+      form.append('notes', notes);
       form.append('method', backendMethod);
       form.append('couponCode', state.discountCode || '');
       form.append('referralDiscount', String(state.discountPercent || 0));
@@ -3444,6 +3441,9 @@ PersistentKeepalive = 25`;
       renderAdminList();
       renderPlanCardsSoldOut();
       renderTrialList(); // el plan agotado también deja de ofrecerse como prueba
+      if (data.persisted === false) {
+        showToast('⚠️ Cambio aplicado, pero NO se pudo guardar permanentemente. Si el servidor se reinicia, se perderá.');
+      }
       try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light'); } catch(e) {}
     } catch (err) {
       showToast(err.message);
@@ -3785,9 +3785,10 @@ PersistentKeepalive = 25`;
   }
 
   // ==================== ADMIN: anuncio popup en la web ====================
-  function renderPopupAdmin(){
+  async function renderPopupAdmin(){
     const toggle = document.getElementById('popupToggle');
     if (!toggle) return;
+    try { popupAnnouncement = await (await fetch('/api/popup-announcement')).json(); } catch (e) {}
     toggle.classList.toggle('on', popupAnnouncement.enabled);
     document.getElementById('popupTitle').value = popupAnnouncement.title;
     document.getElementById('popupMessage').value = popupAnnouncement.message;
@@ -3804,17 +3805,28 @@ PersistentKeepalive = 25`;
     document.getElementById('popupPreviewTitle').textContent = popupAnnouncement.enabled && title ? title : 'Sin anuncio activo';
     document.getElementById('popupPreviewMsg').textContent = popupAnnouncement.enabled && msg ? msg : 'Activa el interruptor y guarda para publicarlo';
   }
-  function savePopupAnnouncement(){
-    popupAnnouncement.title = document.getElementById('popupTitle').value.trim();
-    popupAnnouncement.message = document.getElementById('popupMessage').value.trim();
-    renderPopupPreview();
-    try { window.Telegram?.WebApp?.sendData?.(JSON.stringify({ type:'admin_update_popup', ...popupAnnouncement })); } catch(e) {}
-    showToast('Anuncio guardado');
-    try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
+  async function savePopupAnnouncement(){
+    if (!isAdminUser) { showToast('Solo un administrador puede cambiar esto.'); return; }
+    const title = document.getElementById('popupTitle').value.trim();
+    const message = document.getElementById('popupMessage').value.trim();
+    try {
+      const res = await fetch('/api/popup-announcement/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requesterId: currentUser.id, enabled: popupAnnouncement.enabled, title, message }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo guardar el anuncio.');
+      popupAnnouncement = data.announcement;
+      renderPopupPreview();
+      showToast('Anuncio guardado');
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); } catch(e) {}
+    } catch (err) { showToast(err.message); }
   }
   let sitePopupShown = false;
-  function maybeShowSitePopup(){
-    if (sitePopupShown || !popupAnnouncement.enabled || !popupAnnouncement.title) return;
+  async function maybeShowSitePopup(){
+    if (sitePopupShown) return;
+    try { popupAnnouncement = await (await fetch('/api/popup-announcement')).json(); } catch (e) { return; }
+    if (!popupAnnouncement.enabled || !popupAnnouncement.title) return;
     sitePopupShown = true;
     document.getElementById('sitePopupTitle').textContent = popupAnnouncement.title;
     document.getElementById('sitePopupMsg').textContent = popupAnnouncement.message;
