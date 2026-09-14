@@ -389,7 +389,12 @@ function getVipStatusHtml(user) {
     html += `<tg-emoji emoji-id="6023880246128810031">📅</tg-emoji> <b>Activado:</b> ${vipSince}\n`;
     html += `<tg-emoji emoji-id="6021435576513730578">📋</tg-emoji> <b>Plan:</b> ${planNombre}\n`;
     html += `<tg-emoji emoji-id="5778202206922608769">⏳</tg-emoji> <b>Días restantes:</b> ${diasRestantes} días\n`;
-    html += `<tg-emoji emoji-id="5992430854909989581">💰</tg-emoji> <b>Precio:</b> $${user.plan_price || '0'} CUP\n\n`;
+    html += `<tg-emoji emoji-id="5992430854909989581">💰</tg-emoji> <b>Precio:</b> $${user.plan_price || '0'} CUP\n`;
+    if (user.speed_download && user.speed_upload) {
+        html += `<tg-emoji emoji-id="6019175208240289774">⚡</tg-emoji> <b>Velocidad contratada:</b> ${user.speed_download} Mbps ↓ / ${user.speed_upload} Mbps ↑\n\n`;
+    } else {
+        html += `\n`;
+    }
     if (diasRestantes <= 7) {
         html += `<tg-emoji emoji-id="6019102674832595118">⚠️</tg-emoji> <b>TU PLAN ESTÁ POR EXPIRAR PRONTO</b>\nRenueva ahora para mantener tu acceso VIP.\n\n`;
     } else {
@@ -1165,7 +1170,7 @@ app.get('/api/check-terms/:telegramId', async (req, res) => {
 
 app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
   try {
-    const { telegramId, plan, price, notes, method, couponCode, upgrade_to, from_plan, duration, ip_choice, resellerId, resellerClientUsername } = req.body;
+    const { telegramId, plan, price, notes, method, couponCode, upgrade_to, from_plan, duration, ip_choice, resellerId, resellerClientUsername, speedDownload, speedUpload } = req.body;
     if (!telegramId || !plan || !price) return res.status(400).json({ error: 'Datos incompletos' });
     if (!req.file) return res.status(400).json({ error: 'Captura de pantalla requerida' });
 
@@ -1224,7 +1229,8 @@ app.post('/api/payment', upload.single('screenshot'), async (req, res) => {
       status: 'pending', created_at: new Date().toISOString(),
       coupon_used: couponUsed, coupon_code: couponUsed ? couponCode?.toUpperCase() : null, coupon_discount: couponDiscount,
       payment_type: isUpgrade ? 'upgrade' : 'purchase', upgrade_to: upgrade_to || null, from_plan: from_plan || null,
-      duration: duration || null, ip_choice: ip_choice || null, reseller_id: linkedResellerId
+      duration: duration || null, ip_choice: ip_choice || null, reseller_id: linkedResellerId,
+      speed_download: speedDownload || null, speed_upload: speedUpload || null
     });
     if (!payment) throw new Error('No se pudo crear el pago en la base de datos');
 
@@ -1357,9 +1363,9 @@ app.post('/api/payments/:id/approve', async (req, res) => {
 
     const user = await db.getUser(payment.telegram_id);
     if (payment.payment_type === 'upgrade' && payment.upgrade_to) {
-      await db.makeUserVIP(payment.telegram_id, { plan: payment.upgrade_to, plan_price: payment.price, vip_since: user?.vip_since || new Date().toISOString() });
+      await db.makeUserVIP(payment.telegram_id, { plan: payment.upgrade_to, plan_price: payment.price, vip_since: user?.vip_since || new Date().toISOString(), speed_download: payment.speed_download, speed_upload: payment.speed_upload });
     } else {
-      await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString() });
+      await db.makeUserVIP(payment.telegram_id, { plan: payment.plan, plan_price: payment.price, vip_since: new Date().toISOString(), speed_download: payment.speed_download, speed_upload: payment.speed_upload });
     }
 
     // Auto-envío de configuración desde el pool
@@ -1645,7 +1651,13 @@ app.post('/api/request-trial', async (req, res) => {
   pendingTrialLocks.set(telegramId, now);
 
   try {
-    // 0. Si el plan está marcado como agotado, tampoco se puede pedir prueba de él
+    // 0. El plan Express no tiene pool de pruebas propio (no se ofrece prueba de este plan)
+    if (trialPlanType === 'express') {
+      pendingTrialLocks.delete(telegramId);
+      return res.status(400).json({ error: 'El Plan Express no tiene prueba gratuita disponible.' });
+    }
+
+    // 0.1 Si el plan está marcado como agotado, tampoco se puede pedir prueba de él
     if (trialPlanType && PLAN_AVAILABILITY[trialPlanType]) {
       pendingTrialLocks.delete(telegramId);
       return res.status(409).json({ error: 'Este plan está agotado por ahora, no se pueden generar pruebas.' });

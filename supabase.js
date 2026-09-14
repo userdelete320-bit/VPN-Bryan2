@@ -184,6 +184,8 @@ const db = {
         plan: vipData.plan || 'vip',
         plan_price: vipData.plan_price || 0,
         vip_since: newVipSince,
+        speed_download: vipData.speed_download ?? currentUser?.speed_download ?? null,
+        speed_upload: vipData.speed_upload ?? currentUser?.speed_upload ?? null,
         updated_at: new Date().toISOString()
       })
       .eq('telegram_id', userId)
@@ -548,6 +550,8 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
           coupon_discount: paymentData.coupon_discount || 0,
           referral_discount: paymentData.referral_discount || 0,
           reseller_id: paymentData.reseller_id || null,
+          speed_download: paymentData.speed_download || null,
+          speed_upload: paymentData.speed_upload || null,
           created_at: paymentData.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
