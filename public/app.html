@@ -2275,7 +2275,7 @@
     chip.classList.add('active');
     state.expressDuration = chip.dataset.duration;
     const p = PRICES.express[state.expressDuration];
-    document.getElementById('expressPrice').textContent = '$' + p.usdt;
+    document.getElementById('expressPrice').innerHTML = '<small>desde</small> ' + Number(p.cup).toLocaleString('es-ES') + ' CUP';
     document.getElementById('expressPeriod').textContent = PERIOD_LABEL[state.expressDuration];
   }));
   document.querySelectorAll('#expressRegion .mini-chip').forEach(chip => chip.addEventListener('click', (ev) => {
@@ -2732,6 +2732,8 @@
       form.append('method', backendMethod);
       form.append('couponCode', state.discountCode || '');
       form.append('referralDiscount', String(state.discountPercent || 0));
+      form.append('speedDownload', String(state.speedDownload));
+      form.append('speedUpload', String(state.speedUpload));
       if (isResellerSale) {
         form.append('resellerId', String(myReseller.id));
         form.append('resellerClientUsername', state.resellerSaleClient.username || '');
@@ -2891,7 +2893,7 @@ PersistentKeepalive = 25`;
 
     if (currentUser.id) {
       try {
-        const checks = await Promise.all(Object.keys(PLANS).map(async key => {
+        const checks = await Promise.all(Object.keys(PLANS).filter(key => key !== 'express').map(async key => {
           const backendKey = PLAN_BACKEND_KEY[key] || key;
           try {
             const res = await fetch(`/api/check-trial-eligibility/${encodeURIComponent(currentUser.id)}?plan=${encodeURIComponent(backendKey)}`);
@@ -2904,7 +2906,7 @@ PersistentKeepalive = 25`;
     }
 
     list.innerHTML = '';
-    Object.keys(PLANS).forEach(key => {
+    Object.keys(PLANS).filter(key => key !== 'express').forEach(key => {
       const p = PLANS[key];
       const elig = trialEligibilityCache[key];
       const soldOut = !!state.soldOut[key];
