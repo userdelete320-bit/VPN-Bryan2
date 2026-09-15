@@ -1804,7 +1804,18 @@
   const SPEED_CONFIG = {
     baseMbps: 4,
     availableMbps: [4, 8, 12, 16, 20],
+    // Excepciones por plan: si un plan aparece aquí, usa esta lista en vez de la de arriba.
+    // 2 Mbps queda debajo de la velocidad base (4) — el precio base NO cambia,
+    // simplemente 2 Mbps sale más barato (mitad de precio) y 4 Mbps pasa a sentirse
+    // como el siguiente escalón hacia arriba, no como el mínimo.
+    planOverrides: {
+      basico: [2, 4, 8, 12, 16, 20],
+      avanzado: [2, 4, 8, 12, 16, 20],
+    },
   };
+  function availableSpeedsFor(planKey){
+    return SPEED_CONFIG.planOverrides[planKey] || SPEED_CONFIG.availableMbps;
+  }
   // El multiplicador se calcula sobre la MAYOR de descarga/subida, para no
   // cobrar el multiplicador dos veces cuando ambas velocidades difieren
   // (ej. 4 Mbps descarga + 8 Mbps subida = 2x, no 3x).
@@ -2502,10 +2513,12 @@
     const dlBox = document.getElementById('speedDownloadRow');
     const upBox = document.getElementById('speedUploadRow');
     if (!dlBox || !upBox) return;
-    // clamp por si el admin cambió las velocidades disponibles mientras había una selección previa
-    if (!SPEED_CONFIG.availableMbps.includes(state.speedDownload)) state.speedDownload = SPEED_CONFIG.baseMbps;
-    if (!SPEED_CONFIG.availableMbps.includes(state.speedUpload)) state.speedUpload = SPEED_CONFIG.baseMbps;
-    const chipsHtml = (selected) => SPEED_CONFIG.availableMbps.map(mbps =>
+    const speeds = availableSpeedsFor(state.plan);
+    // clamp por si el admin cambió las velocidades disponibles, o si el plan
+    // actual no ofrece la velocidad que tenía elegida el plan anterior
+    if (!speeds.includes(state.speedDownload)) state.speedDownload = SPEED_CONFIG.baseMbps;
+    if (!speeds.includes(state.speedUpload)) state.speedUpload = SPEED_CONFIG.baseMbps;
+    const chipsHtml = (selected) => speeds.map(mbps =>
       `<div class="speed-chip${mbps === selected ? ' active' : ''}" data-mbps="${mbps}">${mbps}</div>`
     ).join('');
     dlBox.innerHTML = chipsHtml(state.speedDownload);
