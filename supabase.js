@@ -2120,6 +2120,54 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     const { data, error } = await dbClient.from('shop_topups').select('*').eq('status', 'pending').order('requested_at', { ascending: true });
     if (error) throw error;
     return data || [];
+  },
+
+  // ========== TIENDA UNIFICADA: órdenes ==========
+  async createShopOrder({ telegram_id, product_id, source, idempotency_key, qty, price_charged_usd }) {
+    const { data, error } = await dbClient.from('shop_orders').insert([{
+      telegram_id: String(telegram_id).trim(), product_id, source, idempotency_key, qty, price_charged_usd, status: 'reserved',
+    }]).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateShopOrder(id, patch) {
+    const { data, error } = await dbClient.from('shop_orders').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getUserShopOrders(telegramId) {
+    const { data, error } = await dbClient.from('shop_orders').select('*, shop_products(name)').eq('telegram_id', String(telegramId).trim()).order('created_at', { ascending: false }).limit(20);
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getShopOrderById(id) {
+    const { data, error } = await dbClient.from('shop_orders').select('*, shop_products(name)').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  // ========== TIENDA UNIFICADA: admin ==========
+  async getRecentShopOrders(limit = 10) {
+    const { data, error } = await dbClient.from('shop_orders').select('*, shop_products(name)').order('created_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getAllShopProducts() {
+    const { data, error } = await dbClient.from('shop_products').select('*').order('active', { ascending: false }).order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async toggleShopProductActive(id) {
+    const { data: current, error: getErr } = await dbClient.from('shop_products').select('active').eq('id', id).single();
+    if (getErr) throw getErr;
+    const { data, error } = await dbClient.from('shop_products').update({ active: !current.active }).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
   }
 };
 

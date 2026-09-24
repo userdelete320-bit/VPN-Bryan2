@@ -16,6 +16,8 @@ const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const db = require('./supabase');
 const { syncShopCatalog } = require('./shop_sync');
+const qamifyConnector = require('./qamify_connector');
+const ggsomaConnector = require('./ggsoma_connector');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
@@ -344,6 +346,7 @@ const SHOP_EMOJIS = {
 const SHOP_I18N = {
   es: {
     shop_title: 'Tienda',
+    shop_title_button: '🛍️ Tienda',
     shop_intro: 'Elige una opción:',
     products: 'Productos',
     profile: 'Perfil',
@@ -354,13 +357,36 @@ const SHOP_I18N = {
     main_menu: 'Menú principal',
     coming_soon: '🚧 Esta sección estará disponible muy pronto.',
     no_products: 'No hay productos disponibles por ahora.',
+    no_orders_yet: 'Todavía no tienes órdenes.',
     buy_soon: '🚧 La compra estará disponible muy pronto.',
     lang_prompt: 'Elige tu idioma:',
     lang_set_es: '✅ Idioma cambiado a Español.',
     lang_set_en: '✅ Language switched to English.',
+    product_not_found: 'Producto no encontrado.',
+    product_unavailable: 'Este producto ya no está disponible.',
+    order_not_found: 'Orden no encontrada.',
+    price: 'Precio',
+    buy_button: 'Comprar',
+    insufficient_balance: '❌ Saldo insuficiente.\n\nNecesitas ${needed} y tienes ${have}.',
+    processing_order: '⏳ Procesando tu orden...',
+    order_completed: '✅ Orden completada',
+    order_failed_refunded: '❌ No se pudo completar esta orden. Tu saldo fue devuelto.\n\nPuedes intentar de nuevo o contactar a soporte.',
+    topup_menu_title: '💰 <b>RECARGAR SALDO</b>',
+    topup_menu_intro: 'Elige una cantidad (USDT - BEP20):',
+    custom_amount: '✏️ Otra cantidad',
+    custom_amount_prompt: '✏️ Manda la cantidad en USDT que quieres recargar (solo números, ej. 15):',
+    invalid_amount: '❌ Cantidad inválida. Manda un número, ej. 15',
+    send_exact_amount: '💰 <b>Manda exactamente ${amount} USDT (BEP20)</b>\n\nDirección:\n${address}\n\nCuando lo hayas enviado, respóndeme aquí con el hash de la transacción (TXID) o una captura del pago.',
+    proof_received: '✅ Recibido. Tu recarga quedó pendiente de revisión — te aviso en cuanto se confirme.',
+    topup_confirmed: '✅ Tu recarga de ${amount} USDT fue confirmada y agregada a tu saldo.',
+    topup_rejected: '❌ No se pudo verificar tu recarga de ${amount} USDT. Contacta a soporte si crees que es un error.',
+    topup_start_error: '❌ No se pudo iniciar la recarga. Intenta de nuevo.',
+    label_user: 'Usuario', label_id: 'Telegram ID', label_balance: 'Saldo',
+    label_orders: 'Órdenes realizadas', label_spent: 'Total gastado', label_status: 'Estado', label_date: 'Fecha',
   },
   en: {
     shop_title: 'Shop',
+    shop_title_button: '🛍️ Shop',
     shop_intro: 'Choose an option:',
     products: 'Products',
     profile: 'Profile',
@@ -371,13 +397,39 @@ const SHOP_I18N = {
     main_menu: 'Main menu',
     coming_soon: '🚧 This section will be available very soon.',
     no_products: 'No products available right now.',
+    no_orders_yet: 'You have no orders yet.',
     buy_soon: '🚧 Buying will be available very soon.',
     lang_prompt: 'Choose your language:',
     lang_set_es: '✅ Idioma cambiado a Español.',
     lang_set_en: '✅ Language switched to English.',
+    product_not_found: 'Product not found.',
+    product_unavailable: 'This product is no longer available.',
+    order_not_found: 'Order not found.',
+    price: 'Price',
+    buy_button: 'Buy',
+    insufficient_balance: '❌ Insufficient balance.\n\nYou need ${needed} and you have ${have}.',
+    processing_order: '⏳ Processing your order...',
+    order_completed: '✅ Order completed',
+    order_failed_refunded: `❌ We couldn't complete this order. Your balance was refunded.\n\nYou can try again or contact support.`,
+    topup_menu_title: '💰 <b>TOP UP BALANCE</b>',
+    topup_menu_intro: 'Choose an amount (USDT - BEP20):',
+    custom_amount: '✏️ Other amount',
+    custom_amount_prompt: '✏️ Send the amount in USDT you want to top up (numbers only, e.g. 15):',
+    invalid_amount: '❌ Invalid amount. Send a number, e.g. 15',
+    send_exact_amount: '💰 <b>Send exactly ${amount} USDT (BEP20)</b>\n\nAddress:\n${address}\n\nOnce sent, reply here with the transaction hash (TXID) or a screenshot of the payment.',
+    proof_received: `✅ Got it. Your top up is pending review — you'll be notified once confirmed.`,
+    topup_confirmed: '✅ Your top up of ${amount} USDT was confirmed and added to your balance.',
+    topup_rejected: '❌ Your top up of ${amount} USDT could not be verified. Contact support if you think this is a mistake.',
+    topup_start_error: '❌ Could not start the top up. Try again.',
+    label_user: 'User', label_id: 'Telegram ID', label_balance: 'Balance',
+    label_orders: 'Orders placed', label_spent: 'Total spent', label_status: 'Status', label_date: 'Date',
   },
 };
-function t(lang, key) { return (SHOP_I18N[lang] || SHOP_I18N.es)[key] || key; }
+function t(lang, key, vars) {
+  let str = (SHOP_I18N[lang] || SHOP_I18N.es)[key] || key;
+  if (vars) Object.keys(vars).forEach(k => { str = str.split('${' + k + '}').join(vars[k]); });
+  return str;
+}
 async function getUserLang(telegramId) {
   try { const u = await db.getUser(telegramId); return u?.language === 'en' ? 'en' : 'es'; }
   catch (e) { return 'es'; }
@@ -540,7 +592,7 @@ async function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false
     const plansUrl = `${webappUrl}/app.html?userId=${userId}`;
     const adminUrl = `${webappUrl}/admin.html?userId=${userId}&admin=true`;
     const lang = await getUserLang(userId);
-    const shopLabel = lang === 'en' ? '🛍️ Shop' : '🛍️ Tienda';
+    const shopLabel = t(lang, 'shop_title_button');
 
     // Menú principal reestructurado por solicitud del administrador.
     const inlineKeyboard = [
@@ -2909,21 +2961,85 @@ bot.action(/^shop_product:(\d+)$/, async (ctx) => {
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const product = await db.getShopProductById(ctx.match[1]);
-  if (!product) { await ctx.reply(lang === 'en' ? 'Product not found.' : 'Producto no encontrado.'); return; }
+  if (!product) { await ctx.reply(t(lang, 'product_not_found')); return; }
 
-  const priceLine = (lang === 'en' ? 'Price' : 'Precio') + ': $' + Number(product.final_price_usd).toFixed(2) + ' USD';
+  const qty = product.min_qty || 1;
+  const totalPrice = Number(product.final_price_usd) * qty;
+  const priceLine = t(lang, 'price') + ': $' + totalPrice.toFixed(2) + ' USD' + (qty > 1 ? ` (x${qty})` : '');
   const text = '✨ <b>' + product.name + '</b>\n\n' + (product.description || '') + '\n\n💰 ' + priceLine;
   await ctx.reply(text, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
-      [createButton('🛒 ' + (lang === 'en' ? 'Buy (coming soon)' : 'Comprar (muy pronto)'), { callback_data: 'shop_buy_soon' })],
+      [createButton('🛒 ' + t(lang, 'buy_button'), { callback_data: `shop_buy:${product.id}` })],
       [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_products:0', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
     ] },
   });
 });
-bot.action('shop_buy_soon', async (ctx) => {
-  const lang = await getUserLang(ctx.from.id.toString());
-  await ctx.answerCbQuery(t(lang, 'buy_soon'), { show_alert: true });
+
+// ==================== COMPRA REAL (fase 4) ====================
+// Reserva saldo → crea la orden en la API correspondiente → entrega o devuelve el saldo si falla.
+bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const product = await db.getShopProductById(ctx.match[1]);
+  if (!product || !product.active) { await ctx.reply(t(lang, 'product_unavailable')); return; }
+
+  const qty = product.min_qty || 1;
+  const totalPrice = Math.round(Number(product.final_price_usd) * qty * 100) / 100;
+
+  let balance;
+  try { balance = await db.getShopBalance(userId); } catch (e) { await ctx.reply('❌ Error consultando tu saldo.'); return; }
+
+  if (Number(balance.balance_usd) < totalPrice) {
+    await ctx.reply(
+      t(lang, 'insufficient_balance', { needed: '$' + totalPrice.toFixed(2), have: '$' + Number(balance.balance_usd).toFixed(2) }),
+      { reply_markup: { inline_keyboard: [[createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })]] } }
+    );
+    return;
+  }
+
+  // 1. Reservar saldo de inmediato (se devuelve automáticamente si la API falla)
+  await db.adjustShopBalance(userId, -totalPrice);
+  const idempotencyKey = `shop_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const order = await db.createShopOrder({
+    telegram_id: userId, product_id: product.id, source: product.source,
+    idempotency_key: idempotencyKey, qty, price_charged_usd: totalPrice,
+  });
+
+  await ctx.reply(t(lang, 'processing_order'));
+
+  // 2. Llamar a la API correspondiente
+  let result;
+  try {
+    const connector = product.source === 'qamify' ? qamifyConnector : ggsomaConnector;
+    result = product.source === 'qamify'
+      ? await connector.createOrder({ idempotencyKey, externalId: product.external_id, qty })
+      : await connector.createOrder({ idempotencyKey, externalRef: product.external_ref, qty });
+  } catch (err) {
+    result = { success: false, error: { code: 'unexpected_error', message: err.message } };
+  }
+
+  // 3. Completar o devolver el saldo
+  if (result.success) {
+    const deliveredContent = (result.items || []).join('\n\n');
+    await db.updateShopOrder(order.id, {
+      status: 'completed', external_order_code: result.external_order_code,
+      delivered_content: deliveredContent, instructions: result.instructions || '',
+    });
+    const deliveryText =
+      `<b>${t(lang, 'order_completed')}</b> #${order.id}\n\n` +
+      `${product.name}\n\n${deliveredContent}` +
+      (result.instructions ? `\n\n📋 ${result.instructions}` : '');
+    await ctx.reply(deliveryText, { parse_mode: 'HTML' });
+  } else {
+    await db.updateShopOrder(order.id, { status: 'failed', error_detail: JSON.stringify(result.error) });
+    await db.adjustShopBalance(userId, totalPrice); // devolver el saldo — nunca se pierde por un fallo de la API
+    await ctx.reply(
+      t(lang, 'order_failed_refunded'),
+      { reply_markup: { inline_keyboard: [[createButton(t(lang, 'support').toUpperCase(), { callback_data: 'show_support', icon_custom_emoji_id: SHOP_EMOJIS.soporte })]] } }
+    );
+  }
 });
 
 bot.action('shop_profile', async (ctx) => {
@@ -2932,20 +3048,29 @@ bot.action('shop_profile', async (ctx) => {
   const lang = await getUserLang(userId);
   let balance;
   try { balance = await db.getShopBalance(userId); } catch (e) { balance = { balance_usd: 0 }; }
+  let orders = [];
+  try { orders = await db.getUserShopOrders(userId); } catch (e) {}
+  const completedOrders = orders.filter(o => o.status === 'completed');
+  const totalSpent = completedOrders.reduce((sum, o) => sum + Number(o.price_charged_usd), 0);
 
-  const labelUser = lang === 'en' ? 'User' : 'Usuario';
-  const labelId = lang === 'en' ? 'Telegram ID' : 'Telegram ID';
-  const labelBalance = lang === 'en' ? 'Balance' : 'Saldo';
+  const labelUser = t(lang, 'label_user');
+  const labelId = t(lang, 'label_id');
+  const labelBalance = t(lang, 'label_balance');
+  const labelOrders = t(lang, 'label_orders');
+  const labelSpent = t(lang, 'label_spent');
   const text =
     `👤 <b>${t(lang, 'profile').toUpperCase()}</b>\n\n` +
     `${labelUser}: ${ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name}\n` +
     `🆔 ${labelId}: <code>${userId}</code>\n` +
-    `💰 ${labelBalance}: <b>$${Number(balance.balance_usd).toFixed(2)} USD</b>`;
+    `💰 ${labelBalance}: <b>$${Number(balance.balance_usd).toFixed(2)} USD</b>\n` +
+    `📦 ${labelOrders}: ${completedOrders.length}\n` +
+    `💵 ${labelSpent}: $${totalSpent.toFixed(2)} USD`;
 
   await ctx.reply(text, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
       [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
+      [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
       [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
     ] },
   });
@@ -2959,9 +3084,9 @@ bot.action('shop_topup', async (ctx) => {
   await ctx.answerCbQuery();
   const lang = await getUserLang(ctx.from.id.toString());
   const buttons = TOPUP_AMOUNTS.map(a => [createButton(`💰 ${a} USDT`, { callback_data: `shop_topup_amt:${a}` })]);
-  buttons.push([createButton(lang === 'en' ? '✏️ Other amount' : '✏️ Otra cantidad', { callback_data: 'shop_topup_custom' })]);
+  buttons.push([createButton(t(lang, 'custom_amount'), { callback_data: 'shop_topup_custom' })]);
   buttons.push([createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_profile', icon_custom_emoji_id: SHOP_EMOJIS.volver })]);
-  await ctx.reply(lang === 'en' ? '💰 <b>TOP UP BALANCE</b>\n\nChoose an amount (USDT - BEP20):' : '💰 <b>RECARGAR SALDO</b>\n\nElige una cantidad (USDT - BEP20):', {
+  await ctx.reply(`${t(lang, 'topup_menu_title')}\n\n${t(lang, 'topup_menu_intro')}`, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: buttons },
   });
@@ -2970,12 +3095,10 @@ bot.action('shop_topup', async (ctx) => {
 async function startTopupProofFlow(ctx, telegramId, amount, lang) {
   let topup;
   try { topup = await db.createShopTopup({ telegram_id: telegramId, amount_usd: amount, network: 'BEP20', address: USDT_CONFIG.WALLET_ADDRESS }); }
-  catch (e) { await ctx.reply(lang === 'en' ? '❌ Could not start the top up. Try again.' : '❌ No se pudo iniciar la recarga. Intenta de nuevo.'); return; }
+  catch (e) { await ctx.reply(t(lang, 'topup_start_error')); return; }
   shopTopupState.set(telegramId, { stage: 'awaiting_proof', amount, topupId: topup.id });
 
-  const text = lang === 'en'
-    ? `💰 <b>Send exactly ${amount} USDT (BEP20)</b>\n\nAddress:\n<code>${USDT_CONFIG.WALLET_ADDRESS}</code>\n\nOnce sent, reply here with the transaction hash (TXID) or a screenshot of the payment.`
-    : `💰 <b>Manda exactamente ${amount} USDT (BEP20)</b>\n\nDirección:\n<code>${USDT_CONFIG.WALLET_ADDRESS}</code>\n\nCuando lo hayas enviado, respóndeme aquí con el hash de la transacción (TXID) o una captura del pago.`;
+  const text = t(lang, 'send_exact_amount', { amount, address: `<code>${USDT_CONFIG.WALLET_ADDRESS}</code>` });
   await ctx.reply(text, { parse_mode: 'HTML' });
 }
 
@@ -2990,7 +3113,7 @@ bot.action('shop_topup_custom', async (ctx) => {
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   shopTopupState.set(userId, { stage: 'awaiting_custom_amount' });
-  await ctx.reply(lang === 'en' ? '✏️ Send the amount in USDT you want to top up (numbers only, e.g. 15):' : '✏️ Manda la cantidad en USDT que quieres recargar (solo números, ej. 15):');
+  await ctx.reply(t(lang, 'custom_amount_prompt'));
 });
 
 // Captura la cantidad personalizada o el comprobante (texto/foto) del flujo de recarga
@@ -3004,7 +3127,7 @@ bot.on('message', async (ctx, next) => {
   if (state.stage === 'awaiting_custom_amount') {
     const amount = parseFloat((ctx.message.text || '').replace(',', '.'));
     if (!amount || amount <= 0) {
-      await ctx.reply(lang === 'en' ? '❌ Invalid amount. Send a number, e.g. 15' : '❌ Cantidad inválida. Manda un número, ej. 15');
+      await ctx.reply(t(lang, 'invalid_amount'));
       return;
     }
     await startTopupProofFlow(ctx, userId, Math.round(amount * 100) / 100, lang);
@@ -3017,9 +3140,7 @@ bot.on('message', async (ctx, next) => {
     try { await db.attachShopTopupProof(state.topupId, txid || (photoId ? `[foto] ${photoId}` : null)); } catch (e) {}
     shopTopupState.delete(userId);
 
-    await ctx.reply(lang === 'en'
-      ? '✅ Got it. Your top up is pending review — you\'ll be notified once confirmed.'
-      : '✅ Recibido. Tu recarga quedó pendiente de revisión — te aviso en cuanto se confirme.');
+    await ctx.reply(t(lang, 'proof_received'));
 
     // Avisar a los admins con botones para confirmar/rechazar
     const caption = `💰 <b>Nueva recarga pendiente</b>\n\nUsuario: ${ctx.from.username ? '@' + ctx.from.username : userId}\nID: <code>${userId}</code>\nMonto: <b>${state.amount} USDT</b>${txid ? `\nTXID: <code>${txid}</code>` : ''}`;
@@ -3047,13 +3168,9 @@ bot.action(/^shop_topup_(confirm|reject):(\d+)$/, async (ctx) => {
     const topup = await db.resolveShopTopup(topupId, action === 'confirm' ? 'confirmed' : 'rejected');
     const lang = await getUserLang(topup.telegram_id);
     if (action === 'confirm') {
-      await bot.telegram.sendMessage(topup.telegram_id, lang === 'en'
-        ? `✅ Your top up of ${topup.amount_usd} USDT was confirmed and added to your balance.`
-        : `✅ Tu recarga de ${topup.amount_usd} USDT fue confirmada y agregada a tu saldo.`);
+      await bot.telegram.sendMessage(topup.telegram_id, t(lang, 'topup_confirmed', { amount: topup.amount_usd }));
     } else {
-      await bot.telegram.sendMessage(topup.telegram_id, lang === 'en'
-        ? `❌ Your top up of ${topup.amount_usd} USDT could not be verified. Contact support if you think this is a mistake.`
-        : `❌ No se pudo verificar tu recarga de ${topup.amount_usd} USDT. Contacta a soporte si crees que es un error.`);
+      await bot.telegram.sendMessage(topup.telegram_id, t(lang, 'topup_rejected', { amount: topup.amount_usd }));
     }
     const stamp = action === 'confirm' ? '✅ CONFIRMADA' : '❌ RECHAZADA';
     try {
@@ -3068,9 +3185,207 @@ bot.action(/^shop_topup_(confirm|reject):(\d+)$/, async (ctx) => {
   }
 });
 
+const ORDER_STATUS_LABEL = {
+  reserved: { es: '⏳ En proceso', en: '⏳ Processing' },
+  completed: { es: '✅ Completada', en: '✅ Completed' },
+  failed: { es: '❌ Fallida', en: '❌ Failed' },
+  refunded: { es: '↩️ Reembolsada', en: '↩️ Refunded' },
+};
 bot.action('shop_orders', async (ctx) => {
-  const lang = await getUserLang(ctx.from.id.toString());
-  await ctx.answerCbQuery(t(lang, 'coming_soon'), { show_alert: true });
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  let orders = [];
+  try { orders = await db.getUserShopOrders(userId); } catch (e) {}
+
+  if (!orders.length) {
+    await ctx.reply(t(lang, 'no_orders_yet'), {
+      reply_markup: { inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })]] },
+    });
+    return;
+  }
+
+  const buttons = orders.map(o => {
+    const statusLabel = (ORDER_STATUS_LABEL[o.status] || {})[lang] || o.status;
+    const name = o.shop_products?.name || `#${o.product_id}`;
+    return [createButton(`#${o.id} · ${name} · ${statusLabel}`, { callback_data: `shop_order:${o.id}` })];
+  });
+  buttons.push([createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })]);
+
+  await ctx.reply(`📦 <b>${t(lang, 'orders').toUpperCase()}</b>`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } });
+});
+
+bot.action(/^shop_order:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const order = await db.getShopOrderById(ctx.match[1]);
+  if (!order || order.telegram_id !== userId) { await ctx.reply(t(lang, 'order_not_found')); return; }
+
+  const statusLabel = (ORDER_STATUS_LABEL[order.status] || {})[lang] || order.status;
+  let text =
+    `📦 <b>#${order.id}</b>\n\n` +
+    `${order.shop_products?.name || ''}\n` +
+    `${t(lang, 'price')}: $${Number(order.price_charged_usd).toFixed(2)}\n` +
+    `${t(lang, 'label_status')}: ${statusLabel}\n` +
+    `${t(lang, 'label_date')}: ${new Date(order.created_at).toLocaleString(lang === 'en' ? 'en-US' : 'es-CU')}`;
+  if (order.status === 'completed' && order.delivered_content) {
+    text += `\n\n${order.delivered_content}`;
+    if (order.instructions) text += `\n\n📋 ${order.instructions}`;
+  }
+
+  await ctx.reply(text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.volver })]] },
+  });
+});
+
+// ==================== PANEL ADMIN DE LA TIENDA (fase 6) ====================
+bot.action('shop_admin_menu', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  await ctx.answerCbQuery();
+  await ctx.reply('🛍️ <b>ADMIN TIENDA</b>', {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [
+      [createButton('📦 ÓRDENES RECIENTES', { callback_data: 'shop_admin_orders' })],
+      [createButton('💰 RECARGAS PENDIENTES', { callback_data: 'shop_admin_topups' })],
+      [createButton('🛍️ PRODUCTOS', { callback_data: 'shop_admin_products:0' })],
+      [createButton('👤 BUSCAR USUARIO', { callback_data: 'shop_admin_find_user' })],
+      [createButton('🔌 ESTADO DE LAS APIs', { callback_data: 'shop_admin_api_status' })],
+      [createButton('MENÚ PRINCIPAL', { callback_data: 'main_menu' })],
+    ] },
+  });
+});
+
+// --- Órdenes recientes (todas las de todos los usuarios) ---
+bot.action('shop_admin_orders', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  await ctx.answerCbQuery();
+  const orders = await db.getRecentShopOrders(10);
+  if (!orders.length) { await ctx.reply('No hay órdenes todavía.'); return; }
+  const statusEs = { reserved: '⏳', completed: '✅', failed: '❌', refunded: '↩️' };
+  const lines = orders.map(o =>
+    `${statusEs[o.status] || ''} #${o.id} · ${o.shop_products?.name || o.product_id} · $${Number(o.price_charged_usd).toFixed(2)} · ${o.telegram_id} · ${new Date(o.created_at).toLocaleString('es-CU')}`
+  );
+  await ctx.reply('📦 <b>ÚLTIMAS 10 ÓRDENES</b>\n\n' + lines.join('\n'), {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] },
+  });
+});
+
+// --- Recargas pendientes (por si se pasó alguna notificación) ---
+bot.action('shop_admin_topups', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  await ctx.answerCbQuery();
+  const topups = await db.getPendingShopTopups();
+  if (!topups.length) { await ctx.reply('No hay recargas pendientes.', { reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] } }); return; }
+  for (const tu of topups) {
+    const caption = `💰 Recarga #${tu.id}\nUsuario: <code>${tu.telegram_id}</code>\nMonto: <b>${tu.amount_usd} USDT</b>${tu.txid ? `\nComprobante: <code>${tu.txid}</code>` : ' (sin comprobante todavía)'}`;
+    await ctx.reply(caption, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[
+        createButton('✅ CONFIRMAR', { callback_data: `shop_topup_confirm:${tu.id}` }),
+        createButton('❌ RECHAZAR', { callback_data: `shop_topup_reject:${tu.id}` }),
+      ]] },
+    });
+  }
+});
+
+// --- Productos: listar y activar/desactivar sin tocar código ---
+bot.action(/^shop_admin_products:(\d+)$/, async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  await ctx.answerCbQuery();
+  const page = parseInt(ctx.match[1], 10) || 0;
+  const products = await db.getAllShopProducts();
+  const pageSize = 8;
+  const totalPages = Math.ceil(products.length / pageSize) || 1;
+  const pageItems = products.slice(page * pageSize, (page + 1) * pageSize);
+
+  const buttons = pageItems.map(p => [createButton(
+    `${p.active ? '🟢' : '🔴'} ${p.name} ($${Number(p.final_price_usd).toFixed(2)}) [${p.source}]`,
+    { callback_data: `shop_admin_toggle:${p.id}:${page}` }
+  )]);
+  const navRow = [];
+  if (page > 0) navRow.push(createButton('⬅️', { callback_data: `shop_admin_products:${page - 1}` }));
+  if (page < totalPages - 1) navRow.push(createButton('➡️', { callback_data: `shop_admin_products:${page + 1}` }));
+  if (navRow.length) buttons.push(navRow);
+  buttons.push([createButton('VOLVER', { callback_data: 'shop_admin_menu' })]);
+
+  const header = `🛍️ <b>PRODUCTOS</b> (${page + 1}/${totalPages}) — toca uno para activar/desactivar`;
+  try { await ctx.editMessageText(header, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }); }
+  catch (e) { await ctx.reply(header, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }); }
+});
+bot.action(/^shop_admin_toggle:(\d+):(\d+)$/, async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  const productId = ctx.match[1];
+  const page = parseInt(ctx.match[2], 10) || 0;
+  const product = await db.toggleShopProductActive(productId);
+  await ctx.answerCbQuery(product.active ? '🟢 Producto activado' : '🔴 Producto desactivado');
+  // refrescar la misma página con el estado ya actualizado
+  const products = await db.getAllShopProducts();
+  const pageSize = 8;
+  const totalPages = Math.ceil(products.length / pageSize) || 1;
+  const pageItems = products.slice(page * pageSize, (page + 1) * pageSize);
+  const buttons = pageItems.map(p => [createButton(
+    `${p.active ? '🟢' : '🔴'} ${p.name} ($${Number(p.final_price_usd).toFixed(2)}) [${p.source}]`,
+    { callback_data: `shop_admin_toggle:${p.id}:${page}` }
+  )]);
+  const navRow = [];
+  if (page > 0) navRow.push(createButton('⬅️', { callback_data: `shop_admin_products:${page - 1}` }));
+  if (page < totalPages - 1) navRow.push(createButton('➡️', { callback_data: `shop_admin_products:${page + 1}` }));
+  if (navRow.length) buttons.push(navRow);
+  buttons.push([createButton('VOLVER', { callback_data: 'shop_admin_menu' })]);
+  await ctx.editMessageText(`🛍️ <b>PRODUCTOS</b> (${page + 1}/${totalPages}) — toca uno para activar/desactivar`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
+});
+
+// --- Buscar usuario: saldo + últimas órdenes ---
+const shopAdminFindUserState = new Map(); // adminId -> true mientras espera el ID
+bot.action('shop_admin_find_user', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  await ctx.answerCbQuery();
+  shopAdminFindUserState.set(ctx.from.id.toString(), true);
+  await ctx.reply('👤 Manda el Telegram ID del usuario que quieres consultar:');
+});
+bot.on('message', async (ctx, next) => {
+  const adminId = ctx.from?.id?.toString();
+  if (!adminId || !isAdmin(adminId) || !shopAdminFindUserState.get(adminId)) return next();
+  shopAdminFindUserState.delete(adminId);
+  const targetId = (ctx.message.text || '').trim();
+  if (!/^\d+$/.test(targetId)) { await ctx.reply('❌ ID inválido.'); return; }
+
+  const balance = await db.getShopBalance(targetId).catch(() => ({ balance_usd: 0 }));
+  const orders = await db.getUserShopOrders(targetId).catch(() => []);
+  const completed = orders.filter(o => o.status === 'completed');
+  const totalSpent = completed.reduce((s, o) => s + Number(o.price_charged_usd), 0);
+
+  const lines = orders.slice(0, 5).map(o => `#${o.id} · ${o.shop_products?.name || o.product_id} · ${o.status}`);
+  await ctx.reply(
+    `👤 <b>Usuario ${targetId}</b>\n\n` +
+    `💰 Saldo: $${Number(balance.balance_usd).toFixed(2)}\n` +
+    `📦 Órdenes completadas: ${completed.length}\n` +
+    `💵 Total gastado: $${totalSpent.toFixed(2)}\n\n` +
+    (lines.length ? `<b>Últimas órdenes:</b>\n${lines.join('\n')}` : 'Sin órdenes todavía.'),
+    { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] } }
+  );
+  return;
+});
+
+// --- Estado de las APIs (a pedido, no automático — sin monitoreo continuo) ---
+bot.action('shop_admin_api_status', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  await ctx.answerCbQuery();
+  await ctx.reply('🔌 Consultando ambas APIs...');
+
+  let qamifyLine, ggsomaLine;
+  try { const bal = await qamifyConnector.getBalance(); qamifyLine = `✅ Qamify — saldo: $${bal.toFixed(2)}`; }
+  catch (e) { qamifyLine = `❌ Qamify — no se pudo consultar (${e.message})`; }
+  try { const bal = await ggsomaConnector.getBalance(); ggsomaLine = `✅ GGSoma — saldo: $${bal.toFixed(2)}`; }
+  catch (e) { ggsomaLine = `❌ GGSoma — no se pudo consultar (${e.message})`; }
+
+  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}`, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] },
+  });
 });
 
 // Middleware: bloquear usuarios baneados
@@ -3440,7 +3755,10 @@ bot.command('trialstatus', async (ctx) => {
 bot.command('admin', async (ctx) => {
   if (!isAdmin(ctx.from.id)) { await ctx.reply('⛔ No tienes permisos.'); return; }
   const adminUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}/admin.html?userId=${ctx.from.id}&admin=true`;
-  await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(adminUrl, ctx))]] } });
+  await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [
+    [createButton("ABRIR PANEL WEB", wa(adminUrl, ctx))],
+    [createButton("🛍️ ADMIN TIENDA", { callback_data: 'shop_admin_menu' })],
+  ] } });
 });
 
 bot.command('ban', async (ctx) => {
