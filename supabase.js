@@ -2057,6 +2057,11 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     const { data, error } = await dbClient.from('shop_products').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
     return data;
+  },
+
+  async setUserLanguage(telegramId, language) {
+    const { error } = await dbClient.from('users').update({ language, updated_at: new Date().toISOString() }).eq('telegram_id', String(telegramId).trim());
+    if (error) throw error;
   }
 };
 

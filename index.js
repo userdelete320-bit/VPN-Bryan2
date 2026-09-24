@@ -321,6 +321,68 @@ async function canSendMessageToUser(telegramId) {
     }
 }
 
+// ==================== TIENDA UNIFICADA: emojis, idiomas ====================
+const SHOP_EMOJIS = {
+  tienda: '5312361253610475399',
+  productos: '5197269100878907942',
+  perfil: '5445221832074483553',
+  recargar: '5400250414929041085',
+  ordenes: '5444856076954520455',
+  soporte: '5267102644886853973',
+  flag_es: '5294323318680206912',
+  flag_us: '5291747893080766866',
+  volver: '5415655814079723871',
+  idioma: '5224450179368767019',
+  verify: '6206479140040743133',
+  fallido: '6206110936789423908',
+  procesando: '4990412201614378299',
+  pendiente: '5262838597060422237',
+  usdt: '5924538275342586042',
+  monedas: '5298640628396085416',
+};
+
+const SHOP_I18N = {
+  es: {
+    shop_title: 'Tienda',
+    shop_intro: 'Elige una opción:',
+    products: 'Productos',
+    profile: 'Perfil',
+    topup: 'Recargar saldo',
+    orders: 'Mis órdenes',
+    support: 'Soporte',
+    back: 'Volver',
+    main_menu: 'Menú principal',
+    coming_soon: '🚧 Esta sección estará disponible muy pronto.',
+    no_products: 'No hay productos disponibles por ahora.',
+    buy_soon: '🚧 La compra estará disponible muy pronto.',
+    lang_prompt: 'Elige tu idioma:',
+    lang_set_es: '✅ Idioma cambiado a Español.',
+    lang_set_en: '✅ Language switched to English.',
+  },
+  en: {
+    shop_title: 'Shop',
+    shop_intro: 'Choose an option:',
+    products: 'Products',
+    profile: 'Profile',
+    topup: 'Top up balance',
+    orders: 'My orders',
+    support: 'Support',
+    back: 'Back',
+    main_menu: 'Main menu',
+    coming_soon: '🚧 This section will be available very soon.',
+    no_products: 'No products available right now.',
+    buy_soon: '🚧 Buying will be available very soon.',
+    lang_prompt: 'Choose your language:',
+    lang_set_es: '✅ Idioma cambiado a Español.',
+    lang_set_en: '✅ Language switched to English.',
+  },
+};
+function t(lang, key) { return (SHOP_I18N[lang] || SHOP_I18N.es)[key] || key; }
+async function getUserLang(telegramId) {
+  try { const u = await db.getUser(telegramId); return u?.language === 'en' ? 'en' : 'es'; }
+  catch (e) { return 'es'; }
+}
+
 const BUTTON_ICONS = {
     'REFERIDOS': '5255977030322760582',
     'COMUNIDAD': '5253830568876977751',
@@ -473,10 +535,12 @@ function getFaqHtml() {
            `Haz clic en el botón para abrir la sección de preguntas frecuentes:`;
 }
 
-function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
+async function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
     const webappUrl = `${process.env.WEBAPP_URL || `http://localhost:${PORT}`}`;
     const plansUrl = `${webappUrl}/app.html?userId=${userId}`;
     const adminUrl = `${webappUrl}/admin.html?userId=${userId}&admin=true`;
+    const lang = await getUserLang(userId);
+    const shopLabel = lang === 'en' ? '🛍️ Shop' : '🛍️ Tienda';
 
     // Menú principal reestructurado por solicitud del administrador.
     const inlineKeyboard = [
@@ -484,6 +548,9 @@ function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false) {
             createButton("VER PLANES", isGroup
                 ? { url: plansUrl, style: 'primary' }
                 : { web_app: { url: plansUrl }, style: 'primary' })
+        ],
+        [
+            createButton(shopLabel, { callback_data: "shop_menu", icon_custom_emoji_id: SHOP_EMOJIS.tienda })
         ],
         [
             createButton("MI PERFIL", { callback_data: "check_status" }),
@@ -2765,6 +2832,113 @@ bot.command('mantenimiento_off', async (ctx) => {
   await ctx.reply('✅ Modo mantenimiento DESACTIVADO. El bot vuelve a funcionar con normalidad.');
 });
 
+// ==================== /lang - selección de idioma ====================
+bot.command('lang', async (ctx) => {
+  const lang = await getUserLang(ctx.from.id.toString());
+  await ctx.reply(t(lang, 'lang_prompt'), {
+    reply_markup: { inline_keyboard: [[
+      createButton('ESPAÑOL', { callback_data: 'set_lang:es', icon_custom_emoji_id: SHOP_EMOJIS.flag_es }),
+      createButton('ENGLISH', { callback_data: 'set_lang:en', icon_custom_emoji_id: SHOP_EMOJIS.flag_us }),
+    ]] },
+  });
+});
+bot.action(/^set_lang:(es|en)$/, async (ctx) => {
+  const lang = ctx.match[1];
+  const userId = ctx.from.id.toString();
+  await ctx.answerCbQuery();
+  try { await db.setUserLanguage(userId, lang); } catch (e) {}
+  await ctx.editMessageText(t(lang, lang === 'en' ? 'lang_set_en' : 'lang_set_es')).catch(() => {});
+});
+
+// ==================== TIENDA UNIFICADA: navegación (fase 2, solo ver) ====================
+bot.action('shop_menu', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const title = t(lang, 'shop_title');
+  await ctx.reply(`🛍️ <b>${title.toUpperCase()}</b>\n\n${t(lang, 'shop_intro')}`, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [
+      [createButton(t(lang, 'products').toUpperCase(), { callback_data: 'shop_products:0', icon_custom_emoji_id: SHOP_EMOJIS.productos })],
+      [createButton(t(lang, 'profile').toUpperCase(), { callback_data: 'shop_profile', icon_custom_emoji_id: SHOP_EMOJIS.perfil })],
+      [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
+      [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
+      [createButton(t(lang, 'support').toUpperCase(), { callback_data: 'show_support', icon_custom_emoji_id: SHOP_EMOJIS.soporte })],
+      [createButton(t(lang, 'main_menu').toUpperCase(), { callback_data: 'main_menu' })],
+    ] },
+  });
+});
+
+const SHOP_PAGE_SIZE = 5;
+bot.action(/^shop_products:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const page = parseInt(ctx.match[1], 10) || 0;
+
+  let products = [];
+  try { products = await db.getActiveShopProducts(); } catch (e) {}
+
+  if (!products.length) {
+    await ctx.reply(t(lang, 'no_products'), { reply_markup: { inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu' })]] } });
+    return;
+  }
+
+  const totalPages = Math.ceil(products.length / SHOP_PAGE_SIZE);
+  const pageItems = products.slice(page * SHOP_PAGE_SIZE, (page + 1) * SHOP_PAGE_SIZE);
+
+  const priceLabel = (p) => '$' + Number(p.final_price_usd).toFixed(2);
+  const buttons = pageItems.map(p => [createButton(p.name + ' - ' + priceLabel(p), { callback_data: `shop_product:${p.id}` })]);
+
+  const navRow = [];
+  if (page > 0) navRow.push(createButton('⬅️', { callback_data: `shop_products:${page - 1}` }));
+  if (page < totalPages - 1) navRow.push(createButton('➡️', { callback_data: `shop_products:${page + 1}` }));
+  if (navRow.length) buttons.push(navRow);
+  buttons.push([createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })]);
+
+  const header = '🛍️ <b>' + t(lang, 'products').toUpperCase() + '</b> (' + (page + 1) + '/' + (totalPages || 1) + ')';
+  try {
+    await ctx.editMessageText(header, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } });
+  } catch (e) {
+    await ctx.reply(header, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } });
+  }
+});
+
+bot.action(/^shop_product:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const product = await db.getShopProductById(ctx.match[1]);
+  if (!product) { await ctx.reply(lang === 'en' ? 'Product not found.' : 'Producto no encontrado.'); return; }
+
+  const priceLine = (lang === 'en' ? 'Price' : 'Precio') + ': $' + Number(product.final_price_usd).toFixed(2) + ' USD';
+  const text = '✨ <b>' + product.name + '</b>\n\n' + (product.description || '') + '\n\n💰 ' + priceLine;
+  await ctx.reply(text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [
+      [createButton('🛒 ' + (lang === 'en' ? 'Buy (coming soon)' : 'Comprar (muy pronto)'), { callback_data: 'shop_buy_soon' })],
+      [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_products:0', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
+    ] },
+  });
+});
+bot.action('shop_buy_soon', async (ctx) => {
+  const lang = await getUserLang(ctx.from.id.toString());
+  await ctx.answerCbQuery(t(lang, 'buy_soon'), { show_alert: true });
+});
+
+bot.action('shop_profile', async (ctx) => {
+  const lang = await getUserLang(ctx.from.id.toString());
+  await ctx.answerCbQuery(t(lang, 'coming_soon'), { show_alert: true });
+});
+bot.action('shop_topup', async (ctx) => {
+  const lang = await getUserLang(ctx.from.id.toString());
+  await ctx.answerCbQuery(t(lang, 'coming_soon'), { show_alert: true });
+});
+bot.action('shop_orders', async (ctx) => {
+  const lang = await getUserLang(ctx.from.id.toString());
+  await ctx.answerCbQuery(t(lang, 'coming_soon'), { show_alert: true });
+});
+
 // Middleware: bloquear usuarios baneados
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
@@ -2973,7 +3147,7 @@ bot.action('how_it_works', async (ctx) => {
 bot.action('main_menu', async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
-  const keyboard = buildMainMenuKeyboard(userId, ctx.from.first_name, isAdmin(userId), isGroupCtx(ctx));
+  const keyboard = await buildMainMenuKeyboard(userId, ctx.from.first_name, isAdmin(userId), isGroupCtx(ctx));
   await ctx.reply(
 `<tg-emoji emoji-id="5199814019325646173">🚀</tg-emoji> <b>VPN CUBA - MENÚ PRINCIPAL</b>
 
@@ -3091,7 +3265,7 @@ bot.start(async (ctx) => {
       await ctx.reply(text, { parse_mode: 'HTML', ...keyboard });
       return;
     }
-    const keyboard = buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
+    const keyboard = await buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage =
 `<tg-emoji emoji-id="5080453055648892904">🏳️</tg-emoji> VpnCUBA — ¡Protección del mundo online!
 
@@ -3105,8 +3279,8 @@ bot.start(async (ctx) => {
     }
 });
 
-bot.command('help', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id, ctx.from.first_name, isAdmin(ctx.from.id)); await ctx.reply('🆘 *Ayuda de VPN Cuba*\n\nUsa los botones para navegar.', { parse_mode: 'Markdown', ...keyboard }); });
-bot.command('menu', async (ctx) => { const keyboard = buildMainMenuKeyboard(ctx.from.id.toString(), ctx.from.first_name, isAdmin(ctx.from.id)); 
+bot.command('help', async (ctx) => { const keyboard = await buildMainMenuKeyboard(ctx.from.id, ctx.from.first_name, isAdmin(ctx.from.id)); await ctx.reply('🆘 *Ayuda de VPN Cuba*\n\nUsa los botones para navegar.', { parse_mode: 'Markdown', ...keyboard }); });
+bot.command('menu', async (ctx) => { const keyboard = await buildMainMenuKeyboard(ctx.from.id.toString(), ctx.from.first_name, isAdmin(ctx.from.id)); 
                                     await ctx.reply(
 `<tg-emoji emoji-id="5199814019325646173">🚀</tg-emoji> <b>VPN CUBA - MENÚ PRINCIPAL</b>
 
