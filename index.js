@@ -15,6 +15,7 @@ require('dotenv').config();
 const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const db = require('./supabase');
+const { syncShopCatalog } = require('./shop_sync');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
@@ -2881,7 +2882,7 @@ bot.action('show_support', async (ctx) => {
     const userId = ctx.from.id.toString();
     const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
     const keyboard = { reply_markup: { inline_keyboard: [
-        [createButton("CEO", { url: 'https://t.me/L0quen2', icon_custom_emoji_id: '5253742260054409879' }), createButton("WHATSAPP", { url: 'https://wa.me/14782638903', icon_custom_emoji_id: '5935973359480213803'})],
+        [createButton("CEO", { url: 'https://t.me/L0quen2', icon_custom_emoji_id: '5253742260054409879' }), createButton("WHATSAPP", { url: 'https://wa.me/447348275566', icon_custom_emoji_id: '5935973359480213803'})],
         [createButton("SOLICITAR REEMBOLSO", wa(`${webappUrl}/garantias.html?userId=${userId}`, ctx), {icon_custom_emoji_id: '5444856076954520455'})],
         [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]
     ] } };
@@ -3486,6 +3487,21 @@ app.get('/api/resellers/finance', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
 });
 
+// ==================== TIENDA UNIFICADA (fase 1: catálogo + conectores) ====================
+// Disparar la sincronización manualmente (solo admin) — útil para probar sin esperar la hora
+app.post('/api/shop/sync', async (req, res) => {
+  try {
+    if (!isAdmin(req.body.requesterId)) return res.status(403).json({ error: 'No autorizado' });
+    const result = await syncShopCatalog(db);
+    res.json({ success: true, result });
+  } catch (error) { res.status(500).json({ error: 'Error sincronizando: ' + error.message }); }
+});
+
+// Solo lectura, para verificar que el catálogo quedó bien guardado (todavía sin UI)
+app.get('/api/shop/products', async (req, res) => {
+  try { res.json(await db.getActiveShopProducts()); } catch (error) { res.status(500).json({ error: 'Error: ' + error.message }); }
+});
+
 // ==================== SOPORTE (TICKETS) ====================
 
 // Usuario: crear ticket nuevo
@@ -3645,6 +3661,16 @@ app.listen(PORT, '0.0.0.0', async () => {
         ]);
     } catch (error) { console.error('❌ Error configurando comandos:', error); }
     startKeepAlive();
+
+    // Tienda unificada: sincroniza el catálogo al iniciar y luego cada hora.
+    // Si falta alguna de las 2 API keys, no truena el arranque — solo avisa.
+    if (!process.env.QAMIFY_API_KEY) console.warn('⚠️ QAMIFY_API_KEY no configurada — el catálogo de Qamify no se sincronizará.');
+    if (!process.env.GGSOMA_API_KEY) console.warn('⚠️ GGSOMA_API_KEY no configurada — el catálogo de GGSoma no se sincronizará.');
+    syncShopCatalog(db).then(r => console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(r))).catch(e => console.error('❌ Error en sincronización inicial de la tienda:', e.message));
+    setInterval(() => {
+      syncShopCatalog(db).then(r => console.log('🛍️ Sincronización de la tienda:', JSON.stringify(r))).catch(e => console.error('❌ Error sincronizando la tienda:', e.message));
+    }, 60 * 60 * 1000); // cada hora
+
     console.log(`🎯 Pool de pruebas: separado por plan (basico/avanzado/cuba_vip/premium/anual)`);
     console.log(`💰 Sistema USDT: MODO MANUAL`);
 });

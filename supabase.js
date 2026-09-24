@@ -2014,6 +2014,49 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     const { data, error } = await dbClient.from('popup_announcement').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1).select().single();
     if (error) throw error;
     return data;
+  },
+
+  // ========== TIENDA UNIFICADA (catálogo Qamify + GGSoma) ==========
+  async upsertShopProduct(p) {
+    const { error } = await dbClient.from('shop_products').upsert({
+      source: p.source,
+      external_id: p.external_id,
+      external_ref: p.external_ref,
+      name: p.name,
+      description: p.description,
+      instructions: p.instructions,
+      your_price_usd: p.your_price_usd,
+      final_price_usd: p.final_price_usd,
+      stock: p.stock,
+      min_qty: p.min_qty,
+      max_qty: p.max_qty,
+      raw_data: p.raw_data,
+      active: true,
+      synced_at: new Date().toISOString(),
+    }, { onConflict: 'source,external_id' });
+    if (error) throw error;
+  },
+
+  async deactivateMissingShopProducts(source, currentExternalIds) {
+    if (!currentExternalIds.length) return; // seguridad: nunca desactivar todo por una lista vacía
+    const { error } = await dbClient
+      .from('shop_products')
+      .update({ active: false })
+      .eq('source', source)
+      .not('external_id', 'in', `(${currentExternalIds.map(id => `"${id}"`).join(',')})`);
+    if (error) throw error;
+  },
+
+  async getActiveShopProducts() {
+    const { data, error } = await dbClient.from('shop_products').select('*').eq('active', true).order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getShopProductById(id) {
+    const { data, error } = await dbClient.from('shop_products').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data;
   }
 };
 
