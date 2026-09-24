@@ -2062,6 +2062,64 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
   async setUserLanguage(telegramId, language) {
     const { error } = await dbClient.from('users').update({ language, updated_at: new Date().toISOString() }).eq('telegram_id', String(telegramId).trim());
     if (error) throw error;
+  },
+
+  // ========== TIENDA UNIFICADA: saldo y recargas ==========
+  async getShopBalance(telegramId) {
+    const id = String(telegramId).trim();
+    const { data, error } = await dbClient.from('shop_balances').select('*').eq('telegram_id', id).maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+    // primera vez que se consulta: crear la fila en 0
+    const { data: created, error: insErr } = await dbClient.from('shop_balances').insert([{ telegram_id: id, balance_usd: 0 }]).select().single();
+    if (insErr) throw insErr;
+    return created;
+  },
+
+  async adjustShopBalance(telegramId, deltaUsd) {
+    const current = await this.getShopBalance(telegramId);
+    const newBalance = Number(current.balance_usd) + Number(deltaUsd);
+    const { data, error } = await dbClient.from('shop_balances').update({ balance_usd: newBalance, updated_at: new Date().toISOString() }).eq('telegram_id', String(telegramId).trim()).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createShopTopup({ telegram_id, amount_usd, network, address }) {
+    const { data, error } = await dbClient.from('shop_topups').insert([{
+      telegram_id: String(telegram_id).trim(), amount_usd, currency: 'USDT', network: network || 'BEP20', address, status: 'pending',
+    }]).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async attachShopTopupProof(topupId, txid) {
+    const { data, error } = await dbClient.from('shop_topups').update({ txid }).eq('id', topupId).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getShopTopup(id) {
+    const { data, error } = await dbClient.from('shop_topups').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async resolveShopTopup(id, status) {
+    const topup = await this.getShopTopup(id);
+    if (!topup) throw new Error('Recarga no encontrada');
+    if (topup.status !== 'pending') return topup; // evita confirmar/rechazar dos veces
+    const { data, error } = await dbClient.from('shop_topups').update({
+      status, confirmed_at: status === 'confirmed' ? new Date().toISOString() : null,
+    }).eq('id', id).select().single();
+    if (error) throw error;
+    if (status === 'confirmed') await this.adjustShopBalance(topup.telegram_id, topup.amount_usd);
+    return data;
+  },
+
+  async getPendingShopTopups() {
+    const { data, error } = await dbClient.from('shop_topups').select('*').eq('status', 'pending').order('requested_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
   }
 };
 

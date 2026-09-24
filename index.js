@@ -2927,13 +2927,147 @@ bot.action('shop_buy_soon', async (ctx) => {
 });
 
 bot.action('shop_profile', async (ctx) => {
-  const lang = await getUserLang(ctx.from.id.toString());
-  await ctx.answerCbQuery(t(lang, 'coming_soon'), { show_alert: true });
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  let balance;
+  try { balance = await db.getShopBalance(userId); } catch (e) { balance = { balance_usd: 0 }; }
+
+  const labelUser = lang === 'en' ? 'User' : 'Usuario';
+  const labelId = lang === 'en' ? 'Telegram ID' : 'Telegram ID';
+  const labelBalance = lang === 'en' ? 'Balance' : 'Saldo';
+  const text =
+    `👤 <b>${t(lang, 'profile').toUpperCase()}</b>\n\n` +
+    `${labelUser}: ${ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name}\n` +
+    `🆔 ${labelId}: <code>${userId}</code>\n` +
+    `💰 ${labelBalance}: <b>$${Number(balance.balance_usd).toFixed(2)} USD</b>`;
+
+  await ctx.reply(text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [
+      [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
+      [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
+    ] },
+  });
 });
+
+// ==================== RECARGAR SALDO (USDT BEP20, confirmación manual del admin) ====================
+const shopTopupState = new Map(); // telegramId -> { stage: 'awaiting_custom_amount'|'awaiting_proof', amount, topupId }
+const TOPUP_AMOUNTS = [5, 10, 20, 50];
+
 bot.action('shop_topup', async (ctx) => {
+  await ctx.answerCbQuery();
   const lang = await getUserLang(ctx.from.id.toString());
-  await ctx.answerCbQuery(t(lang, 'coming_soon'), { show_alert: true });
+  const buttons = TOPUP_AMOUNTS.map(a => [createButton(`💰 ${a} USDT`, { callback_data: `shop_topup_amt:${a}` })]);
+  buttons.push([createButton(lang === 'en' ? '✏️ Other amount' : '✏️ Otra cantidad', { callback_data: 'shop_topup_custom' })]);
+  buttons.push([createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_profile', icon_custom_emoji_id: SHOP_EMOJIS.volver })]);
+  await ctx.reply(lang === 'en' ? '💰 <b>TOP UP BALANCE</b>\n\nChoose an amount (USDT - BEP20):' : '💰 <b>RECARGAR SALDO</b>\n\nElige una cantidad (USDT - BEP20):', {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
+  });
 });
+
+async function startTopupProofFlow(ctx, telegramId, amount, lang) {
+  let topup;
+  try { topup = await db.createShopTopup({ telegram_id: telegramId, amount_usd: amount, network: 'BEP20', address: USDT_CONFIG.WALLET_ADDRESS }); }
+  catch (e) { await ctx.reply(lang === 'en' ? '❌ Could not start the top up. Try again.' : '❌ No se pudo iniciar la recarga. Intenta de nuevo.'); return; }
+  shopTopupState.set(telegramId, { stage: 'awaiting_proof', amount, topupId: topup.id });
+
+  const text = lang === 'en'
+    ? `💰 <b>Send exactly ${amount} USDT (BEP20)</b>\n\nAddress:\n<code>${USDT_CONFIG.WALLET_ADDRESS}</code>\n\nOnce sent, reply here with the transaction hash (TXID) or a screenshot of the payment.`
+    : `💰 <b>Manda exactamente ${amount} USDT (BEP20)</b>\n\nDirección:\n<code>${USDT_CONFIG.WALLET_ADDRESS}</code>\n\nCuando lo hayas enviado, respóndeme aquí con el hash de la transacción (TXID) o una captura del pago.`;
+  await ctx.reply(text, { parse_mode: 'HTML' });
+}
+
+bot.action(/^shop_topup_amt:(\d+(?:\.\d+)?)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  await startTopupProofFlow(ctx, userId, Number(ctx.match[1]), lang);
+});
+bot.action('shop_topup_custom', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  shopTopupState.set(userId, { stage: 'awaiting_custom_amount' });
+  await ctx.reply(lang === 'en' ? '✏️ Send the amount in USDT you want to top up (numbers only, e.g. 15):' : '✏️ Manda la cantidad en USDT que quieres recargar (solo números, ej. 15):');
+});
+
+// Captura la cantidad personalizada o el comprobante (texto/foto) del flujo de recarga
+bot.on('message', async (ctx, next) => {
+  const userId = ctx.from?.id?.toString();
+  if (!userId) return next();
+  const state = shopTopupState.get(userId);
+  if (!state) return next();
+  const lang = await getUserLang(userId);
+
+  if (state.stage === 'awaiting_custom_amount') {
+    const amount = parseFloat((ctx.message.text || '').replace(',', '.'));
+    if (!amount || amount <= 0) {
+      await ctx.reply(lang === 'en' ? '❌ Invalid amount. Send a number, e.g. 15' : '❌ Cantidad inválida. Manda un número, ej. 15');
+      return;
+    }
+    await startTopupProofFlow(ctx, userId, Math.round(amount * 100) / 100, lang);
+    return;
+  }
+
+  if (state.stage === 'awaiting_proof') {
+    const txid = ctx.message.text || null;
+    const photoId = ctx.message.photo ? ctx.message.photo[ctx.message.photo.length - 1].file_id : null;
+    try { await db.attachShopTopupProof(state.topupId, txid || (photoId ? `[foto] ${photoId}` : null)); } catch (e) {}
+    shopTopupState.delete(userId);
+
+    await ctx.reply(lang === 'en'
+      ? '✅ Got it. Your top up is pending review — you\'ll be notified once confirmed.'
+      : '✅ Recibido. Tu recarga quedó pendiente de revisión — te aviso en cuanto se confirme.');
+
+    // Avisar a los admins con botones para confirmar/rechazar
+    const caption = `💰 <b>Nueva recarga pendiente</b>\n\nUsuario: ${ctx.from.username ? '@' + ctx.from.username : userId}\nID: <code>${userId}</code>\nMonto: <b>${state.amount} USDT</b>${txid ? `\nTXID: <code>${txid}</code>` : ''}`;
+    const adminKeyboard = { reply_markup: { inline_keyboard: [[
+      createButton('✅ CONFIRMAR', { callback_data: `shop_topup_confirm:${state.topupId}` }),
+      createButton('❌ RECHAZAR', { callback_data: `shop_topup_reject:${state.topupId}` }),
+    ]] } };
+    for (const adminId of ADMIN_IDS) {
+      try {
+        if (photoId) await bot.telegram.sendPhoto(adminId, photoId, { caption, parse_mode: 'HTML', ...adminKeyboard });
+        else await bot.telegram.sendMessage(adminId, caption, { parse_mode: 'HTML', ...adminKeyboard });
+      } catch (e) {}
+    }
+    return;
+  }
+  return next();
+});
+
+bot.action(/^shop_topup_(confirm|reject):(\d+)$/, async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) return ctx.answerCbQuery();
+  const action = ctx.match[1];
+  const topupId = ctx.match[2];
+  await ctx.answerCbQuery();
+  try {
+    const topup = await db.resolveShopTopup(topupId, action === 'confirm' ? 'confirmed' : 'rejected');
+    const lang = await getUserLang(topup.telegram_id);
+    if (action === 'confirm') {
+      await bot.telegram.sendMessage(topup.telegram_id, lang === 'en'
+        ? `✅ Your top up of ${topup.amount_usd} USDT was confirmed and added to your balance.`
+        : `✅ Tu recarga de ${topup.amount_usd} USDT fue confirmada y agregada a tu saldo.`);
+    } else {
+      await bot.telegram.sendMessage(topup.telegram_id, lang === 'en'
+        ? `❌ Your top up of ${topup.amount_usd} USDT could not be verified. Contact support if you think this is a mistake.`
+        : `❌ No se pudo verificar tu recarga de ${topup.amount_usd} USDT. Contacta a soporte si crees que es un error.`);
+    }
+    const stamp = action === 'confirm' ? '✅ CONFIRMADA' : '❌ RECHAZADA';
+    try {
+      if (ctx.callbackQuery.message.caption !== undefined) {
+        await ctx.editMessageCaption(`${ctx.callbackQuery.message.caption}\n\n${stamp}`, { parse_mode: 'HTML' });
+      } else {
+        await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n${stamp}`, { parse_mode: 'HTML' });
+      }
+    } catch (e) {}
+  } catch (err) {
+    await ctx.reply('❌ Error procesando la recarga: ' + err.message);
+  }
+});
+
 bot.action('shop_orders', async (ctx) => {
   const lang = await getUserLang(ctx.from.id.toString());
   await ctx.answerCbQuery(t(lang, 'coming_soon'), { show_alert: true });
