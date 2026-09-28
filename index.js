@@ -2924,38 +2924,210 @@ bot.action('shop_menu', async (ctx) => {
   });
 });
 
+// ==================== CATÁLOGO AGRUPADO POR PRODUCTO ====================
+// La tienda muestra primero las familias/productos principales.
+// Ejemplo:
+//   GEMINIS
+//      └─ Geminis Pro 2
+//      └─ Geminis Pro 1
+//   CLAUDE
+//      └─ Claude Anual
+//      └─ Claude Mensual
+//
+// Las familias se ordenan por el precio más alto de sus variantes y,
+// dentro de cada familia, las variantes van de mayor a menor precio.
 const SHOP_PAGE_SIZE = 5;
+
+function getShopProductFamily(name) {
+  let family = String(name || '').trim();
+  if (!family) return 'Otros';
+
+  // Normalizar separadores para poder detectar nombres como:
+  // "Claude - Mensual", "Claude | Anual", etc.
+  family = family.replace(/[|:_]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Quitamos sufijos que representan la variante/plan, no la familia.
+  // Ej.: "Geminis Pro 1" -> "Geminis"
+  //      "Claude Mensual" -> "Claude"
+  family = family.replace(
+    /\s+(?:pro|plan|tier)\s*\d+\s*$/i,
+    ''
+  );
+
+  family = family.replace(
+    /\s+(?:mensual|monthly|month|anual|annual|yearly|year|semanal|weekly|week|diario|daily|day)\s*$/i,
+    ''
+  );
+
+  // También elimina una cantidad/número al final cuando forma parte
+  // de la variante: "Producto 1", "Producto 2", etc.
+  family = family.replace(/\s+\d+\s*$/i, '');
+
+  return family.trim() || 'Otros';
+}
+
+function buildShopFamilies(products) {
+  const groups = new Map();
+
+  for (const product of products) {
+    const family = getShopProductFamily(product.name);
+    if (!groups.has(family)) groups.set(family, []);
+    groups.get(family).push(product);
+  }
+
+  const families = Array.from(groups.entries()).map(([name, items]) => {
+    // Variantes: de mayor a menor precio.
+    items.sort((a, b) => Number(b.final_price_usd) - Number(a.final_price_usd));
+
+    // La familia toma como precio de orden el de su variante más cara.
+    const maxPrice = Number(items[0]?.final_price_usd || 0);
+
+    return { name, items, maxPrice };
+  });
+
+  // Familias: de mayor a menor precio.
+  families.sort((a, b) => {
+    if (b.maxPrice !== a.maxPrice) return b.maxPrice - a.maxPrice;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+
+  return families;
+}
+
+function encodeShopFamily(family) {
+  return Buffer.from(String(family), 'utf8').toString('base64url');
+}
+
+function decodeShopFamily(encoded) {
+  try {
+    return Buffer.from(String(encoded), 'base64url').toString('utf8');
+  } catch (_) {
+    return null;
+  }
+}
+
+async function getGroupedShopCatalog() {
+  let products = [];
+  try { products = await db.getActiveShopProducts(); } catch (e) {}
+  return buildShopFamilies(products);
+}
+
+// Nivel 1: familias principales.
 bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const page = parseInt(ctx.match[1], 10) || 0;
 
-  let products = [];
-  try { products = await db.getActiveShopProducts(); } catch (e) {}
+  const families = await getGroupedShopCatalog();
 
-  if (!products.length) {
-    await ctx.reply(t(lang, 'no_products'), { reply_markup: { inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu' })]] } });
+  if (!families.length) {
+    await ctx.reply(t(lang, 'no_products'), {
+      reply_markup: {
+        inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu' })]]
+      }
+    });
     return;
   }
 
-  const totalPages = Math.ceil(products.length / SHOP_PAGE_SIZE);
-  const pageItems = products.slice(page * SHOP_PAGE_SIZE, (page + 1) * SHOP_PAGE_SIZE);
+  const totalPages = Math.ceil(families.length / SHOP_PAGE_SIZE);
+  const safePage = Math.min(page, totalPages - 1);
+  const pageItems = families.slice(safePage * SHOP_PAGE_SIZE, (safePage + 1) * SHOP_PAGE_SIZE);
 
-  const priceLabel = (p) => '$' + Number(p.final_price_usd).toFixed(2);
-  const buttons = pageItems.map(p => [createButton(p.name + ' - ' + priceLabel(p), { callback_data: `shop_product:${p.id}` })]);
+  const buttons = pageItems.map(family => [
+    createButton(`📦 ${family.name}`, {
+      callback_data: `shop_family:${encodeShopFamily(family.name)}`
+    })
+  ]);
 
   const navRow = [];
-  if (page > 0) navRow.push(createButton('⬅️', { callback_data: `shop_products:${page - 1}` }));
-  if (page < totalPages - 1) navRow.push(createButton('➡️', { callback_data: `shop_products:${page + 1}` }));
+  if (safePage > 0) {
+    navRow.push(createButton('⬅️', { callback_data: `shop_products:${safePage - 1}` }));
+  }
+  if (safePage < totalPages - 1) {
+    navRow.push(createButton('➡️', { callback_data: `shop_products:${safePage + 1}` }));
+  }
   if (navRow.length) buttons.push(navRow);
-  buttons.push([createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })]);
 
-  const header = '🛍️ <b>' + t(lang, 'products').toUpperCase() + '</b> (' + (page + 1) + '/' + (totalPages || 1) + ')';
+  buttons.push([
+    createButton(t(lang, 'back').toUpperCase(), {
+      callback_data: 'shop_menu',
+      icon_custom_emoji_id: SHOP_EMOJIS.volver
+    })
+  ]);
+
+  const header = '🛍️ <b>' + t(lang, 'products').toUpperCase() + '</b> (' +
+    (safePage + 1) + '/' + (totalPages || 1) + ')';
+
   try {
-    await ctx.editMessageText(header, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } });
+    await ctx.editMessageText(header, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }
+    });
   } catch (e) {
-    await ctx.reply(header, { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } });
+    await ctx.reply(header, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }
+    });
+  }
+});
+
+// Nivel 2: variantes de una familia concreta.
+bot.action(/^shop_family:(.+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const familyName = decodeShopFamily(ctx.match[1]);
+
+  if (!familyName) {
+    await ctx.reply(t(lang, 'no_products'));
+    return;
+  }
+
+  const families = await getGroupedShopCatalog();
+  const family = families.find(f => f.name === familyName);
+
+  if (!family || !family.items.length) {
+    await ctx.reply(t(lang, 'no_products'), {
+      reply_markup: {
+        inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), {
+          callback_data: 'shop_products:0',
+          icon_custom_emoji_id: SHOP_EMOJIS.volver
+        })]]
+      }
+    });
+    return;
+  }
+
+  const priceLabel = p => '$' + Number(p.final_price_usd).toFixed(2);
+
+  // Las variantes ya vienen ordenadas de mayor a menor precio.
+  const buttons = family.items.map(p => [
+    createButton(`${p.name} — ${priceLabel(p)}`, {
+      callback_data: `shop_product:${p.id}`
+    })
+  ]);
+
+  buttons.push([
+    createButton(t(lang, 'back').toUpperCase(), {
+      callback_data: 'shop_products:0',
+      icon_custom_emoji_id: SHOP_EMOJIS.volver
+    })
+  ]);
+
+  const header = `📦 <b>${family.name.toUpperCase()}</b>\n\n` +
+    'Selecciona una variante:';
+
+  try {
+    await ctx.editMessageText(header, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }
+    });
+  } catch (e) {
+    await ctx.reply(header, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }
+    });
   }
 });
 
@@ -2974,7 +3146,7 @@ bot.action(/^shop_product:(\d+)$/, async (ctx) => {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
       [createButton('🛒 ' + t(lang, 'buy_button'), { callback_data: `shop_buy:${product.id}` })],
-      [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_products:0', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
+      [createButton(t(lang, 'back').toUpperCase(), { callback_data: `shop_family:${encodeShopFamily(getShopProductFamily(product.name))}`, icon_custom_emoji_id: SHOP_EMOJIS.volver })],
     ] },
   });
 });
