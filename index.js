@@ -347,7 +347,7 @@ const SHOP_EMOJIS = {
 const SHOP_I18N = {
   es: {
     shop_title: 'Tienda',
-    shop_title_button: '🛍️ Tienda',
+    shop_title_button: 'Tienda',
     shop_intro: 'Elige una opción:',
     products: 'Productos',
     profile: 'Perfil',
@@ -388,7 +388,7 @@ const SHOP_I18N = {
   },
   en: {
     shop_title: 'Shop',
-    shop_title_button: '🛍️ Shop',
+    shop_title_button: 'Shop',
     shop_intro: 'Choose an option:',
     products: 'Products',
     profile: 'Profile',
@@ -605,7 +605,7 @@ async function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false
                 : { web_app: { url: plansUrl }, style: 'primary' })
         ],
         [
-            createButton(shopLabel, { callback_data: "shop_menu", icon_custom_emoji_id: SHOP_EMOJIS.tienda })
+            createButton(shopLabel, { callback_data: "shop_menu", style: 'primary' })
         ],
         [
             createButton("MI PERFIL", { callback_data: "check_status" }),
@@ -2905,175 +2905,272 @@ bot.action(/^set_lang:(es|en)$/, async (ctx) => {
   await ctx.editMessageText(t(lang, lang === 'en' ? 'lang_set_en' : 'lang_set_es')).catch(() => {});
 });
 
-// ==================== TIENDA UNIFICADA: navegación (fase 2, solo ver) ====================
+// ==================== TIENDA UNIFICADA: navegación y compra ====================
+// Catálogo agrupado por producto/marca, independientemente de la API de origen.
+// Ej.: todos los ChatGPT quedan juntos aunque vengan de Qamify, GGSoma o Warzone.
+const SHOP_PAGE_SIZE = 10;
+
+const SHOP_ARROW_EMOJIS = {
+  left: '5258236805890710909',
+  right: '5260450573768990626',
+};
+
+const SHOP_CONFIRM_EMOJIS = {
+  cart: '5312361253610475399',
+  order: '5444856076954520455',
+  product: '5278702045883292456',
+  productAlt: '5377466085870156737',
+  quantity: '5303214794336125778',
+  unitPrice: '5197434882321567830',
+  total: '5224257782013769471',
+  balance: '5377620962390857342',
+};
+
+function shopTgEmoji(id, fallback) {
+  return `<tg-emoji emoji-id="${id}">${fallback}</tg-emoji>`;
+}
+
+// Familias conocidas para evitar que variantes como "ChatGPT Plus", "ChatGPT Pro",
+// "ChatGPT 1M", etc. aparezcan como productos separados.
+const SHOP_FAMILY_RULES = [
+  { label: 'ChatGPT', patterns: [/\bchat[-\s]*gpt\b/i, /\bopen[-\s]*ai\b/i] },
+  { label: 'Gemini', patterns: [/\bgemini\b/i] },
+  { label: 'Claude', patterns: [/\bclaude\b/i] },
+  { label: 'ElevenLabs', patterns: [/\beleven\s*labs?\b/i, /\belevenlabs\b/i] },
+  { label: 'Adobe', patterns: [/\badobe\b/i] },
+  { label: 'Canva', patterns: [/\bcanva\b/i] },
+  { label: 'Netflix', patterns: [/\bnetflix\b/i] },
+  { label: 'Spotify', patterns: [/\bspotify\b/i] },
+  { label: 'YouTube', patterns: [/\byoutube\b/i] },
+  { label: 'CapCut', patterns: [/\bcap\s*cut\b/i, /\bcapcut\b/i] },
+  { label: 'Microsoft 365', patterns: [/\bmicrosoft\s*365\b/i, /\boffice\s*365\b/i] },
+  { label: 'Microsoft', patterns: [/\bmicrosoft\b/i] },
+  { label: 'Windows', patterns: [/\bwindows\b/i] },
+  { label: 'Notion', patterns: [/\bnotion\b/i] },
+  { label: 'Midjourney', patterns: [/\bmidjourney\b/i] },
+  { label: 'Perplexity', patterns: [/\bperplexity\b/i] },
+  { label: 'Cursor', patterns: [/\bcursor\b/i] },
+];
+
+function getShopFamily(product) {
+  const raw = product.raw_data || {};
+  const candidates = [
+    raw.brand, raw.category, raw.product_type, raw.type,
+    product.name, product.description
+  ].filter(Boolean).map(String);
+
+  const text = candidates.join(' ');
+  for (const rule of SHOP_FAMILY_RULES) {
+    if (rule.patterns.some(pattern => pattern.test(text))) return rule.label;
+  }
+
+  // Fallback: para productos que no pertenezcan a una familia conocida,
+  // usamos las primeras palabras significativas del nombre.
+  const fallback = String(product.name || 'Otros')
+    .replace(/[\[\](){}|]/g, ' ')
+    .replace(/\b(pro|plus|premium|basic|basic|mensual|monthly|annual|anual|month|months|year|years)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' ');
+
+  return fallback || 'Otros';
+}
+
+function groupShopProducts(products) {
+  const groups = new Map();
+
+  for (const product of products) {
+    const family = getShopFamily(product);
+    if (!groups.has(family)) groups.set(family, []);
+    groups.get(family).push(product);
+  }
+
+  // Dentro de cada familia: mayor precio → menor precio.
+  for (const items of groups.values()) {
+    items.sort((a, b) => {
+      const priceDiff = Number(b.final_price_usd || 0) - Number(a.final_price_usd || 0);
+      if (priceDiff !== 0) return priceDiff;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' });
+    });
+  }
+
+  // Las familias también se ordenan por el producto más caro que contienen.
+  return [...groups.entries()]
+    .sort((a, b) => {
+      const maxA = Math.max(...a[1].map(p => Number(p.final_price_usd || 0)));
+      const maxB = Math.max(...b[1].map(p => Number(p.final_price_usd || 0)));
+      if (maxB !== maxA) return maxB - maxA;
+      return a[0].localeCompare(b[0], 'es', { sensitivity: 'base' });
+    });
+}
+
+function escapeShopHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function getShopStock(product) {
+  const raw = product.raw_data || {};
+  const rawStock = String(product.stock ?? '').toLowerCase();
+
+  // Algunas APIs representan stock ilimitado con -1 o un indicador equivalente.
+  if (raw.stock_unlimited === true || rawStock === 'unlimited' || rawStock === 'infinite' || Number(product.stock) === -1) {
+    return Infinity;
+  }
+
+  const stock = Number(product.stock);
+  return Number.isFinite(stock) ? Math.max(0, Math.floor(stock)) : null;
+}
+
+function isShopSoldOut(product) {
+  const stock = getShopStock(product);
+  return stock !== null && stock <= 0;
+}
+
+function shopButtonStyle(product) {
+  return isShopSoldOut(product) ? 'danger' : 'primary';
+}
+
+function shopArrowButton(label, callbackData, emojiId, style = 'primary') {
+  return createButton(label, {
+    callback_data: callbackData,
+    icon_custom_emoji_id: emojiId,
+    style,
+  });
+}
+
+function buildShopMenuKeyboard(lang) {
+  return {
+    inline_keyboard: [
+      [
+        createButton(t(lang, 'products').toUpperCase(), {
+          callback_data: 'shop_products:0',
+          style: 'primary'
+        }),
+        createButton(t(lang, 'profile').toUpperCase(), {
+          callback_data: 'shop_profile',
+          style: 'primary'
+        }),
+      ],
+      [
+        createButton(t(lang, 'topup').toUpperCase(), {
+          callback_data: 'shop_topup',
+          style: 'primary'
+        }),
+        createButton(t(lang, 'orders').toUpperCase(), {
+          callback_data: 'shop_orders',
+          style: 'primary'
+        }),
+      ],
+      [
+        createButton(t(lang, 'support').toUpperCase(), {
+          callback_data: 'show_support',
+          style: 'success'
+        }),
+        createButton(t(lang, 'main_menu').toUpperCase(), {
+          callback_data: 'main_menu',
+          style: 'primary'
+        }),
+      ],
+    ]
+  };
+}
+
 bot.action('shop_menu', async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const title = t(lang, 'shop_title');
-  await ctx.reply(`🛍️ <b>${title.toUpperCase()}</b>\n\n${t(lang, 'shop_intro')}`, {
-    parse_mode: 'HTML',
-    reply_markup: { inline_keyboard: [
-      [createButton(t(lang, 'products').toUpperCase(), { callback_data: 'shop_products:0', icon_custom_emoji_id: SHOP_EMOJIS.productos })],
-      [createButton(t(lang, 'profile').toUpperCase(), { callback_data: 'shop_profile', icon_custom_emoji_id: SHOP_EMOJIS.perfil })],
-      [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
-      [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
-      [createButton(t(lang, 'support').toUpperCase(), { callback_data: 'show_support', icon_custom_emoji_id: SHOP_EMOJIS.soporte })],
-      [createButton(t(lang, 'main_menu').toUpperCase(), { callback_data: 'main_menu' })],
-    ] },
-  });
+
+  await ctx.reply(
+    `🛍️ <b>${title.toUpperCase()}</b>\n\n${t(lang, 'shop_intro')}`,
+    {
+      parse_mode: 'HTML',
+      reply_markup: buildShopMenuKeyboard(lang),
+    }
+  );
 });
 
-// ==================== CATÁLOGO AGRUPADO POR PRODUCTO ====================
-// La tienda muestra primero las familias/productos principales.
-// Ejemplo:
-//   GEMINIS
-//      └─ Geminis Pro 2
-//      └─ Geminis Pro 1
-//   CLAUDE
-//      └─ Claude Anual
-//      └─ Claude Mensual
-//
-// Las familias se ordenan por el precio más alto de sus variantes y,
-// dentro de cada familia, las variantes van de mayor a menor precio.
-const SHOP_PAGE_SIZE = 5;
-
-function getShopProductFamily(name) {
-  const original = String(name || '').trim();
-  if (!original) return 'Otros';
-
-  // Agrupación por producto/marca, NO por API.
-  // Todo lo que contenga una de estas marcas termina en la misma familia,
-  // aunque venga de Qamify, GGSoma, Warzone u otra API.
-  const normalized = original
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[_|:]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const familyRules = [
-    { family: 'ChatGPT', pattern: /\bchat\s*[-_ ]?gpt\b|\bopenai\b/i },
-    { family: 'Gemini', pattern: /\bgemini\b|\bgoogle\s+gemini\b/i },
-    { family: 'Claude', pattern: /\bclaude\b|\banthropic\b/i },
-    { family: 'ElevenLabs', pattern: /\beleven\s*[-_ ]?labs?\b|\belevenlabs\b/i },
-  ];
-
-  for (const rule of familyRules) {
-    if (rule.pattern.test(normalized)) return rule.family;
-  }
-
-  // Para productos que todavía no tengan una regla específica,
-  // mantenemos la agrupación genérica anterior.
-  let family = normalized;
-
-  family = family.replace(
-    /\s+(?:pro|plan|tier)\s*\d+\s*$/i,
-    ''
-  );
-
-  family = family.replace(
-    /\s+(?:mensual|monthly|month|anual|annual|yearly|year|semanal|weekly|week|diario|daily|day)\s*$/i,
-    ''
-  );
-
-  family = family.replace(/\s+\d+\s*$/i, '');
-
-  return family.trim() || 'Otros';
-}
-
-function buildShopFamilies(products) {
-  const groups = new Map();
-
-  for (const product of products) {
-    const family = getShopProductFamily(product.name);
-    if (!groups.has(family)) groups.set(family, []);
-    groups.get(family).push(product);
-  }
-
-  const families = Array.from(groups.entries()).map(([name, items]) => {
-    // Variantes: de mayor a menor precio.
-    items.sort((a, b) => Number(b.final_price_usd) - Number(a.final_price_usd));
-
-    // La familia toma como precio de orden el de su variante más cara.
-    const maxPrice = Number(items[0]?.final_price_usd || 0);
-
-    return { name, items, maxPrice };
-  });
-
-  // Familias: de mayor a menor precio.
-  families.sort((a, b) => {
-    if (b.maxPrice !== a.maxPrice) return b.maxPrice - a.maxPrice;
-    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-  });
-
-  return families;
-}
-
-function encodeShopFamily(family) {
-  return Buffer.from(String(family), 'utf8').toString('base64url');
-}
-
-function decodeShopFamily(encoded) {
-  try {
-    return Buffer.from(String(encoded), 'base64url').toString('utf8');
-  } catch (_) {
-    return null;
-  }
-}
-
-async function getGroupedShopCatalog() {
-  let products = [];
-  try { products = await db.getActiveShopProducts(); } catch (e) {}
-  return buildShopFamilies(products);
-}
-
-// Nivel 1: familias principales.
+// Primer nivel: familias/marcas.
 bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
-  const page = parseInt(ctx.match[1], 10) || 0;
+  const page = Math.max(0, parseInt(ctx.match[1], 10) || 0);
 
-  const families = await getGroupedShopCatalog();
+  let products = [];
+  try { products = await db.getActiveShopProducts(); } catch (e) {}
 
-  if (!families.length) {
+  if (!products.length) {
     await ctx.reply(t(lang, 'no_products'), {
       reply_markup: {
-        inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu' })]]
+        inline_keyboard: [[
+          createButton(t(lang, 'back').toUpperCase(), {
+            callback_data: 'shop_menu',
+            style: 'primary'
+          })
+        ]]
       }
     });
     return;
   }
 
-  const totalPages = Math.ceil(families.length / SHOP_PAGE_SIZE);
+  const groups = groupShopProducts(products);
+  const totalPages = Math.ceil(groups.length / SHOP_PAGE_SIZE) || 1;
   const safePage = Math.min(page, totalPages - 1);
-  const pageItems = families.slice(safePage * SHOP_PAGE_SIZE, (safePage + 1) * SHOP_PAGE_SIZE);
+  const pageItems = groups.slice(
+    safePage * SHOP_PAGE_SIZE,
+    (safePage + 1) * SHOP_PAGE_SIZE
+  );
 
-  const buttons = pageItems.map(family => [
-    createButton(`📦 ${family.name}`, {
-      callback_data: `shop_family:${encodeShopFamily(family.name)}`
-    })
-  ]);
+  const buttons = pageItems.map(([family, items]) => {
+    const maxPrice = Math.max(...items.map(p => Number(p.final_price_usd || 0)));
+    const soldOutCount = items.filter(isShopSoldOut).length;
+    const suffix = soldOutCount === items.length ? ' · AGOTADO' : ` · ${items.length} opciones`;
+    return [createButton(
+      `📦 ${family} · hasta $${maxPrice.toFixed(2)}${suffix}`,
+      {
+        callback_data: `shop_family:${encodeURIComponent(family)}:0`,
+        style: soldOutCount === items.length ? 'danger' : 'primary'
+      }
+    )];
+  });
 
   const navRow = [];
   if (safePage > 0) {
-    navRow.push(createButton('⬅️', { callback_data: `shop_products:${safePage - 1}` }));
+    navRow.push(shopArrowButton(
+      'ATRÁS',
+      `shop_products:${safePage - 1}`,
+      SHOP_ARROW_EMOJIS.left,
+      'primary'
+    ));
   }
   if (safePage < totalPages - 1) {
-    navRow.push(createButton('➡️', { callback_data: `shop_products:${safePage + 1}` }));
+    navRow.push(shopArrowButton(
+      'ADELANTE',
+      `shop_products:${safePage + 1}`,
+      SHOP_ARROW_EMOJIS.right,
+      'primary'
+    ));
   }
   if (navRow.length) buttons.push(navRow);
 
   buttons.push([
     createButton(t(lang, 'back').toUpperCase(), {
       callback_data: 'shop_menu',
-      icon_custom_emoji_id: SHOP_EMOJIS.volver
+      style: 'primary'
     })
   ]);
 
-  const header = '🛍️ <b>' + t(lang, 'products').toUpperCase() + '</b> (' +
-    (safePage + 1) + '/' + (totalPages || 1) + ')';
+  const header =
+    `🛍️ <b>${t(lang, 'products').toUpperCase()}</b>\n` +
+    `Página ${safePage + 1}/${totalPages}\n\n` +
+    `Selecciona una categoría:`;
 
   try {
     await ctx.editMessageText(header, {
@@ -3088,51 +3185,74 @@ bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   }
 });
 
-// Nivel 2: variantes de una familia concreta.
-bot.action(/^shop_family:(.+)$/, async (ctx) => {
+// Segundo nivel: variantes de una familia.
+bot.action(/^shop_family:([^:]+):(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
-  const familyName = decodeShopFamily(ctx.match[1]);
+  const family = decodeURIComponent(ctx.match[1]);
+  const page = Math.max(0, parseInt(ctx.match[2], 10) || 0);
 
-  if (!familyName) {
+  let products = [];
+  try { products = await db.getActiveShopProducts(); } catch (e) {}
+
+  const items = groupShopProducts(products).find(([name]) => name === family)?.[1] || [];
+
+  if (!items.length) {
     await ctx.reply(t(lang, 'no_products'));
     return;
   }
 
-  const families = await getGroupedShopCatalog();
-  const family = families.find(f => f.name === familyName);
+  const totalPages = Math.ceil(items.length / SHOP_PAGE_SIZE) || 1;
+  const safePage = Math.min(page, totalPages - 1);
+  const pageItems = items.slice(
+    safePage * SHOP_PAGE_SIZE,
+    (safePage + 1) * SHOP_PAGE_SIZE
+  );
 
-  if (!family || !family.items.length) {
-    await ctx.reply(t(lang, 'no_products'), {
-      reply_markup: {
-        inline_keyboard: [[createButton(t(lang, 'back').toUpperCase(), {
-          callback_data: 'shop_products:0',
-          icon_custom_emoji_id: SHOP_EMOJIS.volver
-        })]]
+  const buttons = pageItems.map(product => {
+    const stock = getShopStock(product);
+    const soldOut = stock !== null && stock <= 0;
+    const stockText = soldOut ? 'AGOTADO' : `Stock: ${stock === Infinity ? '∞' : (stock === null ? 'N/D' : stock)}`;
+    return [createButton(
+      `${soldOut ? '🔴' : '🔵'} ${product.name} · $${Number(product.final_price_usd).toFixed(2)} · ${stockText}`,
+      {
+        callback_data: `shop_product:${product.id}:${safePage}`,
+        style: soldOut ? 'danger' : 'primary'
       }
-    });
-    return;
+    )];
+  });
+
+  const navRow = [];
+  if (safePage > 0) {
+    navRow.push(shopArrowButton(
+      'ATRÁS',
+      `shop_family:${encodeURIComponent(family)}:${safePage - 1}`,
+      SHOP_ARROW_EMOJIS.left,
+      'primary'
+    ));
   }
-
-  const priceLabel = p => '$' + Number(p.final_price_usd).toFixed(2);
-
-  // Las variantes ya vienen ordenadas de mayor a menor precio.
-  const buttons = family.items.map(p => [
-    createButton(`${p.name} — ${priceLabel(p)}`, {
-      callback_data: `shop_product:${p.id}`
-    })
-  ]);
+  if (safePage < totalPages - 1) {
+    navRow.push(shopArrowButton(
+      'ADELANTE',
+      `shop_family:${encodeURIComponent(family)}:${safePage + 1}`,
+      SHOP_ARROW_EMOJIS.right,
+      'primary'
+    ));
+  }
+  if (navRow.length) buttons.push(navRow);
 
   buttons.push([
-    createButton(t(lang, 'back').toUpperCase(), {
+    createButton('CATEGORÍAS', {
       callback_data: 'shop_products:0',
-      icon_custom_emoji_id: SHOP_EMOJIS.volver
+      style: 'primary'
     })
   ]);
 
-  const header = `📦 <b>${family.name.toUpperCase()}</b>\n\n` +
-    'Selecciona una variante:';
+  const header =
+    `📦 <b>${escapeShopHtml(family)}</b>\n` +
+    `Página ${safePage + 1}/${totalPages}\n\n` +
+    `Selecciona un producto:`;
 
   try {
     await ctx.editMessageText(header, {
@@ -3147,31 +3267,367 @@ bot.action(/^shop_family:(.+)$/, async (ctx) => {
   }
 });
 
-bot.action(/^shop_product:(\d+)$/, async (ctx) => {
+// Estado temporal para "Otra cantidad".
+const shopQuantityState = new Map(); // telegramId -> { productId }
+
+function getShopQuantityOptions(product) {
+  const stock = getShopStock(product);
+  const maxQtyFromProduct = Number(product.max_qty);
+  const maxQty = Number.isFinite(maxQtyFromProduct) && maxQtyFromProduct > 0
+    ? maxQtyFromProduct
+    : Infinity;
+
+  const minQtyRaw = Number(product.min_qty);
+  const minQty = Number.isFinite(minQtyRaw) && minQtyRaw > 0 ? Math.floor(minQtyRaw) : 1;
+  const maxAvailable = stock !== null ? Math.min(stock, maxQty) : maxQty;
+
+  return { minQty, maxQty: maxAvailable };
+}
+
+function normalizeShopQty(product, qty) {
+  const { minQty, maxQty } = getShopQuantityOptions(product);
+  const n = Number(qty);
+  if (!Number.isInteger(n)) return null;
+  if (n < minQty || n > maxQty) return null;
+  return n;
+}
+
+function productDetailText(product, lang) {
+  const stock = getShopStock(product);
+  const stockText = stock === Infinity ? '∞' : (stock === null ? 'N/D' : stock);
+  const raw = product.raw_data || {};
+
+  // Usamos primero los campos normalizados y, si vienen vacíos, aprovechamos
+  // datos descriptivos que algunas APIs dejan dentro de raw_data.
+  const descriptionValue =
+    product.description ||
+    raw.description ||
+    raw.details ||
+    raw.detail ||
+    raw.note ||
+    '';
+
+  const instructionsValue =
+    product.instructions ||
+    raw.instructions ||
+    raw.instruction ||
+    raw.terms ||
+    raw.requirements ||
+    '';
+
+  const description = descriptionValue ? escapeShopHtml(descriptionValue) : '';
+  const instructions = instructionsValue ? escapeShopHtml(instructionsValue) : '';
+
+  // Estos datos solo se muestran si realmente existen en la API.
+  const extraFields = [
+    ['account_type', 'Tipo de cuenta', 'Account type'],
+    ['accountType', 'Tipo de cuenta', 'Account type'],
+    ['delivery_method', 'Entrega', 'Delivery'],
+    ['deliveryMethod', 'Entrega', 'Delivery'],
+    ['warranty', 'Garantía', 'Warranty'],
+    ['guarantee', 'Garantía', 'Warranty'],
+    ['region', 'Región', 'Region'],
+    ['duration', 'Duración', 'Duration'],
+    ['period', 'Periodo', 'Period'],
+  ];
+
+  const extraLines = [];
+  const usedExtraKeys = new Set();
+
+  for (const [key, esLabel, enLabel] of extraFields) {
+    if (usedExtraKeys.has(key)) continue;
+    const value = raw[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      extraLines.push(`• <b>${lang === 'en' ? enLabel : esLabel}:</b> ${escapeShopHtml(value)}`);
+      usedExtraKeys.add(key);
+    }
+  }
+
+  let text =
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.product, '🛍️')} <b>${escapeShopHtml(product.name)}</b>\n\n`;
+
+  if (description) {
+    text += `📝 <b>${lang === 'en' ? 'Description' : 'Descripción'}:</b>\n${description}\n\n`;
+  }
+
+  if (instructions) {
+    text += `📋 <b>${lang === 'en' ? 'Instructions' : 'Instrucciones'}:</b>\n${instructions}\n\n`;
+  }
+
+  if (extraLines.length) {
+    text += `ℹ️ <b>${lang === 'en' ? 'Product information' : 'Información del producto'}:</b>\n${extraLines.join('\n')}\n\n`;
+  }
+
+  text += `📦 <b>${lang === 'en' ? 'Stock' : 'Stock'}:</b> ${stockText}\n`;
+  text += `💵 <b>${t(lang, 'price')}:</b> $${Number(product.final_price_usd).toFixed(2)} USD / unidad`;
+
+  if (!description && !instructions && !extraLines.length) {
+    text += `\n\n⚠️ ${lang === 'en'
+      ? 'The provider did not supply additional product instructions.'
+      : 'El proveedor no proporcionó instrucciones adicionales para este producto.'}`;
+  }
+
+  return text;
+}
+
+async function showShopProductDetail(ctx, product, lang, familyPage = 0) {
+  const stock = getShopStock(product);
+
+  if (isShopSoldOut(product)) {
+    await ctx.answerCbQuery(
+      lang === 'en' ? '❌ This product is sold out.' : '❌ Este producto está agotado.',
+      { show_alert: true }
+    );
+    return;
+  }
+
+  const { minQty, maxQty } = getShopQuantityOptions(product);
+  if (maxQty < minQty) {
+    await ctx.answerCbQuery(
+      lang === 'en' ? '❌ This product is not available.' : '❌ Este producto no está disponible.',
+      { show_alert: true }
+    );
+    return;
+  }
+
+  const quantityCandidates = [1, 5, 10, 20, 50, 100]
+    .filter(q => q >= minQty && q <= maxQty);
+
+  // Si el mínimo del proveedor es distinto, mostramos también ese mínimo.
+  if (!quantityCandidates.includes(minQty) && minQty <= maxQty) {
+    quantityCandidates.unshift(minQty);
+  }
+
+  const quantityButtons = [];
+  for (let i = 0; i < quantityCandidates.length; i += 3) {
+    quantityButtons.push(
+      quantityCandidates.slice(i, i + 3).map(q =>
+        createButton(String(q), {
+          callback_data: `shop_buy:${product.id}:${q}`,
+          style: 'primary'
+        })
+      )
+    );
+  }
+
+  // "Otra cantidad" siempre queda verde.
+  quantityButtons.push([
+    createButton('Otra cantidad', {
+      callback_data: `shop_qty_custom:${product.id}`,
+      style: 'success'
+    })
+  ]);
+
+  const family = getShopFamily(product);
+  quantityButtons.push([
+    createButton(
+      lang === 'en' ? 'BACK' : 'ATRÁS',
+      {
+        callback_data: `shop_family:${encodeURIComponent(family)}:${familyPage}`,
+        style: 'primary'
+      }
+    )
+  ]);
+
+  const text = productDetailText(product, lang) +
+    `\n\n🧮 <b>${lang === 'en' ? 'Choose quantity' : 'Elige la cantidad'}:</b>`;
+
+  await ctx.editMessageText(text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: quantityButtons }
+  }).catch(async () => {
+    await ctx.reply(text, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: quantityButtons }
+    });
+  });
+}
+
+bot.action(/^shop_product:(\d+)(?::(\d+))?$/, async (ctx) => {
+  const productId = ctx.match[1];
+  const familyPage = parseInt(ctx.match[2] || '0', 10) || 0;
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const product = await db.getShopProductById(productId);
+
+  if (!product) {
+    await ctx.answerCbQuery();
+    await ctx.reply(t(lang, 'product_not_found'));
+    return;
+  }
+
+  await showShopProductDetail(ctx, product, lang, familyPage);
+});
+
+async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
+  const normalizedQty = normalizeShopQty(product, qty);
+  if (normalizedQty === null) {
+    await ctx.answerCbQuery(
+      lang === 'en'
+        ? '❌ Invalid quantity for this product.'
+        : '❌ Cantidad no válida para este producto.',
+      { show_alert: true }
+    );
+    return;
+  }
+
+  const totalPrice = Math.round(
+    Number(product.final_price_usd) * normalizedQty * 100
+  ) / 100;
+
+  let balance;
+  try {
+    balance = await db.getShopBalance(ctx.from.id.toString());
+  } catch (e) {
+    await ctx.answerCbQuery('❌ Error consultando tu saldo.', { show_alert: true });
+    return;
+  }
+
+  const balanceValue = Number(balance.balance_usd || 0);
+  const afterPurchase = Math.round((balanceValue - totalPrice) * 100) / 100;
+
+  const text =
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.cart, '🛒')} <b>${lang === 'en' ? 'CONFIRM PURCHASE' : 'CONFIRMAR COMPRA'}</b>\n\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.order, '🧾')} <b>Order ID:</b> — <i>${lang === 'en' ? 'generated after confirmation' : 'se genera al confirmar'}</i>\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.product, '🛍️')} <b>Product:</b> ${escapeShopHtml(product.name)}\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.quantity, '🧮')} <b>Quantity:</b> ${normalizedQty}\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.unitPrice, '💸')} <b>Unit Price:</b> $${Number(product.final_price_usd).toFixed(2)}\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.total, '💰')} <b>Total:</b> $${totalPrice.toFixed(2)}\n\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.balance, '🪹')} <b>Your Balance:</b> $${balanceValue.toFixed(2)}\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.balance, '🪹')} <b>After Purchase:</b> $${afterPurchase.toFixed(2)}\n\n` +
+    (balanceValue >= totalPrice
+      ? (lang === 'en' ? 'Confirm your purchase?' : '¿Confirmas tu compra?')
+      : (lang === 'en'
+        ? '❌ Insufficient balance. Recharge your balance to continue.'
+        : '❌ Saldo insuficiente. Recarga tu saldo para continuar.'));
+
+  const buttons = [];
+  if (balanceValue >= totalPrice) {
+    buttons.push([
+      createButton(
+        lang === 'en' ? 'Confirm' : 'Confirmar',
+        { callback_data: `shop_confirm:${product.id}:${normalizedQty}`, style: 'success' }
+      ),
+      createButton(
+        lang === 'en' ? 'Cancel' : 'Cancelar',
+        { callback_data: `shop_product:${product.id}`, style: 'danger' }
+      )
+    ]);
+  } else {
+    buttons.push([
+      createButton(t(lang, 'topup').toUpperCase(), {
+        callback_data: 'shop_topup',
+        style: 'primary'
+      }),
+      createButton(
+        lang === 'en' ? 'Cancel' : 'Cancelar',
+        { callback_data: `shop_product:${product.id}`, style: 'danger' }
+      )
+    ]);
+  }
+
+  await ctx.editMessageText(text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons }
+  }).catch(async () => {
+    await ctx.reply(text, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }
+    });
+  });
+}
+
+// Elegir cantidad: todavía no compra; solo muestra la confirmación.
+bot.action(/^shop_buy:(\d+):(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const product = await db.getShopProductById(ctx.match[1]);
+  const lang = await getUserLang(ctx.from.id.toString());
+
+  if (!product || !product.active) {
+    await ctx.reply(t(lang, 'product_unavailable'));
+    return;
+  }
+
+  if (isShopSoldOut(product)) {
+    await ctx.answerCbQuery(
+      lang === 'en' ? '❌ This product is sold out.' : '❌ Este producto está agotado.',
+      { show_alert: true }
+    );
+    return;
+  }
+
+  await showShopPurchaseConfirmation(ctx, product, Number(ctx.match[2]), lang);
+});
+
+bot.action(/^shop_qty_custom:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const product = await db.getShopProductById(ctx.match[1]);
-  if (!product) { await ctx.reply(t(lang, 'product_not_found')); return; }
 
-  const qty = product.min_qty || 1;
-  const totalPrice = Number(product.final_price_usd) * qty;
-  const priceLine = t(lang, 'price') + ': $' + totalPrice.toFixed(2) + ' USD' + (qty > 1 ? ` (x${qty})` : '');
-  const text = '✨ <b>' + product.name + '</b>\n\n' + (product.description || '') + '\n\n💰 ' + priceLine;
-  await ctx.reply(text, {
-    parse_mode: 'HTML',
-    reply_markup: { inline_keyboard: [
-      [createButton('🛒 ' + t(lang, 'buy_button'), { callback_data: `shop_buy:${product.id}` })],
-      [createButton(t(lang, 'back').toUpperCase(), { callback_data: `shop_family:${encodeShopFamily(getShopProductFamily(product.name))}`, icon_custom_emoji_id: SHOP_EMOJIS.volver })],
-    ] },
-  });
+  if (!product || !product.active) {
+    await ctx.reply(t(lang, 'product_unavailable'));
+    return;
+  }
+
+  if (isShopSoldOut(product)) {
+    await ctx.answerCbQuery(
+      lang === 'en' ? '❌ This product is sold out.' : '❌ Este producto está agotado.',
+      { show_alert: true }
+    );
+    return;
+  }
+
+  shopQuantityState.set(userId, { productId: product.id });
+  const { minQty, maxQty } = getShopQuantityOptions(product);
+
+  await ctx.reply(
+    lang === 'en'
+      ? `✏️ Send the quantity you want (from ${minQty} to ${maxQty === Infinity ? 'the available stock' : maxQty}).`
+      : `✏️ Escribe la cantidad que deseas (desde ${minQty} hasta ${maxQty === Infinity ? 'el stock disponible' : maxQty}).`
+  );
 });
 
-// ==================== COMPRA REAL (fase 4) ====================
+// Captura "Otra cantidad" sin interferir con los demás mensajes del bot.
+bot.on('message', async (ctx, next) => {
+  const userId = ctx.from?.id?.toString();
+  if (!userId) return next();
+
+  const state = shopQuantityState.get(userId);
+  if (!state) return next();
+
+  const text = String(ctx.message?.text || '').trim();
+  const lang = await getUserLang(userId);
+  const product = await db.getShopProductById(state.productId).catch(() => null);
+
+  shopQuantityState.delete(userId);
+
+  if (!product || !product.active || isShopSoldOut(product)) {
+    await ctx.reply(t(lang, 'product_unavailable'));
+    return;
+  }
+
+  const qty = Number(text);
+  const normalizedQty = normalizeShopQty(product, qty);
+
+  if (normalizedQty === null) {
+    const { minQty, maxQty } = getShopQuantityOptions(product);
+    await ctx.reply(
+      lang === 'en'
+        ? `❌ Invalid quantity. Use an integer from ${minQty} to ${maxQty === Infinity ? 'the available stock' : maxQty}.`
+        : `❌ Cantidad inválida. Usa un número entero desde ${minQty} hasta ${maxQty === Infinity ? 'el stock disponible' : maxQty}.`
+    );
+    return;
+  }
+
+  await showShopPurchaseConfirmation(ctx, product, normalizedQty, lang);
+});
+
+// ==================== COMPRA REAL ====================
 // Reserva saldo → crea la orden en la API correspondiente.
 // Warzone tiene un tratamiento especial para HTTP 500 porque el pedido
 // puede haberse creado aunque el POST no devuelva una respuesta normal.
-bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
+bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
@@ -3191,7 +3647,16 @@ bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
     }
   }
 
-  const qty = product.min_qty || 1;
+  const qty = normalizeShopQty(product, Number(ctx.match[2]));
+  if (qty === null) {
+    await ctx.reply(
+      lang === 'en'
+        ? '❌ The requested quantity is no longer available.'
+        : '❌ La cantidad solicitada ya no está disponible.'
+    );
+    return;
+  }
+
   const totalPrice = Math.round(Number(product.final_price_usd) * qty * 100) / 100;
 
   let balance;
@@ -3213,7 +3678,7 @@ bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
           inline_keyboard: [[
             createButton(t(lang, 'topup').toUpperCase(), {
               callback_data: 'shop_topup',
-              icon_custom_emoji_id: SHOP_EMOJIS.recargar
+              style: 'primary'
             })
           ]]
         }
@@ -3321,7 +3786,7 @@ bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
           inline_keyboard: [[
             createButton(t(lang, 'support').toUpperCase(), {
               callback_data: 'show_support',
-              icon_custom_emoji_id: SHOP_EMOJIS.soporte
+              style: 'success'
             })
           ]]
         }
@@ -3346,7 +3811,7 @@ bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
           inline_keyboard: [[
             createButton(t(lang, 'support').toUpperCase(), {
               callback_data: 'show_support',
-              icon_custom_emoji_id: SHOP_EMOJIS.soporte
+              style: 'success'
             })
           ]]
         }
@@ -3369,14 +3834,13 @@ bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
         inline_keyboard: [[
           createButton(t(lang, 'support').toUpperCase(), {
             callback_data: 'show_support',
-            icon_custom_emoji_id: SHOP_EMOJIS.soporte
+            style: 'success'
           })
         ]]
       }
     }
   );
 });
-
 
 bot.action('shop_profile', async (ctx) => {
   await ctx.answerCbQuery();
