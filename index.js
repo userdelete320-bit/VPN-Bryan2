@@ -2939,16 +2939,34 @@ bot.action('shop_menu', async (ctx) => {
 const SHOP_PAGE_SIZE = 5;
 
 function getShopProductFamily(name) {
-  let family = String(name || '').trim();
-  if (!family) return 'Otros';
+  const original = String(name || '').trim();
+  if (!original) return 'Otros';
 
-  // Normalizar separadores para poder detectar nombres como:
-  // "Claude - Mensual", "Claude | Anual", etc.
-  family = family.replace(/[|:_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Agrupación por producto/marca, NO por API.
+  // Todo lo que contenga una de estas marcas termina en la misma familia,
+  // aunque venga de Qamify, GGSoma, Warzone u otra API.
+  const normalized = original
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_|:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  // Quitamos sufijos que representan la variante/plan, no la familia.
-  // Ej.: "Geminis Pro 1" -> "Geminis"
-  //      "Claude Mensual" -> "Claude"
+  const familyRules = [
+    { family: 'ChatGPT', pattern: /\bchat\s*[-_ ]?gpt\b|\bopenai\b/i },
+    { family: 'Gemini', pattern: /\bgemini\b|\bgoogle\s+gemini\b/i },
+    { family: 'Claude', pattern: /\bclaude\b|\banthropic\b/i },
+    { family: 'ElevenLabs', pattern: /\beleven\s*[-_ ]?labs?\b|\belevenlabs\b/i },
+  ];
+
+  for (const rule of familyRules) {
+    if (rule.pattern.test(normalized)) return rule.family;
+  }
+
+  // Para productos que todavía no tengan una regla específica,
+  // mantenemos la agrupación genérica anterior.
+  let family = normalized;
+
   family = family.replace(
     /\s+(?:pro|plan|tier)\s*\d+\s*$/i,
     ''
@@ -2959,8 +2977,6 @@ function getShopProductFamily(name) {
     ''
   );
 
-  // También elimina una cantidad/número al final cuando forma parte
-  // de la variante: "Producto 1", "Producto 2", etc.
   family = family.replace(/\s+\d+\s*$/i, '');
 
   return family.trim() || 'Otros';
