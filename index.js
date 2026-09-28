@@ -18,6 +18,7 @@ const db = require('./supabase');
 const { syncShopCatalog } = require('./shop_sync');
 const qamifyConnector = require('./qamify_connector');
 const ggsomaConnector = require('./ggsoma_connector');
+const warzoneConnector = require('./warzone_connector');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
@@ -371,6 +372,7 @@ const SHOP_I18N = {
     processing_order: '⏳ Procesando tu orden...',
     order_completed: '✅ Orden completada',
     order_failed_refunded: '❌ No se pudo completar esta orden. Tu saldo fue devuelto.\n\nPuedes intentar de nuevo o contactar a soporte.',
+    order_provider_pending: '⚠️ La orden fue creada en el proveedor, pero la entrega todavía está pendiente. Tu saldo se mantiene reservado hasta confirmar la entrega. Contacta a soporte si no recibes el producto.',
     topup_menu_title: '💰 <b>RECARGAR SALDO</b>',
     topup_menu_intro: 'Elige una cantidad (USDT - BEP20):',
     custom_amount: '✏️ Otra cantidad',
@@ -411,6 +413,7 @@ const SHOP_I18N = {
     processing_order: '⏳ Processing your order...',
     order_completed: '✅ Order completed',
     order_failed_refunded: `❌ We couldn't complete this order. Your balance was refunded.\n\nYou can try again or contact support.`,
+    order_provider_pending: '⚠️ The order was created at the provider, but delivery is still pending. Your balance remains reserved until delivery is confirmed. Contact support if you do not receive the product.',
     topup_menu_title: '💰 <b>TOP UP BALANCE</b>',
     topup_menu_intro: 'Choose an amount (USDT - BEP20):',
     custom_amount: '✏️ Other amount',
@@ -2977,70 +2980,215 @@ bot.action(/^shop_product:(\d+)$/, async (ctx) => {
 });
 
 // ==================== COMPRA REAL (fase 4) ====================
-// Reserva saldo → crea la orden en la API correspondiente → entrega o devuelve el saldo si falla.
+// Reserva saldo → crea la orden en la API correspondiente.
+// Warzone tiene un tratamiento especial para HTTP 500 porque el pedido
+// puede haberse creado aunque el POST no devuelva una respuesta normal.
 bot.action(/^shop_buy:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const product = await db.getShopProductById(ctx.match[1]);
-  if (!product || !product.active) { await ctx.reply(t(lang, 'product_unavailable')); return; }
+
+  if (!product || !product.active) {
+    await ctx.reply(t(lang, 'product_unavailable'));
+    return;
+  }
+
+  // Warzone: no permitir comprar un servicio que su catálogo marca como no ordenable.
+  if (product.source === 'warzone') {
+    const raw = product.raw_data || {};
+    if (!raw.orderable || Number(product.stock || 0) <= 0 || raw.price == null) {
+      await ctx.reply(t(lang, 'product_unavailable'));
+      return;
+    }
+  }
 
   const qty = product.min_qty || 1;
   const totalPrice = Math.round(Number(product.final_price_usd) * qty * 100) / 100;
 
   let balance;
-  try { balance = await db.getShopBalance(userId); } catch (e) { await ctx.reply('❌ Error consultando tu saldo.'); return; }
+  try {
+    balance = await db.getShopBalance(userId);
+  } catch (e) {
+    await ctx.reply('❌ Error consultando tu saldo.');
+    return;
+  }
 
   if (Number(balance.balance_usd) < totalPrice) {
     await ctx.reply(
-      t(lang, 'insufficient_balance', { needed: '$' + totalPrice.toFixed(2), have: '$' + Number(balance.balance_usd).toFixed(2) }),
-      { reply_markup: { inline_keyboard: [[createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })]] } }
+      t(lang, 'insufficient_balance', {
+        needed: '$' + totalPrice.toFixed(2),
+        have: '$' + Number(balance.balance_usd).toFixed(2)
+      }),
+      {
+        reply_markup: {
+          inline_keyboard: [[
+            createButton(t(lang, 'topup').toUpperCase(), {
+              callback_data: 'shop_topup',
+              icon_custom_emoji_id: SHOP_EMOJIS.recargar
+            })
+          ]]
+        }
+      }
     );
     return;
   }
 
-  // 1. Reservar saldo de inmediato (se devuelve automáticamente si la API falla)
+  // 1. Reservar saldo local antes de gastar en el proveedor.
   await db.adjustShopBalance(userId, -totalPrice);
-  const idempotencyKey = `shop_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+  const idempotencyKey =
+    `shop_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
   const order = await db.createShopOrder({
-    telegram_id: userId, product_id: product.id, source: product.source,
-    idempotency_key: idempotencyKey, qty, price_charged_usd: totalPrice,
+    telegram_id: userId,
+    product_id: product.id,
+    source: product.source,
+    idempotency_key: idempotencyKey,
+    qty,
+    price_charged_usd: totalPrice,
   });
 
   await ctx.reply(t(lang, 'processing_order'));
 
-  // 2. Llamar a la API correspondiente
+  // 2. Llamar a la API correspondiente.
   let result;
   try {
-    const connector = product.source === 'qamify' ? qamifyConnector : ggsomaConnector;
-    result = product.source === 'qamify'
-      ? await connector.createOrder({ idempotencyKey, externalId: product.external_id, qty })
-      : await connector.createOrder({ idempotencyKey, externalRef: product.external_ref, qty });
+    if (product.source === 'qamify') {
+      result = await qamifyConnector.createOrder({
+        idempotencyKey,
+        externalId: product.external_id,
+        qty
+      });
+    } else if (product.source === 'ggsoma') {
+      result = await ggsomaConnector.createOrder({
+        idempotencyKey,
+        externalRef: product.external_ref,
+        qty
+      });
+    } else if (product.source === 'warzone') {
+      result = await warzoneConnector.createOrder({
+        serviceId: product.external_id,
+        qty
+      });
+    } else {
+      result = {
+        success: false,
+        safeToRefund: true,
+        error: {
+          code: 'unsupported_source',
+          message: `Fuente no soportada: ${product.source}`
+        }
+      };
+    }
   } catch (err) {
-    result = { success: false, error: { code: 'unexpected_error', message: err.message } };
+    result = {
+      success: false,
+      safeToRefund: false,
+      ambiguous: true,
+      error: {
+        code: 'unexpected_error',
+        message: err.message
+      }
+    };
   }
 
-  // 3. Completar o devolver el saldo
+  // 3. Compra confirmada: entregar.
   if (result.success) {
     const deliveredContent = (result.items || []).join('\n\n');
+
     await db.updateShopOrder(order.id, {
-      status: 'completed', external_order_code: result.external_order_code,
-      delivered_content: deliveredContent, instructions: result.instructions || '',
+      status: 'completed',
+      external_order_code: result.external_order_code,
+      delivered_content: deliveredContent,
+      instructions: result.instructions || '',
+      error_detail: null,
     });
+
     const deliveryText =
       `<b>${t(lang, 'order_completed')}</b> #${order.id}\n\n` +
       `${product.name}\n\n${deliveredContent}` +
       (result.instructions ? `\n\n📋 ${result.instructions}` : '');
+
     await ctx.reply(deliveryText, { parse_mode: 'HTML' });
-  } else {
-    await db.updateShopOrder(order.id, { status: 'failed', error_detail: JSON.stringify(result.error) });
-    await db.adjustShopBalance(userId, totalPrice); // devolver el saldo — nunca se pierde por un fallo de la API
+    return;
+  }
+
+  // 4. CASO CRÍTICO WARZONE:
+  // Si el POST dio 500 y GET /orders encontró una orden pagada pero todavía
+  // sin productos, NO devolvemos el saldo del cliente.
+  if (result.ambiguous || result.provider_charged) {
+    await db.updateShopOrder(order.id, {
+      status: 'reserved',
+      external_order_code: result.external_order_code || null,
+      error_detail: JSON.stringify(result.error || {
+        code: 'provider_pending'
+      }),
+    });
+
+    await ctx.reply(
+      t(lang, 'order_provider_pending'),
+      {
+        reply_markup: {
+          inline_keyboard: [[
+            createButton(t(lang, 'support').toUpperCase(), {
+              callback_data: 'show_support',
+              icon_custom_emoji_id: SHOP_EMOJIS.soporte
+            })
+          ]]
+        }
+      }
+    );
+    return;
+  }
+
+  // 5. Solo reembolsamos cuando el conector confirma que es seguro hacerlo.
+  if (result.safeToRefund) {
+    await db.updateShopOrder(order.id, {
+      status: 'failed',
+      error_detail: JSON.stringify(result.error || {})
+    });
+
+    await db.adjustShopBalance(userId, totalPrice);
+
     await ctx.reply(
       t(lang, 'order_failed_refunded'),
-      { reply_markup: { inline_keyboard: [[createButton(t(lang, 'support').toUpperCase(), { callback_data: 'show_support', icon_custom_emoji_id: SHOP_EMOJIS.soporte })]] } }
+      {
+        reply_markup: {
+          inline_keyboard: [[
+            createButton(t(lang, 'support').toUpperCase(), {
+              callback_data: 'show_support',
+              icon_custom_emoji_id: SHOP_EMOJIS.soporte
+            })
+          ]]
+        }
+      }
     );
+    return;
   }
+
+  // 6. Fallo indeterminado de un conector: no arriesgar un doble gasto.
+  // El saldo queda reservado hasta revisión.
+  await db.updateShopOrder(order.id, {
+    status: 'reserved',
+    error_detail: JSON.stringify(result.error || {})
+  });
+
+  await ctx.reply(
+    t(lang, 'order_provider_pending'),
+    {
+      reply_markup: {
+        inline_keyboard: [[
+          createButton(t(lang, 'support').toUpperCase(), {
+            callback_data: 'show_support',
+            icon_custom_emoji_id: SHOP_EMOJIS.soporte
+          })
+        ]]
+      }
+    }
+  );
 });
+
 
 bot.action('shop_profile', async (ctx) => {
   await ctx.answerCbQuery();
@@ -3376,13 +3524,15 @@ bot.action('shop_admin_api_status', async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.reply('🔌 Consultando ambas APIs...');
 
-  let qamifyLine, ggsomaLine;
+  let qamifyLine, ggsomaLine, warzoneLine;
   try { const bal = await qamifyConnector.getBalance(); qamifyLine = `✅ Qamify — saldo: $${bal.toFixed(2)}`; }
   catch (e) { qamifyLine = `❌ Qamify — no se pudo consultar (${e.message})`; }
   try { const bal = await ggsomaConnector.getBalance(); ggsomaLine = `✅ GGSoma — saldo: $${bal.toFixed(2)}`; }
   catch (e) { ggsomaLine = `❌ GGSoma — no se pudo consultar (${e.message})`; }
+  try { const bal = await warzoneConnector.getBalance(); warzoneLine = `✅ Warzone — saldo: $${bal.toFixed(2)}`; }
+  catch (e) { warzoneLine = `❌ Warzone — no se pudo consultar (${e.message})`; }
 
-  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}`, {
+  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}\n${warzoneLine}`, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] },
   });
@@ -4292,9 +4442,26 @@ app.listen(PORT, '0.0.0.0', async () => {
     // Si falta alguna de las 2 API keys, no truena el arranque — solo avisa.
     if (!process.env.QAMIFY_API_KEY) console.warn('⚠️ QAMIFY_API_KEY no configurada — el catálogo de Qamify no se sincronizará.');
     if (!process.env.GGSOMA_API_KEY) console.warn('⚠️ GGSOMA_API_KEY no configurada — el catálogo de GGSoma no se sincronizará.');
-    syncShopCatalog(db).then(r => console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(r))).catch(e => console.error('❌ Error en sincronización inicial de la tienda:', e.message));
+    if (!process.env.WARZONE_API_KEY) console.warn('⚠️ WARZONE_API_KEY no configurada — el catálogo de Warzone no se sincronizará.');
+
+    // Sincronización de Qamify + GGSoma (existente).
+    syncShopCatalog(db)
+      .then(r => console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(r)))
+      .catch(e => console.error('❌ Error en sincronización inicial de la tienda:', e.message));
+
+    // Warzone se sincroniza por separado para no tocar la estructura de las otras APIs.
+    warzoneConnector.syncCatalog(db)
+      .then(r => console.log('🛍️ Sincronización inicial Warzone:', JSON.stringify(r)))
+      .catch(e => console.error('❌ Error en sincronización inicial Warzone:', e.message));
+
     setInterval(() => {
-      syncShopCatalog(db).then(r => console.log('🛍️ Sincronización de la tienda:', JSON.stringify(r))).catch(e => console.error('❌ Error sincronizando la tienda:', e.message));
+      syncShopCatalog(db)
+        .then(r => console.log('🛍️ Sincronización de la tienda:', JSON.stringify(r)))
+        .catch(e => console.error('❌ Error sincronizando la tienda:', e.message));
+
+      warzoneConnector.syncCatalog(db)
+        .then(r => console.log('🛍️ Sincronización Warzone:', JSON.stringify(r)))
+        .catch(e => console.error('❌ Error sincronizando Warzone:', e.message));
     }, 60 * 60 * 1000); // cada hora
 
     console.log(`🎯 Pool de pruebas: separado por plan (basico/avanzado/cuba_vip/premium/anual)`);
