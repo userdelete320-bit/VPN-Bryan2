@@ -3495,7 +3495,6 @@ PersistentKeepalive = 25`;
       const remoteAvail = await availRes.json();
 
       Object.keys(PLAN_BACKEND_KEY).forEach(uiKey => {
-        if (uiKey === 'express') return; // el express usa su propia tabla por duración (ver más abajo)
         const backendKey = PLAN_BACKEND_KEY[uiKey];
         const rp = remotePrices?.[backendKey];
         // Solo se actualizan los campos que de verdad gestiona el admin desde el backend.
