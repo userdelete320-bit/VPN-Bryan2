@@ -2655,7 +2655,7 @@ app.get('/api/upgrade-options/:telegramId', async (req, res) => {
 
 app.post('/api/refund-request', upload.single('refundProof'), async (req, res) => {
   try {
-    const { telegramId, paymentId, motivo, detalles, planName, refundDestination } = req.body;
+    const { telegramId, paymentId, motivo, detalles, refundDestination } = req.body;
 
     if (!telegramId || !paymentId || !motivo || !refundDestination) {
       if (req.file?.path) fs.unlink(req.file.path, () => {});
@@ -2683,6 +2683,11 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
     const username = user?.username ? `@${user.username}` : 'Sin usuario';
     const firstName = user?.first_name || 'Usuario';
 
+    // El nombre del producto/configuración debe salir del pago registrado en BD,
+    // no de un nombre enviado por el frontend, que puede estar desactualizado.
+    const planName = getPlanName(payment.plan);
+    const configurationName = payment.config_file || planName;
+
     let proofUrl = null;
     if (req.file) {
       try {
@@ -2697,7 +2702,7 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
       status: 'refund_pending',
       refund_motivo: motivo,
       refund_detalles: detalles || '',
-      refund_plan_name: planName || payment.plan,
+      refund_plan_name: planName,
       refund_requested_at: new Date().toISOString(),
       refund_destination: refundDestination,
       refund_proof_url: proofUrl || null
@@ -2707,10 +2712,10 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
       `👤 *Usuario:* ${firstName}\n` +
       `📱 *Telegram:* ${username}\n` +
       `🆔 *ID:* ${telegramId}\n` +
-      `📋 *Plan:* ${planName || payment.plan}\n` +
+      `📋 *Plan:* ${planName}\n` +
+      `🗂️ *Configuración entregada:* ${configurationName}\n` +
       `💳 *Método de pago:* ${payment.method}\n` +
       `🔖 *ID de pago:* \`${paymentId}\`\n` +
-      `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
       `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
       `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
       `💰 *Destino del reembolso:* ${refundDestination || 'No especificado'}\n` +
@@ -2739,7 +2744,7 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
     try {
       await bot.telegram.sendMessage(telegramId,
         `✅ <b>Solicitud de reembolso recibida</b>\n\n` +
-        `<b>Plan:</b> ${planName || payment.plan}\n` +
+        `<b>Plan:</b> ${planName}\n` +
         `<b>Motivo:</b> ${REFUND_MOTIVOS[motivo] || motivo}\n` +
         `\nUn administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.`,
         { parse_mode: 'HTML' }
