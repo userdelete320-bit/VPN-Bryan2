@@ -347,13 +347,13 @@ const SHOP_EMOJIS = {
 const SHOP_I18N = {
   es: {
     shop_title: 'Tienda',
-    shop_title_button: '🛍️ Tienda',
+    shop_title_button: 'Tienda',
     shop_intro: 'Elige una opción:',
-    products: '🛍️ Productos',
-    profile: '👤 Perfil',
-    topup: '💰 Recargar saldo',
-    orders: '📦 Mis órdenes',
-    support: '🎧 Soporte',
+    products: 'Productos',
+    profile: 'Perfil',
+    topup: 'Recargar saldo',
+    orders: 'Mis órdenes',
+    support: 'Soporte',
     back: 'Volver',
     main_menu: 'Menú principal',
     coming_soon: '🚧 Esta sección estará disponible muy pronto.',
@@ -388,13 +388,13 @@ const SHOP_I18N = {
   },
   en: {
     shop_title: 'Shop',
-    shop_title_button: '🛍️ Shop',
+    shop_title_button: 'Shop',
     shop_intro: 'Choose an option:',
-    products: '🛍️ Products',
-    profile: '👤 Profile',
-    topup: '💰 Top up balance',
-    orders: '📦 My orders',
-    support: '🎧 Support',
+    products: 'Products',
+    profile: 'Profile',
+    topup: 'Top up balance',
+    orders: 'My orders',
+    support: 'Support',
     back: 'Back',
     main_menu: 'Main menu',
     coming_soon: '🚧 This section will be available very soon.',
@@ -2950,6 +2950,12 @@ const SHOP_FAMILY_RULES = [
   { label: 'Midjourney', patterns: [/\bmidjourney\b/i] },
   { label: 'Perplexity', patterns: [/\bperplexity\b/i] },
   { label: 'Cursor', patterns: [/\bcursor\b/i] },
+  { label: 'iLovePDF', patterns: [/\bilovepdf\b/i] },
+  { label: 'Lovable', patterns: [/\blovable\b/i] },
+  { label: 'Udemy', patterns: [/\budemy\b/i] },
+  { label: 'Apple Music', patterns: [/\bapple\s+music\b/i] },
+  { label: 'LinkedIn', patterns: [/\blinkedin\b/i] },
+  { label: 'Proton', patterns: [/\bproton\b/i] },
 ];
 
 function getShopFamily(product) {
@@ -2966,17 +2972,20 @@ function getShopFamily(product) {
 
   // Fallback: para productos que no pertenezcan a una familia conocida,
   // usamos las primeras palabras significativas del nombre.
-  const fallback = String(product.name || 'Otros')
+  const fallbackWords = String(product.name || 'Otros')
     .replace(/[\[\](){}|]/g, ' ')
-    .replace(/\b(pro|plus|premium|basic|basic|mensual|monthly|annual|anual|month|months|year|years)\b/gi, ' ')
+    .replace(/\b(pro|plus|premium|basic|mensual|monthly|annual|anual|month|months|year|years)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(' ');
+    .filter(Boolean);
 
-  return fallback || 'Otros';
+  // Variantes numéricas como "12M", "100" o "1m" no crean familias nuevas.
+  if (fallbackWords.length > 1 && /^\d+(?:[.,]?\d*)?[a-z]*$/i.test(fallbackWords[1])) {
+    return fallbackWords[0] || 'Otros';
+  }
+
+  return fallbackWords.slice(0, 2).join(' ') || 'Otros';
 }
 
 function groupShopProducts(products) {
@@ -3048,27 +3057,27 @@ function buildShopMenuKeyboard(lang) {
   return {
     inline_keyboard: [
       [
-        createButton(t(lang, 'products').toUpperCase(), {
+        createButton('🛍️ Productos', {
           callback_data: 'shop_products:0',
           style: 'primary'
         }),
-        createButton(t(lang, 'profile').toUpperCase(), {
+        createButton('👤 Perfil', {
           callback_data: 'shop_profile',
           style: 'primary'
         }),
       ],
       [
-        createButton(t(lang, 'topup').toUpperCase(), {
+        createButton('💰 Recargar saldo', {
           callback_data: 'shop_topup',
           style: 'primary'
         }),
-        createButton(t(lang, 'orders').toUpperCase(), {
+        createButton('📦 Mis órdenes', {
           callback_data: 'shop_orders',
           style: 'primary'
         }),
       ],
       [
-        createButton(t(lang, 'support').toUpperCase(), {
+        createButton('🎧 Soporte', {
           callback_data: 'show_support',
           style: 'success'
         }),
@@ -3097,9 +3106,8 @@ bot.action('shop_menu', async (ctx) => {
 });
 
 // Primer nivel: familias/marcas.
-// Se conserva un snapshot corto por usuario para que el número de páginas
-// no cambie entre ADELANTE/ATRÁS si una sincronización actualiza el catálogo
-// mientras el usuario está navegando.
+// El catálogo se congela unos minutos por usuario para que el total de páginas
+// no cambie mientras se navega con ATRÁS/ADELANTE.
 const shopCatalogSessions = new Map();
 const SHOP_CATALOG_SESSION_TTL_MS = 10 * 60 * 1000;
 
@@ -3113,16 +3121,18 @@ async function getShopCatalogSnapshot(userId, forceRefresh = false) {
   let products = [];
   try { products = await db.getActiveShopProducts(); } catch (e) {}
   const groups = groupShopProducts(products);
+  const totalPages = Math.max(1, Math.ceil(groups.length / SHOP_PAGE_SIZE));
+  console.log(`🛍️ Catálogo tienda: ${products.length} productos activos → ${groups.length} categorías → ${totalPages} páginas.`);
   shopCatalogSessions.set(userId, { createdAt: now, groups });
   return groups;
 }
 
-async function renderShopProductFamilies(ctx, requestedPage) {
+async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = false) {
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const page = Math.max(0, Number.parseInt(requestedPage, 10) || 0);
 
-  const groups = await getShopCatalogSnapshot(userId);
+  const groups = await getShopCatalogSnapshot(userId, forceRefresh);
 
   if (!groups.length) {
     await ctx.reply(t(lang, 'no_products'), {
@@ -3208,11 +3218,7 @@ async function renderShopProductFamilies(ctx, requestedPage) {
 // para evitar cualquier ambigüedad al procesar ADELANTE/ATRÁS.
 bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
-  // Al abrir Productos desde el menú se crea/renueva el snapshot.
-  if (String(ctx.match[1]) === '0') {
-    shopCatalogSessions.delete(ctx.from.id.toString());
-  }
-  await renderShopProductFamilies(ctx, ctx.match[1]);
+  await renderShopProductFamilies(ctx, ctx.match[1], true);
 });
 
 bot.action(/^shop_products_page:(\d+)$/, async (ctx) => {
@@ -3550,7 +3556,7 @@ async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
     ]);
   } else {
     buttons.push([
-      createButton(t(lang, 'topup').toUpperCase(), {
+      createButton('💰 Recargar saldo', {
         callback_data: 'shop_topup',
         style: 'primary'
       }),
@@ -3711,7 +3717,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(t(lang, 'topup').toUpperCase(), {
+            createButton('💰 Recargar saldo', {
               callback_data: 'shop_topup',
               style: 'primary'
             })
@@ -3819,7 +3825,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(t(lang, 'support').toUpperCase(), {
+            createButton('🎧 Soporte', {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3844,7 +3850,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(t(lang, 'support').toUpperCase(), {
+            createButton('🎧 Soporte', {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3867,7 +3873,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     {
       reply_markup: {
         inline_keyboard: [[
-          createButton(t(lang, 'support').toUpperCase(), {
+          createButton('🎧 Soporte', {
             callback_data: 'show_support',
             style: 'success'
           })
@@ -3904,8 +3910,8 @@ bot.action('shop_profile', async (ctx) => {
   await ctx.reply(text, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
-      [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
-      [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
+      [createButton('💰 Recargar saldo', { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
+      [createButton('📦 Mis órdenes', { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
       [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
     ] },
   });
