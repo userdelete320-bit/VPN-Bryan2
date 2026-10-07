@@ -3048,27 +3048,27 @@ function buildShopMenuKeyboard(lang) {
   return {
     inline_keyboard: [
       [
-        createButton(`🛍️ ${t(lang, 'products').toUpperCase()}`, {
+        createButton(t(lang, 'products').toUpperCase(), {
           callback_data: 'shop_products:0',
           style: 'primary'
         }),
-        createButton(`👤 ${t(lang, 'profile').toUpperCase()}`, {
+        createButton(t(lang, 'profile').toUpperCase(), {
           callback_data: 'shop_profile',
           style: 'primary'
         }),
       ],
       [
-        createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, {
+        createButton(t(lang, 'topup').toUpperCase(), {
           callback_data: 'shop_topup',
           style: 'primary'
         }),
-        createButton(`📦 ${t(lang, 'orders').toUpperCase()}`, {
+        createButton(t(lang, 'orders').toUpperCase(), {
           callback_data: 'shop_orders',
           style: 'primary'
         }),
       ],
       [
-        createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
+        createButton(t(lang, 'support').toUpperCase(), {
           callback_data: 'show_support',
           style: 'success'
         }),
@@ -3097,7 +3097,7 @@ bot.action('shop_menu', async (ctx) => {
 });
 
 // Primer nivel: familias/marcas.
-bot.action(/^shop_products:(\d+)$/, async (ctx) => {
+bot.action(/^shop_products(?:_page)?:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
@@ -3145,7 +3145,7 @@ bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   if (safePage > 0) {
     navRow.push(shopArrowButton(
       'ATRÁS',
-      `shop_products:${safePage - 1}`,
+      `shop_products_page:${safePage - 1}`,
       SHOP_ARROW_EMOJIS.left,
       'primary'
     ));
@@ -3153,7 +3153,7 @@ bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   if (safePage < totalPages - 1) {
     navRow.push(shopArrowButton(
       'ADELANTE',
-      `shop_products:${safePage + 1}`,
+      `shop_products_page:${safePage + 1}`,
       SHOP_ARROW_EMOJIS.right,
       'primary'
     ));
@@ -3515,7 +3515,7 @@ async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
     ]);
   } else {
     buttons.push([
-      createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, {
+      createButton(t(lang, 'topup').toUpperCase(), {
         callback_data: 'shop_topup',
         style: 'primary'
       }),
@@ -3676,7 +3676,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, {
+            createButton(t(lang, 'topup').toUpperCase(), {
               callback_data: 'shop_topup',
               style: 'primary'
             })
@@ -3784,7 +3784,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
+            createButton(t(lang, 'support').toUpperCase(), {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3809,7 +3809,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
+            createButton(t(lang, 'support').toUpperCase(), {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3832,7 +3832,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     {
       reply_markup: {
         inline_keyboard: [[
-          createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
+          createButton(t(lang, 'support').toUpperCase(), {
             callback_data: 'show_support',
             style: 'success'
           })
@@ -3869,8 +3869,8 @@ bot.action('shop_profile', async (ctx) => {
   await ctx.reply(text, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
-      [createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
-      [createButton(`📦 ${t(lang, 'orders').toUpperCase()}`, { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
+      [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
+      [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
       [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
     ] },
   });
