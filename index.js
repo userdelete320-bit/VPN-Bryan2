@@ -3097,11 +3097,10 @@ bot.action('shop_menu', async (ctx) => {
 });
 
 // Primer nivel: familias/marcas.
-bot.action(/^shop_products(?:_page)?:(\d+)$/, async (ctx) => {
-  await ctx.answerCbQuery();
+async function renderShopProductFamilies(ctx, requestedPage) {
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
-  const page = Math.max(0, parseInt(ctx.match[1], 10) || 0);
+  const page = Math.max(0, Number.parseInt(requestedPage, 10) || 0);
 
   let products = [];
   try { products = await db.getActiveShopProducts(); } catch (e) {}
@@ -3121,12 +3120,15 @@ bot.action(/^shop_products(?:_page)?:(\d+)$/, async (ctx) => {
   }
 
   const groups = groupShopProducts(products);
-  const totalPages = Math.ceil(groups.length / SHOP_PAGE_SIZE) || 1;
-  const safePage = Math.min(page, totalPages - 1);
-  const pageItems = groups.slice(
-    safePage * SHOP_PAGE_SIZE,
-    (safePage + 1) * SHOP_PAGE_SIZE
-  );
+
+  // La última página NO necesita tener 10 categorías. Si quedan 1-9,
+  // siguen formando una página válida. El número de páginas depende
+  // únicamente de la cantidad real de categorías/familias.
+  const totalPages = Math.max(1, Math.ceil(groups.length / SHOP_PAGE_SIZE));
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const start = safePage * SHOP_PAGE_SIZE;
+  const end = Math.min(start + SHOP_PAGE_SIZE, groups.length);
+  const pageItems = groups.slice(start, end);
 
   const buttons = pageItems.map(([family, items]) => {
     const maxPrice = Math.max(...items.map(p => Number(p.final_price_usd || 0)));
@@ -3183,6 +3185,18 @@ bot.action(/^shop_products(?:_page)?:(\d+)$/, async (ctx) => {
       reply_markup: { inline_keyboard: buttons }
     });
   }
+}
+
+// Ruta inicial y ruta exclusiva de paginación. Se mantienen separadas
+// para evitar cualquier ambigüedad al procesar ADELANTE/ATRÁS.
+bot.action(/^shop_products:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await renderShopProductFamilies(ctx, ctx.match[1]);
+});
+
+bot.action(/^shop_products_page:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await renderShopProductFamilies(ctx, ctx.match[1]);
 });
 
 // Segundo nivel: variantes de una familia.
