@@ -19,6 +19,7 @@ const { syncShopCatalog } = require('./shop_sync');
 const qamifyConnector = require('./qamify_connector');
 const ggsomaConnector = require('./ggsoma_connector');
 const warzoneConnector = require('./warzone_connector');
+const digitalcoreConnector = require('./digitalcore_connector');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
@@ -2655,7 +2656,7 @@ app.get('/api/upgrade-options/:telegramId', async (req, res) => {
 
 app.post('/api/refund-request', upload.single('refundProof'), async (req, res) => {
   try {
-    const { telegramId, paymentId, motivo, detalles, refundDestination } = req.body;
+    const { telegramId, paymentId, motivo, detalles, planName, refundDestination } = req.body;
 
     if (!telegramId || !paymentId || !motivo || !refundDestination) {
       if (req.file?.path) fs.unlink(req.file.path, () => {});
@@ -2683,11 +2684,6 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
     const username = user?.username ? `@${user.username}` : 'Sin usuario';
     const firstName = user?.first_name || 'Usuario';
 
-    // El nombre del producto/configuración debe salir del pago registrado en BD,
-    // no de un nombre enviado por el frontend, que puede estar desactualizado.
-    const planName = getPlanName(payment.plan);
-    const configurationName = payment.config_file || planName;
-
     let proofUrl = null;
     if (req.file) {
       try {
@@ -2702,7 +2698,7 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
       status: 'refund_pending',
       refund_motivo: motivo,
       refund_detalles: detalles || '',
-      refund_plan_name: planName,
+      refund_plan_name: planName || payment.plan,
       refund_requested_at: new Date().toISOString(),
       refund_destination: refundDestination,
       refund_proof_url: proofUrl || null
@@ -2712,10 +2708,10 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
       `👤 *Usuario:* ${firstName}\n` +
       `📱 *Telegram:* ${username}\n` +
       `🆔 *ID:* ${telegramId}\n` +
-      `📋 *Plan:* ${planName}\n` +
-      `🗂️ *Configuración entregada:* ${configurationName}\n` +
+      `📋 *Plan:* ${planName || payment.plan}\n` +
       `💳 *Método de pago:* ${payment.method}\n` +
       `🔖 *ID de pago:* \`${paymentId}\`\n` +
+      `📁 *Archivo entregado:* ${payment.config_file || 'No registrado'}\n` +
       `📌 *Motivo:* ${REFUND_MOTIVOS[motivo] || motivo}\n` +
       `💬 *Detalles:* ${detalles || 'Sin detalles adicionales'}\n` +
       `💰 *Destino del reembolso:* ${refundDestination || 'No especificado'}\n` +
@@ -2744,7 +2740,7 @@ app.post('/api/refund-request', upload.single('refundProof'), async (req, res) =
     try {
       await bot.telegram.sendMessage(telegramId,
         `✅ <b>Solicitud de reembolso recibida</b>\n\n` +
-        `<b>Plan:</b> ${planName}\n` +
+        `<b>Plan:</b> ${planName || payment.plan}\n` +
         `<b>Motivo:</b> ${REFUND_MOTIVOS[motivo] || motivo}\n` +
         `\nUn administrador revisará tu caso en las próximas 1–24 horas y te contactará por este chat.`,
         { parse_mode: 'HTML' }
@@ -3729,6 +3725,11 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
         serviceId: product.external_id,
         qty
       });
+    } else if (product.source === 'digitalcore') {
+      result = await digitalcoreConnector.createOrder({
+        productId: product.external_id,
+        qty
+      });
     } else {
       result = {
         success: false,
@@ -4181,15 +4182,17 @@ bot.action('shop_admin_api_status', async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.reply('🔌 Consultando ambas APIs...');
 
-  let qamifyLine, ggsomaLine, warzoneLine;
+  let qamifyLine, ggsomaLine, warzoneLine, digitalcoreLine;
   try { const bal = await qamifyConnector.getBalance(); qamifyLine = `✅ Qamify — saldo: $${bal.toFixed(2)}`; }
   catch (e) { qamifyLine = `❌ Qamify — no se pudo consultar (${e.message})`; }
   try { const bal = await ggsomaConnector.getBalance(); ggsomaLine = `✅ GGSoma — saldo: $${bal.toFixed(2)}`; }
   catch (e) { ggsomaLine = `❌ GGSoma — no se pudo consultar (${e.message})`; }
   try { const bal = await warzoneConnector.getBalance(); warzoneLine = `✅ Warzone — saldo: $${bal.toFixed(2)}`; }
   catch (e) { warzoneLine = `❌ Warzone — no se pudo consultar (${e.message})`; }
+  try { const bal = await digitalcoreConnector.getBalance(); digitalcoreLine = `✅ DigitalCore — saldo: $${bal.toFixed(2)}`; }
+  catch (e) { digitalcoreLine = `❌ DigitalCore — no se pudo consultar (${e.message})`; }
 
-  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}\n${warzoneLine}`, {
+  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}\n${warzoneLine}\n${digitalcoreLine}`, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] },
   });
@@ -5100,6 +5103,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     if (!process.env.QAMIFY_API_KEY) console.warn('⚠️ QAMIFY_API_KEY no configurada — el catálogo de Qamify no se sincronizará.');
     if (!process.env.GGSOMA_API_KEY) console.warn('⚠️ GGSOMA_API_KEY no configurada — el catálogo de GGSoma no se sincronizará.');
     if (!process.env.WARZONE_API_KEY) console.warn('⚠️ WARZONE_API_KEY no configurada — el catálogo de Warzone no se sincronizará.');
+    if (!process.env.DIGITALCORE_API_KEY) console.warn('⚠️ DIGITALCORE_API_KEY no configurada — el catálogo de DigitalCore no se sincronizará.');
 
     // Sincronización de Qamify + GGSoma (existente).
     syncShopCatalog(db)

@@ -7,11 +7,12 @@
 
 const qamify = require('./qamify_connector');
 const ggsoma = require('./ggsoma_connector');
+const digitalcore = require('./digitalcore_connector');
 
 const MARKUP_USD = 3; // aplica igual para Qamify y GGSoma, confirmado por el negocio
 
 async function syncShopCatalog(db) {
-  const results = { qamify: { ok: false, count: 0 }, ggsoma: { ok: false, count: 0 } };
+  const results = { qamify: { ok: false, count: 0 }, ggsoma: { ok: false, count: 0 }, digitalcore: { ok: false, count: 0 } };
 
   let qamifyProducts = [];
   try {
@@ -31,11 +32,20 @@ async function syncShopCatalog(db) {
     console.error('❌ Error sincronizando catálogo de GGSoma:', err.message);
   }
 
-  const allProducts = [...qamifyProducts, ...ggsomaProducts];
+  let digitalcoreProducts = [];
+  try {
+    digitalcoreProducts = await digitalcore.getProducts();
+    results.digitalcore = { ok: true, count: digitalcoreProducts.length };
+  } catch (err) {
+    results.digitalcore = { ok: false, error: err.message };
+    console.error('❌ Error sincronizando catálogo de DigitalCore:', err.message);
+  }
+
+  const allProducts = [...qamifyProducts, ...ggsomaProducts, ...digitalcoreProducts];
 
   // Si AMBAS APIs fallaron, no se toca nada (para no desactivar todo el catálogo
   // por un problema de red pasajero)
-  if (allProducts.length === 0 && !results.qamify.ok && !results.ggsoma.ok) {
+  if (allProducts.length === 0 && !results.qamify.ok && !results.ggsoma.ok && !results.digitalcore.ok) {
     return { ...results, skipped: true, reason: 'ambas APIs fallaron, catálogo no modificado' };
   }
 
@@ -61,6 +71,7 @@ async function syncShopCatalog(db) {
   // vender algo descontinuado, pero conserva el historial de órdenes pasadas.
   if (results.qamify.ok) await db.deactivateMissingShopProducts('qamify', qamifyProducts.map(p => p.external_id));
   if (results.ggsoma.ok) await db.deactivateMissingShopProducts('ggsoma', ggsomaProducts.map(p => p.external_id));
+  if (results.digitalcore.ok) await db.deactivateMissingShopProducts('digitalcore', digitalcoreProducts.map(p => p.external_id));
 
   return { ...results, total_synced: allProducts.length };
 }
