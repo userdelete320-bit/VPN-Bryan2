@@ -19,7 +19,6 @@ const { syncShopCatalog } = require('./shop_sync');
 const qamifyConnector = require('./qamify_connector');
 const ggsomaConnector = require('./ggsoma_connector');
 const warzoneConnector = require('./warzone_connector');
-const digitalcoreConnector = require('./digitalcore_connector');
 
 // ==================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
@@ -3049,27 +3048,27 @@ function buildShopMenuKeyboard(lang) {
   return {
     inline_keyboard: [
       [
-        createButton(t(lang, 'products').toUpperCase(), {
+        createButton(`🛍️ ${t(lang, 'products').toUpperCase()}`, {
           callback_data: 'shop_products:0',
           style: 'primary'
         }),
-        createButton(t(lang, 'profile').toUpperCase(), {
+        createButton(`👤 ${t(lang, 'profile').toUpperCase()}`, {
           callback_data: 'shop_profile',
           style: 'primary'
         }),
       ],
       [
-        createButton(t(lang, 'topup').toUpperCase(), {
+        createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, {
           callback_data: 'shop_topup',
           style: 'primary'
         }),
-        createButton(t(lang, 'orders').toUpperCase(), {
+        createButton(`📦 ${t(lang, 'orders').toUpperCase()}`, {
           callback_data: 'shop_orders',
           style: 'primary'
         }),
       ],
       [
-        createButton(t(lang, 'support').toUpperCase(), {
+        createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
           callback_data: 'show_support',
           style: 'success'
         }),
@@ -3516,7 +3515,7 @@ async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
     ]);
   } else {
     buttons.push([
-      createButton(t(lang, 'topup').toUpperCase(), {
+      createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, {
         callback_data: 'shop_topup',
         style: 'primary'
       }),
@@ -3677,7 +3676,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(t(lang, 'topup').toUpperCase(), {
+            createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, {
               callback_data: 'shop_topup',
               style: 'primary'
             })
@@ -3723,11 +3722,6 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     } else if (product.source === 'warzone') {
       result = await warzoneConnector.createOrder({
         serviceId: product.external_id,
-        qty
-      });
-    } else if (product.source === 'digitalcore') {
-      result = await digitalcoreConnector.createOrder({
-        productId: product.external_id,
         qty
       });
     } else {
@@ -3790,7 +3784,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(t(lang, 'support').toUpperCase(), {
+            createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3815,7 +3809,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton(t(lang, 'support').toUpperCase(), {
+            createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3838,7 +3832,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     {
       reply_markup: {
         inline_keyboard: [[
-          createButton(t(lang, 'support').toUpperCase(), {
+          createButton(`🎧 ${t(lang, 'support').toUpperCase()}`, {
             callback_data: 'show_support',
             style: 'success'
           })
@@ -3875,8 +3869,8 @@ bot.action('shop_profile', async (ctx) => {
   await ctx.reply(text, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
-      [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
-      [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
+      [createButton(`💰 ${t(lang, 'topup').toUpperCase()}`, { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
+      [createButton(`📦 ${t(lang, 'orders').toUpperCase()}`, { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
       [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
     ] },
   });
@@ -4182,17 +4176,15 @@ bot.action('shop_admin_api_status', async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.reply('🔌 Consultando ambas APIs...');
 
-  let qamifyLine, ggsomaLine, warzoneLine, digitalcoreLine;
+  let qamifyLine, ggsomaLine, warzoneLine;
   try { const bal = await qamifyConnector.getBalance(); qamifyLine = `✅ Qamify — saldo: $${bal.toFixed(2)}`; }
   catch (e) { qamifyLine = `❌ Qamify — no se pudo consultar (${e.message})`; }
   try { const bal = await ggsomaConnector.getBalance(); ggsomaLine = `✅ GGSoma — saldo: $${bal.toFixed(2)}`; }
   catch (e) { ggsomaLine = `❌ GGSoma — no se pudo consultar (${e.message})`; }
   try { const bal = await warzoneConnector.getBalance(); warzoneLine = `✅ Warzone — saldo: $${bal.toFixed(2)}`; }
   catch (e) { warzoneLine = `❌ Warzone — no se pudo consultar (${e.message})`; }
-  try { const bal = await digitalcoreConnector.getBalance(); digitalcoreLine = `✅ DigitalCore — saldo: $${bal.toFixed(2)}`; }
-  catch (e) { digitalcoreLine = `❌ DigitalCore — no se pudo consultar (${e.message})`; }
 
-  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}\n${warzoneLine}\n${digitalcoreLine}`, {
+  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}\n${warzoneLine}`, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] },
   });
@@ -5103,7 +5095,6 @@ app.listen(PORT, '0.0.0.0', async () => {
     if (!process.env.QAMIFY_API_KEY) console.warn('⚠️ QAMIFY_API_KEY no configurada — el catálogo de Qamify no se sincronizará.');
     if (!process.env.GGSOMA_API_KEY) console.warn('⚠️ GGSOMA_API_KEY no configurada — el catálogo de GGSoma no se sincronizará.');
     if (!process.env.WARZONE_API_KEY) console.warn('⚠️ WARZONE_API_KEY no configurada — el catálogo de Warzone no se sincronizará.');
-    if (!process.env.DIGITALCORE_API_KEY) console.warn('⚠️ DIGITALCORE_API_KEY no configurada — el catálogo de DigitalCore no se sincronizará.');
 
     // Sincronización de Qamify + GGSoma (existente).
     syncShopCatalog(db)
