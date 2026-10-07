@@ -347,13 +347,13 @@ const SHOP_EMOJIS = {
 const SHOP_I18N = {
   es: {
     shop_title: 'Tienda',
-    shop_title_button: 'Tienda',
+    shop_title_button: '🛍️ Tienda',
     shop_intro: 'Elige una opción:',
-    products: 'Productos',
-    profile: 'Perfil',
-    topup: 'Recargar saldo',
-    orders: 'Mis órdenes',
-    support: 'Soporte',
+    products: '🛍️ Productos',
+    profile: '👤 Perfil',
+    topup: '💰 Recargar saldo',
+    orders: '📦 Mis órdenes',
+    support: '🎧 Soporte',
     back: 'Volver',
     main_menu: 'Menú principal',
     coming_soon: '🚧 Esta sección estará disponible muy pronto.',
@@ -388,13 +388,13 @@ const SHOP_I18N = {
   },
   en: {
     shop_title: 'Shop',
-    shop_title_button: 'Shop',
+    shop_title_button: '🛍️ Shop',
     shop_intro: 'Choose an option:',
-    products: 'Products',
-    profile: 'Profile',
-    topup: 'Top up balance',
-    orders: 'My orders',
-    support: 'Support',
+    products: '🛍️ Products',
+    profile: '👤 Profile',
+    topup: '💰 Top up balance',
+    orders: '📦 My orders',
+    support: '🎧 Support',
     back: 'Back',
     main_menu: 'Main menu',
     coming_soon: '🚧 This section will be available very soon.',
@@ -3097,15 +3097,34 @@ bot.action('shop_menu', async (ctx) => {
 });
 
 // Primer nivel: familias/marcas.
+// Se conserva un snapshot corto por usuario para que el número de páginas
+// no cambie entre ADELANTE/ATRÁS si una sincronización actualiza el catálogo
+// mientras el usuario está navegando.
+const shopCatalogSessions = new Map();
+const SHOP_CATALOG_SESSION_TTL_MS = 10 * 60 * 1000;
+
+async function getShopCatalogSnapshot(userId, forceRefresh = false) {
+  const now = Date.now();
+  const cached = shopCatalogSessions.get(userId);
+  if (!forceRefresh && cached && (now - cached.createdAt) < SHOP_CATALOG_SESSION_TTL_MS) {
+    return cached.groups;
+  }
+
+  let products = [];
+  try { products = await db.getActiveShopProducts(); } catch (e) {}
+  const groups = groupShopProducts(products);
+  shopCatalogSessions.set(userId, { createdAt: now, groups });
+  return groups;
+}
+
 async function renderShopProductFamilies(ctx, requestedPage) {
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const page = Math.max(0, Number.parseInt(requestedPage, 10) || 0);
 
-  let products = [];
-  try { products = await db.getActiveShopProducts(); } catch (e) {}
+  const groups = await getShopCatalogSnapshot(userId);
 
-  if (!products.length) {
+  if (!groups.length) {
     await ctx.reply(t(lang, 'no_products'), {
       reply_markup: {
         inline_keyboard: [[
@@ -3118,8 +3137,6 @@ async function renderShopProductFamilies(ctx, requestedPage) {
     });
     return;
   }
-
-  const groups = groupShopProducts(products);
 
   // La última página NO necesita tener 10 categorías. Si quedan 1-9,
   // siguen formando una página válida. El número de páginas depende
@@ -3191,6 +3208,10 @@ async function renderShopProductFamilies(ctx, requestedPage) {
 // para evitar cualquier ambigüedad al procesar ADELANTE/ATRÁS.
 bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
+  // Al abrir Productos desde el menú se crea/renueva el snapshot.
+  if (String(ctx.match[1]) === '0') {
+    shopCatalogSessions.delete(ctx.from.id.toString());
+  }
   await renderShopProductFamilies(ctx, ctx.match[1]);
 });
 
