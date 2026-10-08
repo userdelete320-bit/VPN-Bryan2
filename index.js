@@ -3200,7 +3200,7 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
   // Para la paginación del catálogo usamos un mensaje nuevo en lugar de
   // depender de editMessageText(). Esto evita que Telegram deje la vista
   // anterior cuando una edición falla o el mensaje original no puede editarse.
-  if (replaceMessage) {
+  if (forceRefresh) {
     try {
       await ctx.deleteMessage();
     } catch (e) {
