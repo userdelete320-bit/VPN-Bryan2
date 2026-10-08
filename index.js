@@ -2950,12 +2950,6 @@ const SHOP_FAMILY_RULES = [
   { label: 'Midjourney', patterns: [/\bmidjourney\b/i] },
   { label: 'Perplexity', patterns: [/\bperplexity\b/i] },
   { label: 'Cursor', patterns: [/\bcursor\b/i] },
-  { label: 'iLovePDF', patterns: [/\bilovepdf\b/i] },
-  { label: 'Lovable', patterns: [/\blovable\b/i] },
-  { label: 'Udemy', patterns: [/\budemy\b/i] },
-  { label: 'Apple Music', patterns: [/\bapple\s+music\b/i] },
-  { label: 'LinkedIn', patterns: [/\blinkedin\b/i] },
-  { label: 'Proton', patterns: [/\bproton\b/i] },
 ];
 
 function getShopFamily(product) {
@@ -2972,20 +2966,17 @@ function getShopFamily(product) {
 
   // Fallback: para productos que no pertenezcan a una familia conocida,
   // usamos las primeras palabras significativas del nombre.
-  const fallbackWords = String(product.name || 'Otros')
+  const fallback = String(product.name || 'Otros')
     .replace(/[\[\](){}|]/g, ' ')
-    .replace(/\b(pro|plus|premium|basic|mensual|monthly|annual|anual|month|months|year|years)\b/gi, ' ')
+    .replace(/\b(pro|plus|premium|basic|basic|mensual|monthly|annual|anual|month|months|year|years)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .split(' ')
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' ');
 
-  // Variantes numéricas como "12M", "100" o "1m" no crean familias nuevas.
-  if (fallbackWords.length > 1 && /^\d+(?:[.,]?\d*)?[a-z]*$/i.test(fallbackWords[1])) {
-    return fallbackWords[0] || 'Otros';
-  }
-
-  return fallbackWords.slice(0, 2).join(' ') || 'Otros';
+  return fallback || 'Otros';
 }
 
 function groupShopProducts(products) {
@@ -3057,27 +3048,27 @@ function buildShopMenuKeyboard(lang) {
   return {
     inline_keyboard: [
       [
-        createButton('🛍️ Productos', {
+        createButton('🛍️ PRODUCTOS', {
           callback_data: 'shop_products:0',
           style: 'primary'
         }),
-        createButton('👤 Perfil', {
+        createButton('👤 PERFIL', {
           callback_data: 'shop_profile',
           style: 'primary'
         }),
       ],
       [
-        createButton('💰 Recargar saldo', {
+        createButton('💰 RECARGAR SALDO', {
           callback_data: 'shop_topup',
           style: 'primary'
         }),
-        createButton('📦 Mis órdenes', {
+        createButton('📦 MIS ÓRDENES', {
           callback_data: 'shop_orders',
           style: 'primary'
         }),
       ],
       [
-        createButton('🎧 Soporte', {
+        createButton('🎧 SOPORTE', {
           callback_data: 'show_support',
           style: 'success'
         }),
@@ -3106,24 +3097,24 @@ bot.action('shop_menu', async (ctx) => {
 });
 
 // Primer nivel: familias/marcas.
-// El catálogo se congela unos minutos por usuario para que el total de páginas
-// no cambie mientras se navega con ATRÁS/ADELANTE.
-const shopCatalogSessions = new Map();
-const SHOP_CATALOG_SESSION_TTL_MS = 10 * 60 * 1000;
+// Snapshot por usuario para que una sincronización de APIs no cambie el número
+// de páginas mientras el usuario navega por el catálogo.
+const SHOP_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
+const shopCatalogCache = new Map();
 
-async function getShopCatalogSnapshot(userId, forceRefresh = false) {
-  const now = Date.now();
-  const cached = shopCatalogSessions.get(userId);
-  if (!forceRefresh && cached && (now - cached.createdAt) < SHOP_CATALOG_SESSION_TTL_MS) {
-    return cached.groups;
-  }
+async function getShopGroupsForUser(userId, forceRefresh = false) {
+  const key = String(userId);
+  const cached = shopCatalogCache.get(key);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached.groups;
 
-  let products = [];
-  try { products = await db.getActiveShopProducts(); } catch (e) {}
+  const products = await db.getActiveShopProducts();
   const groups = groupShopProducts(products);
-  const totalPages = Math.max(1, Math.ceil(groups.length / SHOP_PAGE_SIZE));
-  console.log(`🛍️ Catálogo tienda: ${products.length} productos activos → ${groups.length} categorías → ${totalPages} páginas.`);
-  shopCatalogSessions.set(userId, { createdAt: now, groups });
+  shopCatalogCache.set(key, { groups, expiresAt: Date.now() + SHOP_CATALOG_CACHE_TTL_MS });
+
+  console.log(
+    `🛍️ Catálogo usuario ${key}: ${products.length} productos activos → ` +
+    `${groups.length} categorías → ${Math.max(1, Math.ceil(groups.length / SHOP_PAGE_SIZE))} páginas.`
+  );
   return groups;
 }
 
@@ -3132,7 +3123,12 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
   const lang = await getUserLang(userId);
   const page = Math.max(0, Number.parseInt(requestedPage, 10) || 0);
 
-  const groups = await getShopCatalogSnapshot(userId, forceRefresh);
+  let groups = [];
+  try {
+    groups = await getShopGroupsForUser(userId, forceRefresh);
+  } catch (e) {
+    console.error(`❌ Error cargando catálogo para ${userId}:`, e.message);
+  }
 
   if (!groups.length) {
     await ctx.reply(t(lang, 'no_products'), {
@@ -3201,12 +3197,37 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
     `Página ${safePage + 1}/${totalPages}\n\n` +
     `Selecciona una categoría:`;
 
+  // Para la paginación del catálogo usamos un mensaje nuevo en lugar de
+  // depender de editMessageText(). Esto evita que Telegram deje la vista
+  // anterior cuando una edición falla o el mensaje original no puede editarse.
+  if (replaceMessage) {
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      // Si no se puede borrar el mensaje anterior, continuamos igualmente.
+      console.warn('⚠️ No se pudo borrar el mensaje anterior de la tienda:', e.message);
+    }
+
+    await ctx.reply(header, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }
+    });
+
+    console.log(
+      `🛍️ Paginación tienda: solicitado=${page + 1}/${totalPages}, ` +
+      `categorías=${groups.length}, mostradas=${pageItems.length}, ` +
+      `rango=${start}-${end - 1}`
+    );
+    return;
+  }
+
   try {
     await ctx.editMessageText(header, {
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: buttons }
     });
   } catch (e) {
+    console.warn('⚠️ No se pudo editar el mensaje de productos:', e.message);
     await ctx.reply(header, {
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: buttons }
@@ -3218,12 +3239,17 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
 // para evitar cualquier ambigüedad al procesar ADELANTE/ATRÁS.
 bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
+  // Al entrar a Productos desde el menú se toma un catálogo nuevo.
   await renderShopProductFamilies(ctx, ctx.match[1], true);
 });
 
 bot.action(/^shop_products_page:(\d+)$/, async (ctx) => {
-  await ctx.answerCbQuery();
-  await renderShopProductFamilies(ctx, ctx.match[1]);
+  const requested = Number.parseInt(ctx.match[1], 10) || 0;
+  console.log(`🛍️ Callback paginación recibido: página solicitada=${requested + 1}`);
+  await ctx.answerCbQuery('Cargando página...');
+  // Nunca se vuelve a consultar la BD durante ATRÁS/ADELANTE: se usa el
+  // mismo snapshot con el que se calculó el total de páginas.
+  await renderShopProductFamilies(ctx, requested, false);
 });
 
 // Segundo nivel: variantes de una familia.
@@ -3556,7 +3582,7 @@ async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
     ]);
   } else {
     buttons.push([
-      createButton('💰 Recargar saldo', {
+      createButton(t(lang, 'topup').toUpperCase(), {
         callback_data: 'shop_topup',
         style: 'primary'
       }),
@@ -3717,7 +3743,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton('💰 Recargar saldo', {
+            createButton(t(lang, 'topup').toUpperCase(), {
               callback_data: 'shop_topup',
               style: 'primary'
             })
@@ -3825,7 +3851,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton('🎧 Soporte', {
+            createButton(t(lang, 'support').toUpperCase(), {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3850,7 +3876,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       {
         reply_markup: {
           inline_keyboard: [[
-            createButton('🎧 Soporte', {
+            createButton(t(lang, 'support').toUpperCase(), {
               callback_data: 'show_support',
               style: 'success'
             })
@@ -3873,7 +3899,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     {
       reply_markup: {
         inline_keyboard: [[
-          createButton('🎧 Soporte', {
+          createButton(t(lang, 'support').toUpperCase(), {
             callback_data: 'show_support',
             style: 'success'
           })
@@ -3910,8 +3936,8 @@ bot.action('shop_profile', async (ctx) => {
   await ctx.reply(text, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
-      [createButton('💰 Recargar saldo', { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
-      [createButton('📦 Mis órdenes', { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
+      [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
+      [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
       [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
     ] },
   });
@@ -5137,15 +5163,21 @@ app.listen(PORT, '0.0.0.0', async () => {
     if (!process.env.GGSOMA_API_KEY) console.warn('⚠️ GGSOMA_API_KEY no configurada — el catálogo de GGSoma no se sincronizará.');
     if (!process.env.WARZONE_API_KEY) console.warn('⚠️ WARZONE_API_KEY no configurada — el catálogo de Warzone no se sincronizará.');
 
-    // Sincronización de Qamify + GGSoma (existente).
-    syncShopCatalog(db)
-      .then(r => console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(r)))
-      .catch(e => console.error('❌ Error en sincronización inicial de la tienda:', e.message));
-
-    // Warzone se sincroniza por separado para no tocar la estructura de las otras APIs.
-    warzoneConnector.syncCatalog(db)
-      .then(r => console.log('🛍️ Sincronización inicial Warzone:', JSON.stringify(r)))
-      .catch(e => console.error('❌ Error en sincronización inicial Warzone:', e.message));
+    // Sincronización inicial de todas las fuentes. Warzone se mantiene separado
+    // internamente, pero su resultado se muestra siempre en el log.
+    Promise.allSettled([syncShopCatalog(db), warzoneConnector.syncCatalog(db)])
+      .then(([mainResult, warzoneResult]) => {
+        if (mainResult.status === 'fulfilled') {
+          console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(mainResult.value));
+        } else {
+          console.error('❌ Error en sincronización inicial de la tienda:', mainResult.reason?.message || mainResult.reason);
+        }
+        if (warzoneResult.status === 'fulfilled') {
+          console.log('🛍️ Sincronización inicial Warzone:', JSON.stringify(warzoneResult.value));
+        } else {
+          console.error('❌ Error en sincronización inicial Warzone:', warzoneResult.reason?.message || warzoneResult.reason);
+        }
+      });
 
     setInterval(() => {
       syncShopCatalog(db)
