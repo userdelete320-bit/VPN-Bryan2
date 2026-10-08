@@ -3050,26 +3050,31 @@ function buildShopMenuKeyboard(lang) {
       [
         createButton(t(lang, 'products').toUpperCase(), {
           callback_data: 'shop_products:0',
+          icon_custom_emoji_id: '5920332557466997677',
           style: 'primary'
         }),
         createButton(t(lang, 'profile').toUpperCase(), {
           callback_data: 'shop_profile',
+          icon_custom_emoji_id: SHOP_EMOJIS.perfil,
           style: 'primary'
         }),
       ],
       [
         createButton(t(lang, 'topup').toUpperCase(), {
           callback_data: 'shop_topup',
+          icon_custom_emoji_id: SHOP_EMOJIS.recargar,
           style: 'primary'
         }),
         createButton(t(lang, 'orders').toUpperCase(), {
           callback_data: 'shop_orders',
+          icon_custom_emoji_id: SHOP_EMOJIS.ordenes,
           style: 'primary'
         }),
       ],
       [
         createButton(t(lang, 'support').toUpperCase(), {
           callback_data: 'show_support',
+          icon_custom_emoji_id: SHOP_EMOJIS.soporte,
           style: 'success'
         }),
         createButton(t(lang, 'main_menu').toUpperCase(), {
@@ -3130,14 +3135,14 @@ async function renderShopProductFamilies(ctx, requestedPage) {
   const end = Math.min(start + SHOP_PAGE_SIZE, groups.length);
   const pageItems = groups.slice(start, end);
 
-  const buttons = pageItems.map(([family, items], itemIndex) => {
+  const buttons = pageItems.map(([family, items]) => {
     const maxPrice = Math.max(...items.map(p => Number(p.final_price_usd || 0)));
     const soldOutCount = items.filter(isShopSoldOut).length;
     const suffix = soldOutCount === items.length ? ' · AGOTADO' : ` · ${items.length} opciones`;
     return [createButton(
       `📦 ${family} · hasta $${maxPrice.toFixed(2)}${suffix}`,
       {
-        callback_data: `shop_family:${start + itemIndex}:0`,
+        callback_data: `shop_family:${encodeURIComponent(family)}:0`,
         style: soldOutCount === items.length ? 'danger' : 'primary'
       }
     )];
@@ -3200,19 +3205,17 @@ bot.action(/^shop_products_page:(\d+)$/, async (ctx) => {
 });
 
 // Segundo nivel: variantes de una familia.
-bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
+bot.action(/^shop_family:([^:]+):(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
-  const familyIndex = Math.max(0, parseInt(ctx.match[1], 10) || 0);
+  const family = decodeURIComponent(ctx.match[1]);
   const page = Math.max(0, parseInt(ctx.match[2], 10) || 0);
 
   let products = [];
   try { products = await db.getActiveShopProducts(); } catch (e) {}
 
-  const groups = groupShopProducts(products);
-  const family = groups[familyIndex]?.[0] || '';
-  const items = groups[familyIndex]?.[1] || [];
+  const items = groupShopProducts(products).find(([name]) => name === family)?.[1] || [];
 
   if (!items.length) {
     await ctx.reply(t(lang, 'no_products'));
@@ -3243,7 +3246,7 @@ bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
   if (safePage > 0) {
     navRow.push(shopArrowButton(
       'ATRÁS',
-      `shop_family:${familyIndex}:${safePage - 1}`,
+      `shop_family:${encodeURIComponent(family)}:${safePage - 1}`,
       SHOP_ARROW_EMOJIS.left,
       'primary'
     ));
@@ -3251,7 +3254,7 @@ bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
   if (safePage < totalPages - 1) {
     navRow.push(shopArrowButton(
       'ADELANTE',
-      `shop_family:${familyIndex}:${safePage + 1}`,
+      `shop_family:${encodeURIComponent(family)}:${safePage + 1}`,
       SHOP_ARROW_EMOJIS.right,
       'primary'
     ));
