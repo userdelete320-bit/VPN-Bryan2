@@ -3048,27 +3048,27 @@ function buildShopMenuKeyboard(lang) {
   return {
     inline_keyboard: [
       [
-        createButton('🛍️ PRODUCTOS', {
+        createButton(t(lang, 'products').toUpperCase(), {
           callback_data: 'shop_products:0',
           style: 'primary'
         }),
-        createButton('👤 PERFIL', {
+        createButton(t(lang, 'profile').toUpperCase(), {
           callback_data: 'shop_profile',
           style: 'primary'
         }),
       ],
       [
-        createButton('💰 RECARGAR SALDO', {
+        createButton(t(lang, 'topup').toUpperCase(), {
           callback_data: 'shop_topup',
           style: 'primary'
         }),
-        createButton('📦 MIS ÓRDENES', {
+        createButton(t(lang, 'orders').toUpperCase(), {
           callback_data: 'shop_orders',
           style: 'primary'
         }),
       ],
       [
-        createButton('🎧 SOPORTE', {
+        createButton(t(lang, 'support').toUpperCase(), {
           callback_data: 'show_support',
           style: 'success'
         }),
@@ -3097,40 +3097,15 @@ bot.action('shop_menu', async (ctx) => {
 });
 
 // Primer nivel: familias/marcas.
-// Snapshot por usuario para que una sincronización de APIs no cambie el número
-// de páginas mientras el usuario navega por el catálogo.
-const SHOP_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
-const shopCatalogCache = new Map();
-
-async function getShopGroupsForUser(userId, forceRefresh = false) {
-  const key = String(userId);
-  const cached = shopCatalogCache.get(key);
-  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached.groups;
-
-  const products = await db.getActiveShopProducts();
-  const groups = groupShopProducts(products);
-  shopCatalogCache.set(key, { groups, expiresAt: Date.now() + SHOP_CATALOG_CACHE_TTL_MS });
-
-  console.log(
-    `🛍️ Catálogo usuario ${key}: ${products.length} productos activos → ` +
-    `${groups.length} categorías → ${Math.max(1, Math.ceil(groups.length / SHOP_PAGE_SIZE))} páginas.`
-  );
-  return groups;
-}
-
-async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = false) {
+async function renderShopProductFamilies(ctx, requestedPage) {
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   const page = Math.max(0, Number.parseInt(requestedPage, 10) || 0);
 
-  let groups = [];
-  try {
-    groups = await getShopGroupsForUser(userId, forceRefresh);
-  } catch (e) {
-    console.error(`❌ Error cargando catálogo para ${userId}:`, e.message);
-  }
+  let products = [];
+  try { products = await db.getActiveShopProducts(); } catch (e) {}
 
-  if (!groups.length) {
+  if (!products.length) {
     await ctx.reply(t(lang, 'no_products'), {
       reply_markup: {
         inline_keyboard: [[
@@ -3144,6 +3119,8 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
     return;
   }
 
+  const groups = groupShopProducts(products);
+
   // La última página NO necesita tener 10 categorías. Si quedan 1-9,
   // siguen formando una página válida. El número de páginas depende
   // únicamente de la cantidad real de categorías/familias.
@@ -3153,14 +3130,14 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
   const end = Math.min(start + SHOP_PAGE_SIZE, groups.length);
   const pageItems = groups.slice(start, end);
 
-  const buttons = pageItems.map(([family, items]) => {
+  const buttons = pageItems.map(([family, items], itemIndex) => {
     const maxPrice = Math.max(...items.map(p => Number(p.final_price_usd || 0)));
     const soldOutCount = items.filter(isShopSoldOut).length;
     const suffix = soldOutCount === items.length ? ' · AGOTADO' : ` · ${items.length} opciones`;
     return [createButton(
       `📦 ${family} · hasta $${maxPrice.toFixed(2)}${suffix}`,
       {
-        callback_data: `shop_family:${encodeURIComponent(family)}:0`,
+        callback_data: `shop_family:${start + itemIndex}:0`,
         style: soldOutCount === items.length ? 'danger' : 'primary'
       }
     )];
@@ -3197,37 +3174,12 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
     `Página ${safePage + 1}/${totalPages}\n\n` +
     `Selecciona una categoría:`;
 
-  // Para la paginación del catálogo usamos un mensaje nuevo en lugar de
-  // depender de editMessageText(). Esto evita que Telegram deje la vista
-  // anterior cuando una edición falla o el mensaje original no puede editarse.
-  if (forceRefresh) {
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // Si no se puede borrar el mensaje anterior, continuamos igualmente.
-      console.warn('⚠️ No se pudo borrar el mensaje anterior de la tienda:', e.message);
-    }
-
-    await ctx.reply(header, {
-      parse_mode: 'HTML',
-      reply_markup: { inline_keyboard: buttons }
-    });
-
-    console.log(
-      `🛍️ Paginación tienda: solicitado=${page + 1}/${totalPages}, ` +
-      `categorías=${groups.length}, mostradas=${pageItems.length}, ` +
-      `rango=${start}-${end - 1}`
-    );
-    return;
-  }
-
   try {
     await ctx.editMessageText(header, {
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: buttons }
     });
   } catch (e) {
-    console.warn('⚠️ No se pudo editar el mensaje de productos:', e.message);
     await ctx.reply(header, {
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: buttons }
@@ -3239,31 +3191,28 @@ async function renderShopProductFamilies(ctx, requestedPage, forceRefresh = fals
 // para evitar cualquier ambigüedad al procesar ADELANTE/ATRÁS.
 bot.action(/^shop_products:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
-  // Al entrar a Productos desde el menú se toma un catálogo nuevo.
-  await renderShopProductFamilies(ctx, ctx.match[1], true);
+  await renderShopProductFamilies(ctx, ctx.match[1]);
 });
 
 bot.action(/^shop_products_page:(\d+)$/, async (ctx) => {
-  const requested = Number.parseInt(ctx.match[1], 10) || 0;
-  console.log(`🛍️ Callback paginación recibido: página solicitada=${requested + 1}`);
-  await ctx.answerCbQuery('Cargando página...');
-  // Nunca se vuelve a consultar la BD durante ATRÁS/ADELANTE: se usa el
-  // mismo snapshot con el que se calculó el total de páginas.
-  await renderShopProductFamilies(ctx, requested, false);
+  await ctx.answerCbQuery();
+  await renderShopProductFamilies(ctx, ctx.match[1]);
 });
 
 // Segundo nivel: variantes de una familia.
-bot.action(/^shop_family:([^:]+):(\d+)$/, async (ctx) => {
+bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
-  const family = decodeURIComponent(ctx.match[1]);
+  const familyIndex = Math.max(0, parseInt(ctx.match[1], 10) || 0);
   const page = Math.max(0, parseInt(ctx.match[2], 10) || 0);
 
   let products = [];
   try { products = await db.getActiveShopProducts(); } catch (e) {}
 
-  const items = groupShopProducts(products).find(([name]) => name === family)?.[1] || [];
+  const groups = groupShopProducts(products);
+  const family = groups[familyIndex]?.[0] || '';
+  const items = groups[familyIndex]?.[1] || [];
 
   if (!items.length) {
     await ctx.reply(t(lang, 'no_products'));
@@ -3294,7 +3243,7 @@ bot.action(/^shop_family:([^:]+):(\d+)$/, async (ctx) => {
   if (safePage > 0) {
     navRow.push(shopArrowButton(
       'ATRÁS',
-      `shop_family:${encodeURIComponent(family)}:${safePage - 1}`,
+      `shop_family:${familyIndex}:${safePage - 1}`,
       SHOP_ARROW_EMOJIS.left,
       'primary'
     ));
@@ -3302,7 +3251,7 @@ bot.action(/^shop_family:([^:]+):(\d+)$/, async (ctx) => {
   if (safePage < totalPages - 1) {
     navRow.push(shopArrowButton(
       'ADELANTE',
-      `shop_family:${encodeURIComponent(family)}:${safePage + 1}`,
+      `shop_family:${familyIndex}:${safePage + 1}`,
       SHOP_ARROW_EMOJIS.right,
       'primary'
     ));
@@ -5163,21 +5112,15 @@ app.listen(PORT, '0.0.0.0', async () => {
     if (!process.env.GGSOMA_API_KEY) console.warn('⚠️ GGSOMA_API_KEY no configurada — el catálogo de GGSoma no se sincronizará.');
     if (!process.env.WARZONE_API_KEY) console.warn('⚠️ WARZONE_API_KEY no configurada — el catálogo de Warzone no se sincronizará.');
 
-    // Sincronización inicial de todas las fuentes. Warzone se mantiene separado
-    // internamente, pero su resultado se muestra siempre en el log.
-    Promise.allSettled([syncShopCatalog(db), warzoneConnector.syncCatalog(db)])
-      .then(([mainResult, warzoneResult]) => {
-        if (mainResult.status === 'fulfilled') {
-          console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(mainResult.value));
-        } else {
-          console.error('❌ Error en sincronización inicial de la tienda:', mainResult.reason?.message || mainResult.reason);
-        }
-        if (warzoneResult.status === 'fulfilled') {
-          console.log('🛍️ Sincronización inicial Warzone:', JSON.stringify(warzoneResult.value));
-        } else {
-          console.error('❌ Error en sincronización inicial Warzone:', warzoneResult.reason?.message || warzoneResult.reason);
-        }
-      });
+    // Sincronización de Qamify + GGSoma (existente).
+    syncShopCatalog(db)
+      .then(r => console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(r)))
+      .catch(e => console.error('❌ Error en sincronización inicial de la tienda:', e.message));
+
+    // Warzone se sincroniza por separado para no tocar la estructura de las otras APIs.
+    warzoneConnector.syncCatalog(db)
+      .then(r => console.log('🛍️ Sincronización inicial Warzone:', JSON.stringify(r)))
+      .catch(e => console.error('❌ Error en sincronización inicial Warzone:', e.message));
 
     setInterval(() => {
       syncShopCatalog(db)
