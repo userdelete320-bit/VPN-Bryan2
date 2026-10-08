@@ -605,7 +605,7 @@ async function buildMainMenuKeyboard(userId, firstName, esAdmin, isGroup = false
                 : { web_app: { url: plansUrl }, style: 'primary' })
         ],
         [
-            createButton(shopLabel, { callback_data: "shop_menu", style: 'primary' })
+            createButton(shopLabel, { callback_data: "shop_menu", icon_custom_emoji_id: '5920332557466997677', style: 'primary' })
         ],
         [
             createButton("MI PERFIL", { callback_data: "check_status" }),
@@ -3050,7 +3050,7 @@ function buildShopMenuKeyboard(lang) {
       [
         createButton(t(lang, 'products').toUpperCase(), {
           callback_data: 'shop_products:0',
-          icon_custom_emoji_id: '5920332557466997677',
+          icon_custom_emoji_id: SHOP_EMOJIS.productos,
           style: 'primary'
         }),
         createButton(t(lang, 'profile').toUpperCase(), {
