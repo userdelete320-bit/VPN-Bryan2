@@ -3142,7 +3142,8 @@ async function renderShopProductFamilies(ctx, requestedPage) {
     return [createButton(
       `📦 ${family} · hasta $${maxPrice.toFixed(2)}${suffix}`,
       {
-        callback_data: `shop_family:${encodeURIComponent(family)}:0`,
+        // Usamos el ID de un producto de la familia para mantener callback_data corto.
+        callback_data: `shop_family:${items[0].id}:0`,
         style: soldOutCount === items.length ? 'danger' : 'primary'
       }
     )];
@@ -3205,17 +3206,22 @@ bot.action(/^shop_products_page:(\d+)$/, async (ctx) => {
 });
 
 // Segundo nivel: variantes de una familia.
-bot.action(/^shop_family:([^:]+):(\d+)$/, async (ctx) => {
+bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
-  const family = decodeURIComponent(ctx.match[1]);
+  const representativeProductId = String(ctx.match[1]);
   const page = Math.max(0, parseInt(ctx.match[2], 10) || 0);
 
   let products = [];
   try { products = await db.getActiveShopProducts(); } catch (e) {}
 
-  const items = groupShopProducts(products).find(([name]) => name === family)?.[1] || [];
+  // El ID identifica un producto de la familia sin enviar el nombre completo en callback_data.
+  const representativeProduct = products.find(p => String(p.id) === representativeProductId);
+  const family = representativeProduct ? getShopFamily(representativeProduct) : null;
+  const items = family
+    ? (groupShopProducts(products).find(([name]) => name === family)?.[1] || [])
+    : [];
 
   if (!items.length) {
     await ctx.reply(t(lang, 'no_products'));
@@ -3442,7 +3448,7 @@ async function showShopProductDetail(ctx, product, lang, familyPage = 0) {
     createButton(
       lang === 'en' ? 'BACK' : 'ATRÁS',
       {
-        callback_data: `shop_family:${encodeURIComponent(family)}:${familyPage}`,
+        callback_data: `shop_family:${product.id}:${familyPage}`,
         style: 'primary'
       }
     )
