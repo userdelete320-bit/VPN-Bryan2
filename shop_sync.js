@@ -11,6 +11,16 @@ const vexoran = require('./vexoran_connector');
 
 const MARKUP_USD = 3; // markup fijo de la tienda aplicado a los proveedores integrados
 
+// Vexoran puede representar los booleanos de stock con valores no normalizados
+// en algunas respuestas. Convertimos el campo antes de decidir si hay inventario.
+function isExplicitFalse(value) {
+  return value === false || value === 0 || (typeof value === 'string' && value.trim().toLowerCase() === 'false');
+}
+
+function isExplicitTrue(value) {
+  return value === true || value === 1 || (typeof value === 'string' && value.trim().toLowerCase() === 'true');
+}
+
 async function syncShopCatalog(db) {
   const results = { qamify: { ok: false, count: 0 }, digitalcore: { ok: false, count: 0 }, vexoran: { ok: false, count: 0 } };
 
@@ -44,19 +54,34 @@ async function syncShopCatalog(db) {
   let vexoranProducts = [];
   try {
     const products = await vexoran.getProducts();
-    vexoranProducts = products.map(p => ({
-      source: 'vexoran',
-      external_id: String(p.id),
-      external_ref: String(p.id),
-      name: p.name || String(p.id),
-      description: p.description_text || p.description || p.description_html || '',
-      instructions: p.delivery_instructions || '',
-      your_price_usd: Number(p.price),
-      stock: p.requires_stock === false ? -1 : (p.stock == null ? 0 : Number(p.stock)),
-      min_qty: Number(p.min_qty) > 0 ? Number(p.min_qty) : 1,
-      max_qty: Number(p.max_qty) > 0 ? Number(p.max_qty) : 1000,
-      raw: { ...p, stock_unlimited: p.requires_stock === false },
-    }));
+    vexoranProducts = products.map(p => {
+      // La documentación de Vexoran define stock=null para servicios sin
+      // inventario. 'available=true' también confirma que ese servicio puede
+      // comprarse. No convertir ese null en cero: el bot lo mostraría agotado.
+      const requiresStock = isExplicitFalse(p.requires_stock)
+        ? false
+        : (isExplicitTrue(p.requires_stock) ? true : !(p.stock == null && isExplicitTrue(p.available)));
+      const stockUnlimited = !requiresStock;
+      const normalizedStock = stockUnlimited
+        ? -1
+        : (p.stock == null ? 0 : Number(p.stock));
+
+      return {
+        source: 'vexoran',
+        external_id: String(p.id),
+        external_ref: String(p.id),
+        name: p.name || String(p.id),
+        description: p.description_text || p.description || p.description_html || '',
+        instructions: p.delivery_instructions || '',
+        your_price_usd: Number(p.price),
+        stock: Number.isFinite(normalizedStock) ? normalizedStock : 0,
+        min_qty: Number(p.min_qty) > 0 ? Number(p.min_qty) : 1,
+        max_qty: Number(p.max_qty) > 0 ? Number(p.max_qty) : 1000,
+        // Guardamos los booleanos normalizados para que la validación de compra
+        // no trate 'false' como true por ser una cadena de texto.
+        raw: { ...p, requires_stock: requiresStock, stock_unlimited: stockUnlimited },
+      };
+    });
     results.vexoran = { ok: true, count: vexoranProducts.length };
   } catch (err) {
     results.vexoran = { ok: false, error: err.message };

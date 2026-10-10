@@ -3153,7 +3153,9 @@ function getShopStock(product) {
   const rawStock = String(product.stock ?? '').toLowerCase();
 
   // Algunas APIs representan stock ilimitado con -1 o un indicador equivalente.
-  if (raw.stock_unlimited === true || rawStock === 'unlimited' || rawStock === 'infinite' || Number(product.stock) === -1) {
+  const requiresStockFalse = raw.requires_stock === false || raw.requires_stock === 0 ||
+    (typeof raw.requires_stock === 'string' && raw.requires_stock.trim().toLowerCase() === 'false');
+  if (raw.stock_unlimited === true || requiresStockFalse || rawStock === 'unlimited' || rawStock === 'infinite' || Number(product.stock) === -1) {
     return Infinity;
   }
 
@@ -3852,7 +3854,8 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
   // Vexoran: no vender productos que la API marque como manuales o no ordenables.
   if (product.source === 'vexoran') {
     const raw = product.raw_data || {};
-    const requiresStock = raw.requires_stock !== false;
+    const requiresStock = !(raw.requires_stock === false || raw.requires_stock === 0 ||
+      (typeof raw.requires_stock === 'string' && raw.requires_stock.trim().toLowerCase() === 'false'));
     if (raw.api_orderable === false || raw.manual_delivery === true ||
         (requiresStock && Number(product.stock || 0) <= 0)) {
       await ctx.reply(t(lang, 'product_unavailable'));
