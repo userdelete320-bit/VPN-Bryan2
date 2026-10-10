@@ -17,7 +17,8 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const db = require('./supabase');
 const { syncShopCatalog } = require('./shop_sync');
 const qamifyConnector = require('./qamify_connector');
-const ggsomaConnector = require('./ggsoma_connector');
+const warzoneConnector = require('./warzone_connector');
+const digitalcoreConnector = require('./digitalcore_connector');
 const vexoranConnector = require('./vexoran_connector');
 
 // ==================== PLAN TYPES ====================
@@ -2907,7 +2908,7 @@ bot.action(/^set_lang:(es|en)$/, async (ctx) => {
 
 // ==================== TIENDA UNIFICADA: navegación y compra ====================
 // Catálogo agrupado por producto/marca, independientemente de la API de origen.
-// Ej.: todos los ChatGPT quedan juntos aunque vengan de distintos proveedores.
+// Ej.: todos los ChatGPT quedan juntos aunque vengan de Qamify, Warzone, DigitalCore o Vexoran.
 const SHOP_PAGE_SIZE = 10;
 
 const SHOP_ARROW_EMOJIS = {
@@ -3859,6 +3860,15 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     }
   }
 
+  // Warzone: no vender servicios que el proveedor marque como no ordenables o sin stock.
+  if (product.source === 'warzone') {
+    const raw = product.raw_data || {};
+    if (raw.orderable !== true || Number(product.stock || 0) <= 0) {
+      await ctx.reply(t(lang, 'product_unavailable'));
+      return;
+    }
+  }
+
   const qty = normalizeShopQty(product, Number(ctx.match[2]));
   if (qty === null) {
     await ctx.reply(
@@ -3925,10 +3935,14 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
         externalId: product.external_id,
         qty
       });
-    } else if (product.source === 'ggsoma') {
-      result = await ggsomaConnector.createOrder({
-        idempotencyKey,
-        externalRef: product.external_ref,
+    } else if (product.source === 'warzone') {
+      result = await warzoneConnector.createOrder({
+        serviceId: product.external_id,
+        qty
+      });
+    } else if (product.source === 'digitalcore') {
+      result = await digitalcoreConnector.createOrder({
+        productId: product.external_id,
         qty
       });
     } else if (product.source === 'vexoran') {
@@ -4001,8 +4015,8 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     return;
   }
 
-  // 4. Caso crítico Vexoran: si el resultado es incierto o Vexoran mantiene
-  // la orden retenida para resolución manual, no devolvemos el saldo automáticamente.
+  // 4. Casos de resultado incierto: Warzone o Vexoran pueden tener una orden creada
+  // aunque la respuesta no confirme la entrega. No devolvemos saldo automáticamente.
   if (result.ambiguous || result.provider_charged) {
     await db.updateShopOrder(order.id, {
       status: 'reserved',
@@ -4409,15 +4423,17 @@ bot.action('shop_admin_api_status', async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.reply('🔌 Consultando las APIs de la tienda...');
 
-  let qamifyLine, ggsomaLine, vexoranLine;
+  let qamifyLine, warzoneLine, digitalcoreLine, vexoranLine;
   try { const bal = await qamifyConnector.getBalance(); qamifyLine = `✅ Qamify — saldo: $${bal.toFixed(2)}`; }
   catch (e) { qamifyLine = `❌ Qamify — no se pudo consultar (${e.message})`; }
-  try { const bal = await ggsomaConnector.getBalance(); ggsomaLine = `✅ GGSoma — saldo: $${bal.toFixed(2)}`; }
-  catch (e) { ggsomaLine = `❌ GGSoma — no se pudo consultar (${e.message})`; }
+  try { const bal = await warzoneConnector.getBalance(); warzoneLine = `✅ Warzone — saldo: $${bal.toFixed(2)}`; }
+  catch (e) { warzoneLine = `❌ Warzone — no se pudo consultar (${e.message})`; }
+  try { const bal = await digitalcoreConnector.getBalance(); digitalcoreLine = `✅ DigitalCore — saldo: $${bal.toFixed(2)}`; }
+  catch (e) { digitalcoreLine = `❌ DigitalCore — no se pudo consultar (${e.message})`; }
   try { const bal = await vexoranConnector.getBalance(); vexoranLine = `✅ Vexoran — saldo: $${bal.toFixed(2)}`; }
   catch (e) { vexoranLine = `❌ Vexoran — no se pudo consultar (${e.message})`; }
 
-  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${ggsomaLine}\n${vexoranLine}`, {
+  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${warzoneLine}\n${digitalcoreLine}\n${vexoranLine}`, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] },
   });
@@ -5394,17 +5410,27 @@ app.listen(PORT, '0.0.0.0', async () => {
     // Tienda unificada: sincroniza el catálogo al iniciar y luego cada hora.
     // Cada proveedor puede fallar por separado sin impedir que el bot arranque.
     if (!process.env.QAMIFY_API_KEY) console.warn('⚠️ QAMIFY_API_KEY no configurada — el catálogo de Qamify no se sincronizará.');
-    if (!process.env.GGSOMA_API_KEY) console.warn('⚠️ GGSOMA_API_KEY no configurada — el catálogo de GGSoma no se sincronizará.');
+    if (!process.env.WARZONE_API_KEY) console.warn('⚠️ WARZONE_API_KEY no configurada — el catálogo de Warzone no se sincronizará.');
+    if (!process.env.DIGITALCORE_API_KEY) console.warn('⚠️ DIGITALCORE_API_KEY no configurada — el catálogo de DigitalCore no se sincronizará.');
     if (!process.env.VEXORAN_API_KEY) console.warn('⚠️ VEXORAN_API_KEY no configurada — el catálogo de Vexoran no se sincronizará.');
 
     syncShopCatalog(db)
       .then(r => console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(r)))
       .catch(e => console.error('❌ Error en sincronización inicial de la tienda:', e.message));
 
+    // Warzone se sincroniza por separado para conservar su tratamiento específico.
+    warzoneConnector.syncCatalog(db)
+      .then(r => console.log('🛍️ Sincronización inicial Warzone:', JSON.stringify(r)))
+      .catch(e => console.error('❌ Error en sincronización inicial Warzone:', e.message));
+
     setInterval(() => {
       syncShopCatalog(db)
         .then(r => console.log('🛍️ Sincronización de la tienda:', JSON.stringify(r)))
         .catch(e => console.error('❌ Error sincronizando la tienda:', e.message));
+
+      warzoneConnector.syncCatalog(db)
+        .then(r => console.log('🛍️ Sincronización Warzone:', JSON.stringify(r)))
+        .catch(e => console.error('❌ Error sincronizando Warzone:', e.message));
     }, 60 * 60 * 1000); // cada hora
 
     console.log(`🎯 Pool de pruebas: separado por plan (basico/avanzado/cuba_vip/premium/anual)`);

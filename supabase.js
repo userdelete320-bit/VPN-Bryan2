@@ -2016,7 +2016,7 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     return data;
   },
 
-  // ========== TIENDA UNIFICADA (catálogo Qamify + GGSoma) ==========
+  // ========== TIENDA UNIFICADA (catálogo de proveedores integrados) ==========
   async upsertShopProduct(p) {
     const { error } = await dbClient.from('shop_products').upsert({
       source: p.source,
