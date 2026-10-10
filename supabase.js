@@ -2047,6 +2047,16 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     if (error) throw error;
   },
 
+  // Desactiva los productos de un proveedor retirado sin borrar órdenes ni historial.
+  async deactivateShopProductsBySource(source) {
+    const { error } = await dbClient
+      .from('shop_products')
+      .update({ active: false })
+      .eq('source', source)
+      .eq('active', true);
+    if (error) throw error;
+  },
+
   async getActiveShopProducts() {
     const { data, error } = await dbClient.from('shop_products').select('*').eq('active', true).order('name', { ascending: true });
     if (error) throw error;

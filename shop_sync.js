@@ -8,11 +8,21 @@
 const qamify = require('./qamify_connector');
 const ggsoma = require('./ggsoma_connector');
 const digitalcore = require('./digitalcore_connector');
+const vexoran = require('./vexoran_connector');
 
-const MARKUP_USD = 3; // aplica igual para Qamify y GGSoma, confirmado por el negocio
+const MARKUP_USD = 3; // markup fijo de la tienda aplicado a los proveedores integrados
 
 async function syncShopCatalog(db) {
-  const results = { qamify: { ok: false, count: 0 }, ggsoma: { ok: false, count: 0 }, digitalcore: { ok: false, count: 0 } };
+  const results = { qamify: { ok: false, count: 0 }, ggsoma: { ok: false, count: 0 }, digitalcore: { ok: false, count: 0 }, vexoran: { ok: false, count: 0 } };
+
+  // Warzone se retiró del bot: desactivar su catálogo antiguo sin borrar el historial.
+  try {
+    if (typeof db.deactivateShopProductsBySource === 'function') {
+      await db.deactivateShopProductsBySource('warzone');
+    }
+  } catch (err) {
+    console.error('❌ No se pudieron desactivar los productos antiguos de Warzone:', err.message);
+  }
 
   let qamifyProducts = [];
   try {
@@ -41,12 +51,34 @@ async function syncShopCatalog(db) {
     console.error('❌ Error sincronizando catálogo de DigitalCore:', err.message);
   }
 
-  const allProducts = [...qamifyProducts, ...ggsomaProducts, ...digitalcoreProducts];
+  let vexoranProducts = [];
+  try {
+    const products = await vexoran.getProducts();
+    vexoranProducts = products.map(p => ({
+      source: 'vexoran',
+      external_id: String(p.id),
+      external_ref: String(p.id),
+      name: p.name || String(p.id),
+      description: p.description_text || p.description || p.description_html || '',
+      instructions: p.delivery_instructions || '',
+      your_price_usd: Number(p.price),
+      stock: p.requires_stock === false ? -1 : (p.stock == null ? 0 : Number(p.stock)),
+      min_qty: Number(p.min_qty) > 0 ? Number(p.min_qty) : 1,
+      max_qty: Number(p.max_qty) > 0 ? Number(p.max_qty) : 1000,
+      raw: { ...p, stock_unlimited: p.requires_stock === false },
+    }));
+    results.vexoran = { ok: true, count: vexoranProducts.length };
+  } catch (err) {
+    results.vexoran = { ok: false, error: err.message };
+    console.error('❌ Error sincronizando catálogo de Vexoran:', err.message);
+  }
 
-  // Si AMBAS APIs fallaron, no se toca nada (para no desactivar todo el catálogo
-  // por un problema de red pasajero)
-  if (allProducts.length === 0 && !results.qamify.ok && !results.ggsoma.ok && !results.digitalcore.ok) {
-    return { ...results, skipped: true, reason: 'ambas APIs fallaron, catálogo no modificado' };
+  const allProducts = [...qamifyProducts, ...ggsomaProducts, ...digitalcoreProducts, ...vexoranProducts];
+
+  // Si todas las APIs fallaron, no se toca el catálogo para evitar desactivarlo
+  // por un problema de red pasajero.
+  if (allProducts.length === 0 && !results.qamify.ok && !results.ggsoma.ok && !results.digitalcore.ok && !results.vexoran.ok) {
+    return { ...results, skipped: true, reason: 'todas las APIs fallaron; catálogo no modificado' };
   }
 
   for (const p of allProducts) {
@@ -72,6 +104,7 @@ async function syncShopCatalog(db) {
   if (results.qamify.ok) await db.deactivateMissingShopProducts('qamify', qamifyProducts.map(p => p.external_id));
   if (results.ggsoma.ok) await db.deactivateMissingShopProducts('ggsoma', ggsomaProducts.map(p => p.external_id));
   if (results.digitalcore.ok) await db.deactivateMissingShopProducts('digitalcore', digitalcoreProducts.map(p => p.external_id));
+  if (results.vexoran.ok) await db.deactivateMissingShopProducts('vexoran', vexoranProducts.map(p => p.external_id));
 
   return { ...results, total_synced: allProducts.length };
 }
