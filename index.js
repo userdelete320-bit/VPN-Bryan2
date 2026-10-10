@@ -2932,7 +2932,7 @@ const SHOP_FAMILY_EMOJIS = {
   gemini: '5240377090628428983',
   chatgpt: '5442988908642050809',
   telegram: '5983582264502523326',
-  lenny: '6114014687500705299',
+  lennys: '6114014687500705299',
   higgsfield: '6282760404917559627',
   cursor: '6273793612715138423',
   claude: '6174520215376763867',
@@ -2955,7 +2955,7 @@ const SHOP_FAMILY_RULES = [
   { label: 'ChatGPT', patterns: [/\bchat[-\s]*gpt\b/i, /\bopen[-\s]*ai\b/i] },
   { label: 'Gemini', patterns: [/\bgemini\b/i] },
   { label: 'Telegram', patterns: [/\btelegram\b/i] },
-  { label: 'Lenny', patterns: [/\blenny\b/i] },
+  { label: 'Lennys', patterns: [/\blennys?\b/i] },
   { label: 'Higgsfield', patterns: [/\bhiggsfield\b/i] },
   { label: 'LinkedIn', patterns: [/\blinkedin\b/i] },
   { label: 'Claude', patterns: [/\bclaude\b/i] },
@@ -3341,54 +3341,104 @@ function normalizeShopQty(product, qty) {
   return n;
 }
 
+function shopValueToText(value, lang = 'es', depth = 0) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (depth >= 4) return '';
+
+  if (Array.isArray(value)) {
+    return value
+      .map(item => shopValueToText(item, lang, depth + 1))
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (typeof value === 'object') {
+    // Si la API devuelve texto traducido, priorizamos el idioma del usuario.
+    const preferredKeys = lang === 'en'
+      ? ['en', 'english', 'text', 'description', 'details', 'detail', 'content', 'value', 'name', 'title', 'message']
+      : ['es', 'spanish', 'español', 'text', 'description', 'details', 'detail', 'content', 'value', 'name', 'title', 'message'];
+    for (const key of preferredKeys) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const result = shopValueToText(value[key], lang, depth + 1);
+        if (result) return result;
+      }
+    }
+
+    // Para objetos estructurados (por ejemplo, una garantía con tipo y duración),
+    // mostramos los campos legibles en vez de convertir el objeto a [object Object].
+    return Object.entries(value)
+      .map(([key, item]) => {
+        const result = shopValueToText(item, lang, depth + 1);
+        if (!result) return '';
+        const label = key.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+        return `${label}: ${result}`;
+      })
+      .filter(Boolean)
+      .join(' · ');
+  }
+  return '';
+}
+
+function findShopRawValue(raw, keys, depth = 0) {
+  if (!raw || typeof raw !== 'object' || depth > 3) return undefined;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(raw, key) && raw[key] !== null && raw[key] !== undefined && raw[key] !== '') {
+      return raw[key];
+    }
+  }
+  for (const value of Object.values(raw)) {
+    if (value && typeof value === 'object') {
+      const found = findShopRawValue(value, keys, depth + 1);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}
+
 function productDetailText(product, lang) {
   const stock = getShopStock(product);
   const stockText = stock === Infinity ? '∞' : (stock === null ? 'N/D' : stock);
   const raw = product.raw_data || {};
 
-  // Usamos primero los campos normalizados y, si vienen vacíos, aprovechamos
-  // datos descriptivos que algunas APIs dejan dentro de raw_data.
+  // Las APIs no siempre colocan la información en el mismo nivel del JSON.
   const descriptionValue =
     product.description ||
-    raw.description ||
-    raw.details ||
-    raw.detail ||
-    raw.note ||
+    findShopRawValue(raw, ['description', 'details', 'detail', 'note', 'product_description', 'productDescription']) ||
     '';
 
   const instructionsValue =
     product.instructions ||
-    raw.instructions ||
-    raw.instruction ||
-    raw.terms ||
-    raw.requirements ||
+    findShopRawValue(raw, ['instructions', 'instruction', 'terms', 'requirements', 'usage', 'how_to_use', 'howToUse']) ||
     '';
 
-  const description = descriptionValue ? escapeShopHtml(descriptionValue) : '';
-  const instructions = instructionsValue ? escapeShopHtml(instructionsValue) : '';
+  const descriptionText = shopValueToText(descriptionValue, lang);
+  const instructionsText = shopValueToText(instructionsValue, lang);
+  const description = descriptionText ? escapeShopHtml(descriptionText) : '';
+  const instructions = instructionsText ? escapeShopHtml(instructionsText) : '';
 
-  // Estos datos solo se muestran si realmente existen en la API.
+  // Estos datos solo se muestran si existen; los objetos se convierten a texto legible.
   const extraFields = [
-    ['account_type', 'Tipo de cuenta', 'Account type'],
-    ['accountType', 'Tipo de cuenta', 'Account type'],
-    ['delivery_method', 'Entrega', 'Delivery'],
-    ['deliveryMethod', 'Entrega', 'Delivery'],
-    ['warranty', 'Garantía', 'Warranty'],
-    ['guarantee', 'Garantía', 'Warranty'],
-    ['region', 'Región', 'Region'],
-    ['duration', 'Duración', 'Duration'],
-    ['period', 'Periodo', 'Period'],
+    [['account_type', 'accountType'], 'Tipo de cuenta', 'Account type'],
+    [['delivery_method', 'deliveryMethod'], 'Entrega', 'Delivery'],
+    [['warranty', 'guarantee'], 'Garantía', 'Warranty'],
+    [['region'], 'Región', 'Region'],
+    [['duration'], 'Duración', 'Duration'],
+    [['period'], 'Periodo', 'Period'],
   ];
 
   const extraLines = [];
-  const usedExtraKeys = new Set();
+  const usedLabels = new Set();
 
-  for (const [key, esLabel, enLabel] of extraFields) {
-    if (usedExtraKeys.has(key)) continue;
-    const value = raw[key];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      extraLines.push(`• <b>${lang === 'en' ? enLabel : esLabel}:</b> ${escapeShopHtml(value)}`);
-      usedExtraKeys.add(key);
+  for (const [keys, esLabel, enLabel] of extraFields) {
+    const label = lang === 'en' ? enLabel : esLabel;
+    if (usedLabels.has(label)) continue;
+    const value = findShopRawValue(raw, keys);
+    const readableValue = shopValueToText(value, lang);
+    if (readableValue) {
+      extraLines.push(`• <b>${label}:</b> ${escapeShopHtml(readableValue)}`);
+      usedLabels.add(label);
     }
   }
 
