@@ -3196,6 +3196,12 @@ function buildShopMenuKeyboard(lang) {
         }),
       ],
       [
+        createButton('🔎 BUSCAR PRODUCTO', {
+          callback_data: 'shop_search_start',
+          style: 'primary'
+        }),
+      ],
+      [
         createButton(t(lang, 'topup').toUpperCase(), {
           callback_data: 'shop_topup',
           icon_custom_emoji_id: SHOP_EMOJIS.recargar,
@@ -3221,6 +3227,187 @@ function buildShopMenuKeyboard(lang) {
     ]
   };
 }
+
+// Búsqueda de productos por categoría y nombre. El estado se guarda por usuario
+// para que la paginación y el botón de volver mantengan la consulta realizada.
+const shopSearchState = new Map(); // telegramId -> { awaitingQuery, query, productIds, page }
+
+function normalizeShopSearchText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function getShopSearchCategory(product) {
+  const raw = product.raw_data || {};
+  const name = normalizeShopSearchText(product.name);
+  const description = normalizeShopSearchText(product.description || raw.description || '');
+  const metadataCategory = normalizeShopSearchText(raw.category || raw.product_category || raw.product_type || '');
+  const combined = `${name} ${description} ${metadataCategory}`;
+
+  // Categorías conocidas primero para evitar que las etiquetas genéricas del
+  // proveedor clasifiquen incorrectamente un producto reconocible.
+  if (/\b(vpn|wireguard|windscribe|nordvpn|surfshark|expressvpn|aviravpn)\b/.test(combined) ||
+      /\bproton unlimited\b/.test(name) || /\bthunder vpn\b/.test(combined) ||
+      /\bmexico vpn\b/.test(combined)) return 'VPN';
+
+  if (/\b(chatgpt|openai|gemini|claude|elevenlabs|eleven labs|midjourney|suno|runway|leonardo ai|muse ai|higgsfield|perplexity|cursor ai|gamma ai|wiktor ai|manus ai|artificial intelligence|inteligencia artificial|\bia\b|\bai\b)\b/.test(combined)) return 'IA';
+  if (/\b(netflix|spotify|youtube|crunchyroll|amazon prime video|prime video|apple music|disney|streaming)\b/.test(combined)) return 'Streaming';
+  if (/\b(udemy|coursera|duolingo|education|educacion|curso|learning)\b/.test(combined)) return 'Educación';
+  if (/\b(game|gaming|juego|juegos|mlbb|mobile legends|free fire|pubg|roblox|steam)\b/.test(combined)) return 'Juegos';
+  if (/\b(microsoft 365|office 365|notion|linkedin|adobe|ilovepdf|outlook|canva|figma|autodesk|productivity|productividad)\b/.test(combined)) return 'Productividad';
+
+  // Si el proveedor tiene una categoría propia, se conserva como categoría
+  // de búsqueda para no dejar productos válidos sin clasificar.
+  if (raw.category || raw.product_category) {
+    const original = String(raw.category || raw.product_category).trim();
+    if (original && original.length <= 48) return original;
+  }
+  return 'Otros';
+}
+
+function findShopSearchResults(products, query) {
+  const normalizedQuery = normalizeShopSearchText(query);
+  if (!normalizedQuery) return [];
+
+  const categoryMatches = [];
+  const nameMatches = [];
+  const seen = new Set();
+
+  const uniqueKey = (product) => String(product.id ?? `${product.source || ''}:${product.external_id || product.name || ''}`);
+  const matchesText = (value) => normalizeShopSearchText(value).includes(normalizedQuery);
+
+  // Primero: productos cuya categoría coincide con la búsqueda.
+  for (const product of products) {
+    if (matchesText(getShopSearchCategory(product))) {
+      const key = uniqueKey(product);
+      if (!seen.has(key)) {
+        seen.add(key);
+        categoryMatches.push(product);
+      }
+    }
+  }
+
+  // Después: coincidencias por nombre, descripción o marca. Los que ya
+  // aparecieron por categoría se omiten para que nunca se repitan.
+  for (const product of products) {
+    const raw = product.raw_data || {};
+    const searchable = [product.name, product.description, raw.brand, raw.category,
+      raw.product_type, raw.type, raw.description].filter(Boolean).join(' ');
+    if (matchesText(searchable)) {
+      const key = uniqueKey(product);
+      if (!seen.has(key)) {
+        seen.add(key);
+        nameMatches.push(product);
+      }
+    }
+  }
+
+  const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' });
+  categoryMatches.sort(byName);
+  nameMatches.sort(byName);
+  return categoryMatches.concat(nameMatches);
+}
+
+async function renderShopSearchResults(ctx, requestedPage = 0, edit = false) {
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const state = shopSearchState.get(userId);
+  if (!state || !state.query) {
+    await ctx.reply('Primero pulsa «BUSCAR PRODUCTO» y escribe una categoría o nombre.');
+    return;
+  }
+
+  let products = [];
+  try { products = await db.getActiveShopProducts(); } catch (e) {
+    console.error('Error obteniendo productos para búsqueda:', e.message);
+  }
+
+  const results = findShopSearchResults(products, state.query);
+  const totalPages = Math.max(1, Math.ceil(results.length / SHOP_PAGE_SIZE));
+  const page = Math.max(0, Math.min(Number.parseInt(requestedPage, 10) || 0, totalPages - 1));
+  state.page = page;
+  state.productIds = results.map(product => String(product.id));
+  shopSearchState.set(userId, state);
+
+  let message;
+  const buttons = [];
+  if (!results.length) {
+    message = `🔎 <b>Sin resultados</b>\n\nNo encontramos productos para «${escapeShopHtml(state.query)}». Prueba con otra categoría o una parte del nombre.`;
+  } else {
+    const start = page * SHOP_PAGE_SIZE;
+    const pageItems = results.slice(start, start + SHOP_PAGE_SIZE);
+    message = `🔎 <b>RESULTADOS DE BÚSQUEDA</b>\nConsulta: <b>${escapeShopHtml(state.query)}</b>\nCoincidencias: ${results.length}\nPágina ${page + 1}/${totalPages}\n\nSelecciona un producto:`;
+
+    for (const product of pageItems) {
+      const soldOut = isShopSoldOut(product);
+      const price = Number(product.final_price_usd || 0).toFixed(2);
+      buttons.push([createButton(
+        `${soldOut ? '🔴' : '🔵'} ${product.name} · $${price}${soldOut ? ' · AGOTADO' : ''}`,
+        { callback_data: `shop_search_product:${product.id}`, style: soldOut ? 'danger' : 'primary' }
+      )]);
+    }
+
+    const navRow = [];
+    if (page > 0) navRow.push(createButton('⬅️ ATRÁS', { callback_data: `shop_search_page:${page - 1}`, style: 'primary' }));
+    if (page < totalPages - 1) navRow.push(createButton('ADELANTE ➡️', { callback_data: `shop_search_page:${page + 1}`, style: 'primary' }));
+    if (navRow.length) buttons.push(navRow);
+  }
+
+  buttons.push([
+    createButton('🔎 NUEVA BÚSQUEDA', { callback_data: 'shop_search_start', style: 'primary' }),
+    createButton('TIENDA', { callback_data: 'shop_menu', style: 'primary' }),
+  ]);
+
+  const options = { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } };
+  if (edit && ctx.callbackQuery?.message) {
+    await ctx.editMessageText(message, options).catch(async () => { await ctx.reply(message, options); });
+  } else {
+    await ctx.reply(message, options);
+  }
+}
+
+bot.action('shop_search_start', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  shopSearchState.set(userId, { awaitingQuery: true, query: '', productIds: [], page: 0 });
+  await ctx.reply(lang === 'en'
+    ? '🔎 Send a product name or category (for example: VPN, AI, Netflix, ChatGPT).'
+    : '🔎 Escribe una categoría o el nombre parcial o completo de un producto (por ejemplo: VPN, IA, Netflix o ChatGPT).',
+    { reply_markup: { inline_keyboard: [[createButton('CANCELAR', { callback_data: 'shop_search_cancel', style: 'danger' })]] } });
+});
+
+bot.action('shop_search_cancel', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const state = shopSearchState.get(userId);
+  if (state?.awaitingQuery) shopSearchState.delete(userId);
+  await ctx.editMessageText('Búsqueda cancelada. Puedes volver a intentarlo desde la tienda.').catch(() => {});
+});
+
+bot.action(/^shop_search_page:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await renderShopSearchResults(ctx, ctx.match[1], true);
+});
+
+bot.action(/^shop_search_product:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const product = await db.getShopProductById(ctx.match[1]);
+  if (!product || product.active === false) {
+    await ctx.reply(t(lang, 'product_not_found'));
+    return;
+  }
+  const state = shopSearchState.get(userId);
+  const backCallback = `shop_search_page:${Math.max(0, Number(state?.page || 0))}`;
+  await showShopProductDetail(ctx, product, lang, 0, backCallback);
+});
 
 bot.action('shop_menu', async (ctx) => {
   await ctx.answerCbQuery();
@@ -3583,7 +3770,7 @@ function productDetailText(product, lang) {
   return text;
 }
 
-async function showShopProductDetail(ctx, product, lang, familyPage = 0) {
+async function showShopProductDetail(ctx, product, lang, familyPage = 0, backCallback = null) {
   const stock = getShopStock(product);
 
   if (isShopSoldOut(product)) {
@@ -3636,7 +3823,7 @@ async function showShopProductDetail(ctx, product, lang, familyPage = 0) {
     createButton(
       lang === 'en' ? 'BACK' : 'ATRÁS',
       {
-        callback_data: `shop_family:${product.id}:${familyPage}`,
+        callback_data: backCallback || `shop_family:${product.id}:${familyPage}`,
         style: 'primary'
       }
     )
@@ -5055,6 +5242,20 @@ bot.on('text', async (ctx) => {
   const text = ctx.message.text;
   if (text.startsWith('/')) return;
   const userId = ctx.from.id.toString();
+  const pendingSearch = shopSearchState.get(userId);
+  if (pendingSearch?.awaitingQuery) {
+    const query = text.trim();
+    if (!query) {
+      await ctx.reply('Escribe al menos una letra o palabra para buscar.');
+      return;
+    }
+    pendingSearch.awaitingQuery = false;
+    pendingSearch.query = query;
+    pendingSearch.page = 0;
+    shopSearchState.set(userId, pendingSearch);
+    await renderShopSearchResults(ctx, 0, false);
+    return;
+  }
   const esAdmin = isAdmin(userId);
   const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
   if (text === '📁 VER PLANES') { await ctx.reply('📋 *NUESTROS PLANES*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR WEB DE PLANES", wa(`${webappUrl}/app.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
