@@ -2926,6 +2926,25 @@ const SHOP_CONFIRM_EMOJIS = {
   balance: '5377620962390857342',
 };
 
+// Emojis de marca facilitados para las familias de productos de la tienda.
+// Las familias sin ID asignado conservan el aspecto actual.
+const SHOP_FAMILY_EMOJIS = {
+  gemini: '5240377090628428983',
+  chatgpt: '5442988908642050809',
+  telegram: '5983582264502523326',
+  lenny: '6114014687500705299',
+  higgsfield: '6282760404917559627',
+  cursor: '6273793612715138423',
+  claude: '6174520215376763867',
+  linkedin: '6147415948082028679',
+  elevenlabs: '6219689196722854904',
+};
+
+function getShopFamilyEmoji(family) {
+  const key = String(family || '').toLowerCase().replace(/[\s_-]/g, '');
+  return SHOP_FAMILY_EMOJIS[key] || null;
+}
+
 function shopTgEmoji(id, fallback) {
   return `<tg-emoji emoji-id="${id}">${fallback}</tg-emoji>`;
 }
@@ -2935,6 +2954,10 @@ function shopTgEmoji(id, fallback) {
 const SHOP_FAMILY_RULES = [
   { label: 'ChatGPT', patterns: [/\bchat[-\s]*gpt\b/i, /\bopen[-\s]*ai\b/i] },
   { label: 'Gemini', patterns: [/\bgemini\b/i] },
+  { label: 'Telegram', patterns: [/\btelegram\b/i] },
+  { label: 'Lenny', patterns: [/\blenny\b/i] },
+  { label: 'Higgsfield', patterns: [/\bhiggsfield\b/i] },
+  { label: 'LinkedIn', patterns: [/\blinkedin\b/i] },
   { label: 'Claude', patterns: [/\bclaude\b/i] },
   { label: 'ElevenLabs', patterns: [/\beleven\s*labs?\b/i, /\belevenlabs\b/i] },
   { label: 'Adobe', patterns: [/\badobe\b/i] },
@@ -3140,10 +3163,10 @@ async function renderShopProductFamilies(ctx, requestedPage) {
     const soldOutCount = items.filter(isShopSoldOut).length;
     const suffix = soldOutCount === items.length ? ' · AGOTADO' : ` · ${items.length} opciones`;
     return [createButton(
-      `📦 ${family} · hasta $${maxPrice.toFixed(2)}${suffix}`,
+      `${getShopFamilyEmoji(family) ? '' : '📦 '}${family} · hasta $${maxPrice.toFixed(2)}${suffix}`,
       {
-        // Usamos el ID de un producto de la familia para mantener callback_data corto.
         callback_data: `shop_family:${items[0].id}:0`,
+        ...(getShopFamilyEmoji(family) ? { icon_custom_emoji_id: getShopFamilyEmoji(family) } : {}),
         style: soldOutCount === items.length ? 'danger' : 'primary'
       }
     )];
@@ -3216,7 +3239,7 @@ bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
   let products = [];
   try { products = await db.getActiveShopProducts(); } catch (e) {}
 
-  // El ID identifica un producto de la familia sin enviar el nombre completo en callback_data.
+  // El ID de un producto representa su familia y evita nombres largos en callback_data.
   const representativeProduct = products.find(p => String(p.id) === representativeProductId);
   const family = representativeProduct ? getShopFamily(representativeProduct) : null;
   const items = family
@@ -3243,6 +3266,7 @@ bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
       `${soldOut ? '🔴' : '🔵'} ${product.name} · $${Number(product.final_price_usd).toFixed(2)} · ${stockText}`,
       {
         callback_data: `shop_product:${product.id}:${safePage}`,
+        ...(getShopFamilyEmoji(getShopFamily(product)) ? { icon_custom_emoji_id: getShopFamilyEmoji(getShopFamily(product)) } : {}),
         style: soldOut ? 'danger' : 'primary'
       }
     )];
@@ -3252,7 +3276,7 @@ bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
   if (safePage > 0) {
     navRow.push(shopArrowButton(
       'ATRÁS',
-      `shop_family:${encodeURIComponent(family)}:${safePage - 1}`,
+      `shop_family:${representativeProductId}:${safePage - 1}`,
       SHOP_ARROW_EMOJIS.left,
       'primary'
     ));
@@ -3260,7 +3284,7 @@ bot.action(/^shop_family:(\d+):(\d+)$/, async (ctx) => {
   if (safePage < totalPages - 1) {
     navRow.push(shopArrowButton(
       'ADELANTE',
-      `shop_family:${encodeURIComponent(family)}:${safePage + 1}`,
+      `shop_family:${representativeProductId}:${safePage + 1}`,
       SHOP_ARROW_EMOJIS.right,
       'primary'
     ));
@@ -3368,8 +3392,9 @@ function productDetailText(product, lang) {
     }
   }
 
+  const familyEmoji = getShopFamilyEmoji(getShopFamily(product));
   let text =
-    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.product, '🛍️')} <b>${escapeShopHtml(product.name)}</b>\n\n`;
+    `${familyEmoji ? shopTgEmoji(familyEmoji, '✨') : shopTgEmoji(SHOP_CONFIRM_EMOJIS.product, '🛍️')} <b>${escapeShopHtml(product.name)}</b>\n\n`;
 
   if (description) {
     text += `📝 <b>${lang === 'en' ? 'Description' : 'Descripción'}:</b>\n${description}\n\n`;
@@ -3787,6 +3812,27 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       `<b>${t(lang, 'order_completed')}</b> #${order.id}\n\n` +
       `${product.name}\n\n${deliveredContent}` +
       (result.instructions ? `\n\n📋 ${result.instructions}` : '');
+
+    // Notificar a todos los administradores solo cuando la compra quedó completada.
+    const buyerName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'Usuario';
+    const buyerUsername = ctx.from.username ? `@${ctx.from.username}` : 'sin_usuario';
+    const adminPurchaseReport =
+      `🛒 <b>NUEVA COMPRA DE TIENDA</b>\n\n` +
+      `👤 <b>Usuario:</b> ${escapeShopHtml(buyerName)} (${escapeShopHtml(buyerUsername)})\n` +
+      `🆔 <b>Telegram ID:</b> <code>${escapeShopHtml(userId)}</code>\n` +
+      `📦 <b>Producto:</b> ${escapeShopHtml(product.name)}\n` +
+      `🔢 <b>Cantidad:</b> ${qty}\n` +
+      `💵 <b>Total pagado:</b> $${totalPrice.toFixed(2)} USD\n` +
+      `🔌 <b>API:</b> ${escapeShopHtml(product.source)}\n` +
+      `🧾 <b>Orden:</b> #${order.id}`;
+
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await bot.telegram.sendMessage(adminId, adminPurchaseReport, { parse_mode: 'HTML' });
+      } catch (e) {
+        console.error(`No se pudo notificar la compra de tienda al admin ${adminId}:`, e.message);
+      }
+    }
 
     await ctx.reply(deliveryText, { parse_mode: 'HTML' });
     return;
@@ -4541,6 +4587,29 @@ bot.start(async (ctx) => {
       await ctx.reply(text, { parse_mode: 'HTML', ...keyboard });
       return;
     }
+
+    // Los enlaces /shoplinks abren directamente la ficha del producto indicado.
+    const productLinkMatch = !isGroup && /^buy_item(\d+)$/.exec(String(startPayload || ''));
+    if (productLinkMatch) {
+      const linkedProduct = await db.getShopProductById(productLinkMatch[1]).catch(() => null);
+      const lang = await getUserLang(userId.toString());
+      if (!linkedProduct || !linkedProduct.active) {
+        await ctx.reply('❌ Este producto ya no está disponible.', {
+          reply_markup: { inline_keyboard: [[createButton('MENÚ PRINCIPAL', { callback_data: 'main_menu' })]] }
+        });
+        return;
+      }
+      if (isShopSoldOut(linkedProduct)) {
+        await ctx.reply(`❌ <b>${escapeShopHtml(linkedProduct.name)}</b> está agotado actualmente.`, {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[createButton('MENÚ PRINCIPAL', { callback_data: 'main_menu' })]] }
+        });
+        return;
+      }
+      await showShopProductDetail(ctx, linkedProduct, lang, 0);
+      return;
+    }
+
     const keyboard = await buildMainMenuKeyboard(userId.toString(), firstName, esAdmin, isGroup);
     let welcomeMessage =
 `<tg-emoji emoji-id="5080453055648892904">🏳️</tg-emoji> VpnCUBA — ¡Protección del mundo online!
@@ -4586,6 +4655,51 @@ bot.command('admin', async (ctx) => {
     [createButton("ABRIR PANEL WEB", wa(adminUrl, ctx))],
     [createButton("🛍️ ADMIN TIENDA", { callback_data: 'shop_admin_menu' })],
   ] } });
+});
+
+// Admin: /shoplinks [página] muestra enlaces profundos de productos activos.
+// Cada enlace abre la ficha del producto; no ejecuta una compra automáticamente.
+bot.command('shoplinks', async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) {
+    await ctx.reply('⛔ No tienes permisos.');
+    return;
+  }
+
+  const requestedPage = Number.parseInt(String(ctx.message.text || '').trim().split(/\s+/)[1] || '1', 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  let products = [];
+  try {
+    products = await db.getActiveShopProducts();
+  } catch (error) {
+    await ctx.reply('❌ No se pudieron obtener los productos de la tienda.');
+    return;
+  }
+
+  if (!products.length) {
+    await ctx.reply('No hay productos activos en la tienda.');
+    return;
+  }
+
+  const pageSize = 8;
+  const totalPages = Math.ceil(products.length / pageSize);
+  const safePage = Math.min(page, totalPages);
+  const pageItems = products.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const lines = pageItems.map(product => {
+    const link = `https://t.me/vpncubaw_bot?start=buy_item${product.id}`;
+    return `📦 <b>${escapeShopHtml(product.name)}</b> (ID: <code>${product.id}</code>)\n` +
+      `API: ${escapeShopHtml(product.source)} · <a href=\"${link}\">Abrir ficha</a>\n` +
+      `<code>${link}</code>`;
+  });
+
+  const navigation = safePage < totalPages
+    ? `\n\nSiguiente página: <code>/shoplinks ${safePage + 1}</code>`
+    : '';
+  await ctx.reply(
+    `🔗 <b>ENLACES DE PRODUCTOS</b> · Página ${safePage}/${totalPages}\n` +
+    `Cada enlace abre la ficha del producto, sin comprar automáticamente.\n\n` +
+    lines.join('\n\n') + navigation,
+    { parse_mode: 'HTML', disable_web_page_preview: true }
+  );
 });
 
 bot.command('ban', async (ctx) => {
