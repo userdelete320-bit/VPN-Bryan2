@@ -2997,6 +2997,16 @@ const SHOP_FAMILY_EMOJIS = {
   applemusic: '5287380220578372452',
   outlook: '5796683820564484775',
   microsoft365: '5879540508572783398',
+  supabase: '6311992261571780495',
+  resendpro: '6282820830812447039',
+  salesnavigator: '5879747654845468247',
+  warpbuild: '6311858258592145122',
+  supergrock: '6131755724226700852',
+  supergrock910d: '6131755724226700852',
+  supercut: '6282901765176173058',
+  business2m: '5882148571628704558',
+  career2m: '5882148571628704558',
+  apiorderstest: '5001385701321738129',
 };
 
 function getShopFamilyEmoji(family) {
@@ -3012,6 +3022,15 @@ function shopTgEmoji(id, fallback) {
 // "ChatGPT 1M", etc. aparezcan como productos separados.
 const SHOP_FAMILY_RULES = [
   // Familias añadidas para asociar los emojis personalizados por marca.
+  { label: 'SuperGrock 9-10D', patterns: [/\bsuper\s*grock\s*9\s*[-–]?\s*10\s*d\b/i, /\bsupergrock\s*9\s*[-–]?\s*10\s*d\b/i] },
+  { label: 'Sales Navigator', patterns: [/\bsales\s*navigator\b/i] },
+  { label: 'Warp Build', patterns: [/\bwarp\s*build\b/i] },
+  { label: 'Resend Pro', patterns: [/\bresend\s*pro\b/i] },
+  { label: 'Supabase', patterns: [/\bsupabase\b/i] },
+  { label: 'SuperCut', patterns: [/\bsuper\s*cut\b/i, /\bsupercut\b/i] },
+  { label: 'Business 2m', patterns: [/\bbusiness\s*2\s*m\b/i] },
+  { label: 'Career 2m', patterns: [/\bcareer\s*2\s*m\b/i] },
+  { label: 'API Orders Test', patterns: [/\bapi\s*orders?\s*test\b/i] },
   { label: 'LinkedIn Career', patterns: [/\blinkedin\s+career\b/i] },
   { label: 'Amazon Prime Video', patterns: [/\bamazon\s+prime\s+video\b/i] },
   { label: 'Magic Patterns', patterns: [/\bmagic\s*patterns\b/i] },
