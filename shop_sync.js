@@ -1,11 +1,10 @@
 // ==========================================================
 //  Sincronización del catálogo de la tienda unificada
-// Junta los productos de Qamify + DigitalCore + Vexoran, les aplica el markup
+// Junta los productos de DigitalCore + Vexoran, les aplica el markup
 //  y los guarda en caché (shop_products) — así "Productos" nunca
 //  consulta las APIs en vivo cada vez que un usuario la abre.
 // ==========================================================
 
-const qamify = require('./qamify_connector');
 const digitalcore = require('./digitalcore_connector');
 const vexoran = require('./vexoran_connector');
 
@@ -22,24 +21,17 @@ function isExplicitTrue(value) {
 }
 
 async function syncShopCatalog(db) {
-  const results = { qamify: { ok: false, count: 0 }, digitalcore: { ok: false, count: 0 }, vexoran: { ok: false, count: 0 } };
+  const results = { digitalcore: { ok: false, count: 0 }, vexoran: { ok: false, count: 0 } };
 
-  // GGSoma se retiró: desactivar su catálogo anterior sin borrar compras ni historial.
-  try {
-    if (typeof db.deactivateShopProductsBySource === 'function') {
-      await db.deactivateShopProductsBySource('ggsoma');
+  // Proveedores retirados: desactivar su catálogo anterior sin borrar órdenes ni historial.
+  for (const retiredSource of ['ggsoma', 'qamify', 'warzone']) {
+    try {
+      if (typeof db.deactivateShopProductsBySource === 'function') {
+        await db.deactivateShopProductsBySource(retiredSource);
+      }
+    } catch (err) {
+      console.error(`❌ No se pudieron desactivar los productos antiguos de ${retiredSource}:`, err.message);
     }
-  } catch (err) {
-    console.error('❌ No se pudieron desactivar los productos antiguos de GGSoma:', err.message);
-  }
-
-  let qamifyProducts = [];
-  try {
-    qamifyProducts = await qamify.getProducts();
-    results.qamify = { ok: true, count: qamifyProducts.length };
-  } catch (err) {
-    results.qamify = { ok: false, error: err.message };
-    console.error('❌ Error sincronizando catálogo de Qamify:', err.message);
   }
 
   let digitalcoreProducts = [];
@@ -88,11 +80,11 @@ async function syncShopCatalog(db) {
     console.error('❌ Error sincronizando catálogo de Vexoran:', err.message);
   }
 
-  const allProducts = [...qamifyProducts, ...digitalcoreProducts, ...vexoranProducts];
+  const allProducts = [...digitalcoreProducts, ...vexoranProducts];
 
   // Si todas las APIs fallaron, no se toca el catálogo para evitar desactivarlo
   // por un problema de red pasajero.
-  if (allProducts.length === 0 && !results.qamify.ok && !results.digitalcore.ok && !results.vexoran.ok) {
+  if (allProducts.length === 0 && !results.digitalcore.ok && !results.vexoran.ok) {
     return { ...results, skipped: true, reason: 'todas las APIs fallaron; catálogo no modificado' };
   }
 
@@ -116,8 +108,7 @@ async function syncShopCatalog(db) {
 
   // Desactivar (no borrar) los que YA NO aparecen en su API de origen — evita
   // vender algo descontinuado, pero conserva el historial de órdenes pasadas.
-  if (results.qamify.ok) await db.deactivateMissingShopProducts('qamify', qamifyProducts.map(p => p.external_id));
-    if (results.digitalcore.ok) await db.deactivateMissingShopProducts('digitalcore', digitalcoreProducts.map(p => p.external_id));
+  if (results.digitalcore.ok) await db.deactivateMissingShopProducts('digitalcore', digitalcoreProducts.map(p => p.external_id));
   if (results.vexoran.ok) await db.deactivateMissingShopProducts('vexoran', vexoranProducts.map(p => p.external_id));
 
   return { ...results, total_synced: allProducts.length };

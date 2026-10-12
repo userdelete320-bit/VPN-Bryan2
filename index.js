@@ -16,8 +16,6 @@ const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const db = require('./supabase');
 const { syncShopCatalog } = require('./shop_sync');
-const qamifyConnector = require('./qamify_connector');
-const warzoneConnector = require('./warzone_connector');
 const digitalcoreConnector = require('./digitalcore_connector');
 const vexoranConnector = require('./vexoran_connector');
 
@@ -355,6 +353,23 @@ const SHOP_I18N = {
     topup: 'Recargar saldo',
     orders: 'Mis órdenes',
     support: 'Soporte',
+    search_product: 'Buscar producto',
+    search_new: 'Nueva búsqueda',
+    search_store: 'Tienda',
+    search_cancel: 'Cancelar',
+    search_prompt: '🔎 Escribe una categoría o el nombre parcial o completo de un producto (por ejemplo: VPN, IA, Netflix o ChatGPT).',
+    search_need_query: 'Primero pulsa «BUSCAR PRODUCTO» y escribe una categoría o nombre.',
+    search_cancelled: 'Búsqueda cancelada. Puedes volver a intentarlo desde la tienda.',
+    search_no_results: 'Sin resultados',
+    search_no_matches: 'No encontramos productos para «${query}». Prueba con otra categoría o una parte del nombre.',
+    search_results_title: 'RESULTADOS DE BÚSQUEDA',
+    search_query_label: 'Consulta',
+    search_matches: 'Coincidencias',
+    search_page: 'Página',
+    search_select_prompt: 'Selecciona un producto:',
+    search_previous: 'ATRÁS',
+    search_next: 'ADELANTE',
+    search_sold_out: 'AGOTADO',
     back: 'Volver',
     main_menu: 'Menú principal',
     coming_soon: '🚧 Esta sección estará disponible muy pronto.',
@@ -396,6 +411,23 @@ const SHOP_I18N = {
     topup: 'Top up balance',
     orders: 'My orders',
     support: 'Support',
+    search_product: 'Search products',
+    search_new: 'New search',
+    search_store: 'Shop',
+    search_cancel: 'Cancel',
+    search_prompt: '🔎 Enter a category or a partial/full product name (for example: VPN, AI, Netflix, or ChatGPT).',
+    search_need_query: 'Tap “SEARCH PRODUCTS” first, then enter a category or product name.',
+    search_cancelled: 'Search cancelled. You can try again from the shop.',
+    search_no_results: 'No results',
+    search_no_matches: 'We could not find products for “${query}”. Try another category or part of a product name.',
+    search_results_title: 'SEARCH RESULTS',
+    search_query_label: 'Search',
+    search_matches: 'Matches',
+    search_page: 'Page',
+    search_select_prompt: 'Choose a product:',
+    search_previous: 'BACK',
+    search_next: 'NEXT',
+    search_sold_out: 'SOLD OUT',
     back: 'Back',
     main_menu: 'Main menu',
     coming_soon: '🚧 This section will be available very soon.',
@@ -2908,7 +2940,7 @@ bot.action(/^set_lang:(es|en)$/, async (ctx) => {
 
 // ==================== TIENDA UNIFICADA: navegación y compra ====================
 // Catálogo agrupado por producto/marca, independientemente de la API de origen.
-// Ej.: todos los ChatGPT quedan juntos aunque vengan de Qamify, Warzone, DigitalCore o Vexoran.
+// Ej.: todos los ChatGPT quedan juntos aunque vengan de DigitalCore o Vexoran.
 const SHOP_PAGE_SIZE = 10;
 
 const SHOP_ARROW_EMOJIS = {
@@ -3215,7 +3247,7 @@ function buildShopMenuKeyboard(lang) {
         }),
       ],
       [
-        createButton('🔎 BUSCAR PRODUCTO', {
+        createButton(`🔎 ${t(lang, 'search_product').toUpperCase()}`, {
           callback_data: 'shop_search_start',
           style: 'primary'
         }),
@@ -3337,7 +3369,7 @@ async function renderShopSearchResults(ctx, requestedPage = 0, edit = false) {
   const lang = await getUserLang(userId);
   const state = shopSearchState.get(userId);
   if (!state || !state.query) {
-    await ctx.reply('Primero pulsa «BUSCAR PRODUCTO» y escribe una categoría o nombre.');
+    await ctx.reply(t(lang, 'search_need_query'));
     return;
   }
 
@@ -3356,30 +3388,30 @@ async function renderShopSearchResults(ctx, requestedPage = 0, edit = false) {
   let message;
   const buttons = [];
   if (!results.length) {
-    message = `🔎 <b>Sin resultados</b>\n\nNo encontramos productos para «${escapeShopHtml(state.query)}». Prueba con otra categoría o una parte del nombre.`;
+    message = `🔎 <b>${t(lang, 'search_no_results')}</b>\n\n${t(lang, 'search_no_matches', { query: escapeShopHtml(state.query) })}`;
   } else {
     const start = page * SHOP_PAGE_SIZE;
     const pageItems = results.slice(start, start + SHOP_PAGE_SIZE);
-    message = `🔎 <b>RESULTADOS DE BÚSQUEDA</b>\nConsulta: <b>${escapeShopHtml(state.query)}</b>\nCoincidencias: ${results.length}\nPágina ${page + 1}/${totalPages}\n\nSelecciona un producto:`;
+    message = `🔎 <b>${t(lang, 'search_results_title')}</b>\n${t(lang, 'search_query_label')}: <b>${escapeShopHtml(state.query)}</b>\n${t(lang, 'search_matches')}: ${results.length}\n${t(lang, 'search_page')} ${page + 1}/${totalPages}\n\n${t(lang, 'search_select_prompt')}`;
 
     for (const product of pageItems) {
       const soldOut = isShopSoldOut(product);
       const price = Number(product.final_price_usd || 0).toFixed(2);
       buttons.push([createButton(
-        `${soldOut ? '🔴' : '🔵'} ${product.name} · $${price}${soldOut ? ' · AGOTADO' : ''}`,
+        `${soldOut ? '🔴' : '🔵'} ${product.name} · $${price}${soldOut ? ` · ${t(lang, 'search_sold_out')}` : ''}`,
         { callback_data: `shop_search_product:${product.id}`, style: soldOut ? 'danger' : 'primary' }
       )]);
     }
 
     const navRow = [];
-    if (page > 0) navRow.push(createButton('⬅️ ATRÁS', { callback_data: `shop_search_page:${page - 1}`, style: 'primary' }));
-    if (page < totalPages - 1) navRow.push(createButton('ADELANTE ➡️', { callback_data: `shop_search_page:${page + 1}`, style: 'primary' }));
+    if (page > 0) navRow.push(createButton(`⬅️ ${t(lang, 'search_previous')}`, { callback_data: `shop_search_page:${page - 1}`, style: 'primary' }));
+    if (page < totalPages - 1) navRow.push(createButton(`${t(lang, 'search_next')} ➡️`, { callback_data: `shop_search_page:${page + 1}`, style: 'primary' }));
     if (navRow.length) buttons.push(navRow);
   }
 
   buttons.push([
-    createButton('🔎 NUEVA BÚSQUEDA', { callback_data: 'shop_search_start', style: 'primary' }),
-    createButton('TIENDA', { callback_data: 'shop_menu', style: 'primary' }),
+    createButton(`🔎 ${t(lang, 'search_new').toUpperCase()}`, { callback_data: 'shop_search_start', style: 'primary' }),
+    createButton(t(lang, 'search_store').toUpperCase(), { callback_data: 'shop_menu', style: 'primary' }),
   ]);
 
   const options = { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } };
@@ -3395,10 +3427,8 @@ bot.action('shop_search_start', async (ctx) => {
   const userId = ctx.from.id.toString();
   const lang = await getUserLang(userId);
   shopSearchState.set(userId, { awaitingQuery: true, query: '', productIds: [], page: 0 });
-  await ctx.reply(lang === 'en'
-    ? '🔎 Send a product name or category (for example: VPN, AI, Netflix, ChatGPT).'
-    : '🔎 Escribe una categoría o el nombre parcial o completo de un producto (por ejemplo: VPN, IA, Netflix o ChatGPT).',
-    { reply_markup: { inline_keyboard: [[createButton('CANCELAR', { callback_data: 'shop_search_cancel', style: 'danger' })]] } });
+  await ctx.reply(t(lang, 'search_prompt'),
+    { reply_markup: { inline_keyboard: [[createButton(t(lang, 'search_cancel').toUpperCase(), { callback_data: 'shop_search_cancel', style: 'danger' })]] } });
 });
 
 bot.action('shop_search_cancel', async (ctx) => {
@@ -3406,7 +3436,7 @@ bot.action('shop_search_cancel', async (ctx) => {
   const userId = ctx.from.id.toString();
   const state = shopSearchState.get(userId);
   if (state?.awaitingQuery) shopSearchState.delete(userId);
-  await ctx.editMessageText('Búsqueda cancelada. Puedes volver a intentarlo desde la tienda.').catch(() => {});
+  await ctx.editMessageText(t(await getUserLang(userId), 'search_cancelled')).catch(() => {});
 });
 
 bot.action(/^shop_search_page:(\d+)$/, async (ctx) => {
@@ -4069,15 +4099,6 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     }
   }
 
-  // Warzone: no vender servicios que el proveedor marque como no ordenables o sin stock.
-  if (product.source === 'warzone') {
-    const raw = product.raw_data || {};
-    if (raw.orderable !== true || Number(product.stock || 0) <= 0) {
-      await ctx.reply(t(lang, 'product_unavailable'));
-      return;
-    }
-  }
-
   const qty = normalizeShopQty(product, Number(ctx.match[2]));
   if (qty === null) {
     await ctx.reply(
@@ -4138,18 +4159,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
   // 2. Llamar a la API correspondiente.
   let result;
   try {
-    if (product.source === 'qamify') {
-      result = await qamifyConnector.createOrder({
-        idempotencyKey,
-        externalId: product.external_id,
-        qty
-      });
-    } else if (product.source === 'warzone') {
-      result = await warzoneConnector.createOrder({
-        serviceId: product.external_id,
-        qty
-      });
-    } else if (product.source === 'digitalcore') {
+    if (product.source === 'digitalcore') {
       result = await digitalcoreConnector.createOrder({
         productId: product.external_id,
         qty
@@ -4224,7 +4234,7 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
     return;
   }
 
-  // 4. Casos de resultado incierto: Warzone o Vexoran pueden tener una orden creada
+  // 4. Casos de resultado incierto: Vexoran puede haber creado una orden
   // aunque la respuesta no confirme la entrega. No devolvemos saldo automáticamente.
   if (result.ambiguous || result.provider_charged) {
     await db.updateShopOrder(order.id, {
@@ -4632,17 +4642,13 @@ bot.action('shop_admin_api_status', async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.reply('🔌 Consultando las APIs de la tienda...');
 
-  let qamifyLine, warzoneLine, digitalcoreLine, vexoranLine;
-  try { const bal = await qamifyConnector.getBalance(); qamifyLine = `✅ Qamify — saldo: $${bal.toFixed(2)}`; }
-  catch (e) { qamifyLine = `❌ Qamify — no se pudo consultar (${e.message})`; }
-  try { const bal = await warzoneConnector.getBalance(); warzoneLine = `✅ Warzone — saldo: $${bal.toFixed(2)}`; }
-  catch (e) { warzoneLine = `❌ Warzone — no se pudo consultar (${e.message})`; }
+  let digitalcoreLine, vexoranLine;
   try { const bal = await digitalcoreConnector.getBalance(); digitalcoreLine = `✅ DigitalCore — saldo: $${bal.toFixed(2)}`; }
   catch (e) { digitalcoreLine = `❌ DigitalCore — no se pudo consultar (${e.message})`; }
   try { const bal = await vexoranConnector.getBalance(); vexoranLine = `✅ Vexoran — saldo: $${bal.toFixed(2)}`; }
   catch (e) { vexoranLine = `❌ Vexoran — no se pudo consultar (${e.message})`; }
 
-  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${qamifyLine}\n${warzoneLine}\n${digitalcoreLine}\n${vexoranLine}`, {
+  await ctx.reply(`🔌 <b>ESTADO DE LAS APIs</b>\n\n${digitalcoreLine}\n${vexoranLine}`, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [[createButton('VOLVER', { callback_data: 'shop_admin_menu' })]] },
   });
@@ -5632,8 +5638,6 @@ app.listen(PORT, '0.0.0.0', async () => {
 
     // Tienda unificada: sincroniza el catálogo al iniciar y luego cada hora.
     // Cada proveedor puede fallar por separado sin impedir que el bot arranque.
-    if (!process.env.QAMIFY_API_KEY) console.warn('⚠️ QAMIFY_API_KEY no configurada — el catálogo de Qamify no se sincronizará.');
-    if (!process.env.WARZONE_API_KEY) console.warn('⚠️ WARZONE_API_KEY no configurada — el catálogo de Warzone no se sincronizará.');
     if (!process.env.DIGITALCORE_API_KEY) console.warn('⚠️ DIGITALCORE_API_KEY no configurada — el catálogo de DigitalCore no se sincronizará.');
     if (!process.env.VEXORAN_API_KEY) console.warn('⚠️ VEXORAN_API_KEY no configurada — el catálogo de Vexoran no se sincronizará.');
 
@@ -5641,19 +5645,10 @@ app.listen(PORT, '0.0.0.0', async () => {
       .then(r => console.log('🛍️ Sincronización inicial de la tienda:', JSON.stringify(r)))
       .catch(e => console.error('❌ Error en sincronización inicial de la tienda:', e.message));
 
-    // Warzone se sincroniza por separado para conservar su tratamiento específico.
-    warzoneConnector.syncCatalog(db)
-      .then(r => console.log('🛍️ Sincronización inicial Warzone:', JSON.stringify(r)))
-      .catch(e => console.error('❌ Error en sincronización inicial Warzone:', e.message));
-
     setInterval(() => {
       syncShopCatalog(db)
         .then(r => console.log('🛍️ Sincronización de la tienda:', JSON.stringify(r)))
         .catch(e => console.error('❌ Error sincronizando la tienda:', e.message));
-
-      warzoneConnector.syncCatalog(db)
-        .then(r => console.log('🛍️ Sincronización Warzone:', JSON.stringify(r)))
-        .catch(e => console.error('❌ Error sincronizando Warzone:', e.message));
     }, 60 * 60 * 1000); // cada hora
 
     console.log(`🎯 Pool de pruebas: separado por plan (basico/avanzado/cuba_vip/premium/anual)`);
