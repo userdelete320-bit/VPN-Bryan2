@@ -298,6 +298,8 @@ async function loadPlanPricesFromDb() {
 }
   
 
+const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?mode=gi_t';
+const WHATSAPP_GROUP2_LINK = 'https://chat.whatsapp.com/J0zs52uXjqTCVvC0X7oTJE?s=cl&p=a&mlu=4&ilr=4';
 
 function isAdmin(userId) {
     return ADMIN_IDS.includes(userId.toString());
@@ -475,6 +477,8 @@ const BUTTON_ICONS = {
     'POLÍTICAS': '5256113064821926998',
     'COPIAR ENLACE': '5256057883082107781',
     'CANAL OFICIAL': '5771868281212245617',
+    'WHATSAPP OFICIAL': '5253590213917158323',
+    'WHATSAPP #2': '5253590213917158323',
     'GRUPO ABIERTO': '5915556996215476302',
 
     // Menú principal
@@ -487,6 +491,8 @@ const BUTTON_ICONS = {
 
     // Comunidad
     'CANAL OFICIAL': '5771868281212245617',
+    'WHATSAPP OFICIAL': '5253590213917158323',
+    'WHATSAPP #2': '5253590213917158323',
     'GRUPO ABIERTO': '5915556996215476302',
 
     'DESCARGAR VPN': '5443127283898405358',
@@ -3027,7 +3033,6 @@ const SHOP_FAMILY_EMOJIS = {
   resendpro: '6282820830812447039',
   salesnavigator: '5879747654845468247',
   warpbuild: '6311858258592145122',
-  supergrock: '6131755724226700852',
   supergrock910d: '6131755724226700852',
   supercut: '6282901765176173058',
   business2m: '5882148571628704558',
@@ -4735,6 +4740,10 @@ bot.action('show_community', async (ctx) => {
       `Mantente conectado con nuestra comunidad y accede a todos nuestros canales oficiales. <tg-emoji emoji-id="5082827219080840950">✔️</tg-emoji>\n\n` +
       `<tg-emoji emoji-id="5771868281212245617">📢</tg-emoji> <b>CANAL OFICIAL</b>\n` +
       `Noticias, anuncios y novedades de VPN CUBA.\n\n` +
+      `<tg-emoji emoji-id="5253590213917158323">💬</tg-emoji> <b>WHATSAPP OFICIAL</b>\n` +
+      `Soporte, información y comunidad.\n\n` +
+      `<tg-emoji emoji-id="5253590213917158323">💬</tg-emoji> <b>WHATSAPP #2</b>\n` +
+      `Canal alternativo de nuestra comunidad.\n\n` +
       `<tg-emoji emoji-id="5915556996215476302">👥</tg-emoji> <b>GRUPO ABIERTO</b>\n` +
       `Comparte, pregunta y conecta con otros usuarios.\n\n` +
       `━━━━━━━━━━━━━━\n\n` +
@@ -4742,7 +4751,9 @@ bot.action('show_community', async (ctx) => {
 
     const keyboard = { reply_markup: { inline_keyboard: [
       [createButton("CANAL OFICIAL", { url: "https://t.me/vpncubaw" })],
-      [createButton("GRUPO ABIERTO", { url: "https://t.me/vpncubagroup" })],
+      [createButton("WHATSAPP OFICIAL", { url: "https://chat.whatsapp.com/Fj5dBROMqmeECOllIjVEYu?s=cl&p=a&mlu=4" })],
+      [createButton("WHATSAPP #2", { url: "https://chat.whatsapp.com/CgejliuH5iXENrONFkx6Ah?s=cl&p=a&mlu=4" })],
+      [createButton("GRUPO ABIERTO", { url: "https://chat.whatsapp.com/JayjqdTvKjC8goV3ZBfYPc?s=cl&p=a&mlu=4" })],
       [createButton("MENÚ PRINCIPAL", { callback_data: "main_menu" })]
     ] } };
 
