@@ -3004,6 +3004,7 @@ const SHOP_FAMILY_EMOJIS = {
   chatprd: '5163728460018878700',
   granola: '5161263861755545257',
   supergrock: '6179337489350663129',
+  supergrok: '6179337489350663129',
   youtube: '5436050028198125563',
   amazonprimevideo: '6084483883942811660',
   kling: '6177161027558316737',
@@ -3034,6 +3035,7 @@ const SHOP_FAMILY_EMOJIS = {
   salesnavigator: '5879747654845468247',
   warpbuild: '6311858258592145122',
   supergrock910d: '6131755724226700852',
+  supergrok910d: '6131755724226700852',
   supercut: '6282901765176173058',
   business2m: '5882148571628704558',
   career2m: '5882148571628704558',
@@ -3053,7 +3055,7 @@ function shopTgEmoji(id, fallback) {
 // "ChatGPT 1M", etc. aparezcan como productos separados.
 const SHOP_FAMILY_RULES = [
   // Familias añadidas para asociar los emojis personalizados por marca.
-  { label: 'SuperGrock 9-10D', patterns: [/\bsuper\s*grock\s*9\s*[-–]?\s*10\s*d\b/i, /\bsupergrock\s*9\s*[-–]?\s*10\s*d\b/i] },
+  { label: 'SuperGrock 9-10D', patterns: [/\bsuper\s*grock\s*9\s*[-–]?\s*10\s*d\b/i, /\bsupergrock\s*9\s*[-–]?\s*10\s*d\b/i, /\bsuper\s*grok\s*9\s*[-–]?\s*10\s*d\b/i, /\bsupergrok\s*9\s*[-–]?\s*10\s*d\b/i] },
   { label: 'Sales Navigator', patterns: [/\bsales\s*navigator\b/i] },
   { label: 'Warp Build', patterns: [/\bwarp\s*build\b/i] },
   { label: 'Resend Pro', patterns: [/\bresend\s*pro\b/i] },
@@ -3096,7 +3098,7 @@ const SHOP_FAMILY_RULES = [
   { label: 'Framer', patterns: [/\bframer\b/i] },
   { label: 'ChatPRD', patterns: [/\bchat\s*prd\b/i, /\bchatprd\b/i] },
   { label: 'Granola', patterns: [/\bgranola\b/i] },
-  { label: 'SuperGrock', patterns: [/\bsuper\s*grock\b/i, /\bsupergrock\b/i] },
+  { label: 'SuperGrock', patterns: [/\bsuper\s*grock\b/i, /\bsupergrock\b/i, /\bsuper\s*grok\b/i, /\bsupergrok\b/i] },
   { label: 'Kling', patterns: [/\bkling\b/i] },
   { label: 'NordVPN', patterns: [/\bnord\s*vpn\b/i] },
   { label: 'Suno', patterns: [/\bsuno\b/i] },
