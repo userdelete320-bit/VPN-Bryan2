@@ -343,6 +343,11 @@ const SHOP_EMOJIS = {
   monedas: '5298640628396085416',
 };
 
+const SHOP_CUP_RATE = 1050;
+const SHOP_CUP_CARD = '9238959871181386';
+const SHOP_CUP_PHONE = '63806513'; // Número de pago pendiente de confirmar por el administrador.
+const shopCupProofState = new Map(); // telegramId -> { orderId }
+
 const SHOP_I18N = {
   es: {
     shop_title: 'Tienda',
@@ -384,6 +389,12 @@ const SHOP_I18N = {
     order_not_found: 'Orden no encontrada.',
     price: 'Precio',
     buy_button: 'Comprar',
+    buy_cup: '💳 Comprar en CUP',
+    cup_price: 'Precio en CUP',
+    cup_payment_instructions: '💳 <b>PAGO EN CUP</b>\n\nTarjeta: <code>${card}</code>\nNúmero a confirmar: <code>${phone}</code>\n\n<b>Importe total:</b> ${amount} CUP\n\nRealiza el pago y envía aquí una foto o captura del comprobante. Tu compra se procesará cuando el administrador apruebe el pago.',
+    cup_proof_received: '✅ Comprobante recibido. Tu pago está pendiente de revisión. Te avisaremos cuando el administrador lo apruebe.',
+    cup_payment_rejected: '❌ El administrador rechazó el comprobante de tu compra en CUP. Contacta con soporte si necesitas ayuda.',
+    cup_payment_approved: '✅ Pago en CUP aprobado. Estamos procesando tu compra.',
     insufficient_balance: '❌ Saldo insuficiente.\n\nNecesitas ${needed} y tienes ${have}.',
     processing_order: '⏳ Procesando tu orden...',
     order_completed: '✅ Orden completada',
@@ -442,6 +453,12 @@ const SHOP_I18N = {
     order_not_found: 'Order not found.',
     price: 'Price',
     buy_button: 'Buy',
+    buy_cup: '💳 Buy with CUP',
+    cup_price: 'Price in CUP',
+    cup_payment_instructions: '💳 <b>CUP PAYMENT</b>\n\nCard: <code>${card}</code>\nNumber to confirm: <code>${phone}</code>\n\n<b>Total:</b> ${amount} CUP\n\nMake the payment and send a photo or screenshot of the receipt here. Your order will be processed after an administrator approves the payment.',
+    cup_proof_received: '✅ Receipt received. Your payment is pending review. We will notify you when the administrator approves it.',
+    cup_payment_rejected: '❌ The administrator rejected your CUP purchase receipt. Contact support if you need help.',
+    cup_payment_approved: '✅ CUP payment approved. Your order is being processed.',
     insufficient_balance: '❌ Insufficient balance.\n\nYou need ${needed} and you have ${have}.',
     processing_order: '⏳ Processing your order...',
     order_completed: '✅ Order completed',
@@ -3809,7 +3826,8 @@ function productDetailText(product, lang) {
   }
 
   text += `📦 <b>${lang === 'en' ? 'Stock' : 'Stock'}:</b> ${stockText}\n`;
-  text += `💵 <b>${t(lang, 'price')}:</b> $${Number(product.final_price_usd).toFixed(2)} USD / unidad`;
+  text += `💵 <b>${t(lang, 'price')}:</b> $${Number(product.final_price_usd).toFixed(2)} USD / unidad\n` +
+    `💳 <b>${t(lang, 'cup_price')}:</b> ${(Math.round(Number(product.final_price_usd) * SHOP_CUP_RATE)).toLocaleString(lang === 'en' ? 'en-US' : 'es-CU')} CUP / unidad`;
 
   if (!description && !instructions && !extraLines.length) {
     text += `\n\n⚠️ ${lang === 'en'
@@ -3942,7 +3960,8 @@ async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
     `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.product, '🛍️')} <b>Product:</b> ${escapeShopHtml(product.name)}\n` +
     `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.quantity, '🧮')} <b>Quantity:</b> ${normalizedQty}\n` +
     `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.unitPrice, '💸')} <b>Unit Price:</b> $${Number(product.final_price_usd).toFixed(2)}\n` +
-    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.total, '💰')} <b>Total:</b> $${totalPrice.toFixed(2)}\n\n` +
+    `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.total, '💰')} <b>Total:</b> $${totalPrice.toFixed(2)}\n` +
+    `💳 <b>${t(lang, 'cup_price')} (${lang === 'en' ? 'total' : 'total'}):</b> ${(Math.round(Number(product.final_price_usd) * normalizedQty * SHOP_CUP_RATE)).toLocaleString(lang === 'en' ? 'en-US' : 'es-CU')} CUP\n\n` +
     `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.balance, '🪹')} <b>Your Balance:</b> $${balanceValue.toFixed(2)}\n` +
     `${shopTgEmoji(SHOP_CONFIRM_EMOJIS.balance, '🪹')} <b>After Purchase:</b> $${afterPurchase.toFixed(2)}\n\n` +
     (balanceValue >= totalPrice
@@ -3955,7 +3974,7 @@ async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
   if (balanceValue >= totalPrice) {
     buttons.push([
       createButton(
-        lang === 'en' ? 'Confirm' : 'Confirmar',
+        lang === 'en' ? 'Confirm (USDT)' : 'Confirmar (USDT)',
         { callback_data: `shop_confirm:${product.id}:${normalizedQty}`, style: 'success' }
       ),
       createButton(
@@ -3975,6 +3994,11 @@ async function showShopPurchaseConfirmation(ctx, product, qty, lang) {
       )
     ]);
   }
+
+  buttons.push([createButton(t(lang, 'buy_cup'), {
+    callback_data: `shop_buy_cup:${product.id}:${normalizedQty}`,
+    style: 'primary'
+  })]);
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
@@ -4071,6 +4095,214 @@ bot.on('message', async (ctx, next) => {
   }
 
   await showShopPurchaseConfirmation(ctx, product, normalizedQty, lang);
+});
+
+// ==================== COMPRA EN CUP CON COMPROBANTE ====================
+bot.action(/^shop_buy_cup:(\d+):(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  const lang = await getUserLang(userId);
+  const product = await db.getShopProductById(ctx.match[1]);
+  const qty = product ? normalizeShopQty(product, Number(ctx.match[2])) : null;
+  if (!product || !product.active || qty === null || isShopSoldOut(product)) {
+    await ctx.reply(t(lang, 'product_unavailable'));
+    return;
+  }
+
+  const totalUsd = Math.round(Number(product.final_price_usd) * qty * 100) / 100;
+  const totalCup = Math.round(Number(product.final_price_usd) * qty * SHOP_CUP_RATE);
+  const order = await db.createShopOrder({
+    telegram_id: userId,
+    product_id: product.id,
+    source: product.source,
+    idempotency_key: `shop_cup_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+    qty,
+    price_charged_usd: totalUsd,
+  });
+  if (!order) {
+    await ctx.reply(lang === 'en' ? '❌ Could not create the order. Try again.' : '❌ No se pudo crear la orden. Inténtalo de nuevo.');
+    return;
+  }
+
+  const metadata = {
+    payment_method: 'cup',
+    payment_status: 'awaiting_proof',
+    total_cup: totalCup,
+    total_usd: totalUsd,
+    qty,
+    product_id: product.id,
+    telegram_id: userId,
+  };
+  await db.updateShopOrder(order.id, {
+    status: 'pending_cup',
+    error_detail: JSON.stringify(metadata),
+  });
+  shopCupProofState.set(userId, { orderId: order.id });
+
+  const text = t(lang, 'cup_payment_instructions', {
+    card: SHOP_CUP_CARD,
+    phone: SHOP_CUP_PHONE,
+    amount: totalCup.toLocaleString(lang === 'en' ? 'en-US' : 'es-CU'),
+  });
+  await ctx.reply(
+    `🛍️ <b>${escapeShopHtml(product.name)}</b>\n🔢 <b>${lang === 'en' ? 'Quantity' : 'Cantidad'}:</b> ${qty}\n💵 <b>${lang === 'en' ? 'Final price' : 'Precio final'}:</b> $${totalUsd.toFixed(2)} USD\n💳 <b>${lang === 'en' ? 'Total in CUP' : 'Total en CUP'}:</b> ${totalCup.toLocaleString(lang === 'en' ? 'en-US' : 'es-CU')} CUP\n\n${text}`,
+    { parse_mode: 'HTML' }
+  );
+});
+
+// El comprobante se asocia a la orden pendiente y se envía a los administradores.
+bot.on('message', async (ctx, next) => {
+  const userId = ctx.from?.id?.toString();
+  const pending = userId ? shopCupProofState.get(userId) : null;
+  if (!pending) return next();
+
+  const photo = ctx.message?.photo;
+  const document = ctx.message?.document;
+  const isImageDocument = document && /^image\//i.test(document.mime_type || '');
+  const fileId = photo?.[photo.length - 1]?.file_id || (isImageDocument ? document.file_id : null);
+  if (!fileId) {
+    await ctx.reply(userId && (await getUserLang(userId)) === 'en'
+      ? 'Please send the payment receipt as a photo or image file.'
+      : 'Envía el comprobante como foto o archivo de imagen, por favor.');
+    return;
+  }
+
+  const lang = await getUserLang(userId);
+  const order = await db.getShopOrderById(pending.orderId).catch(() => null);
+  if (!order || order.status !== 'pending_cup') {
+    shopCupProofState.delete(userId);
+    await ctx.reply(t(lang, 'product_unavailable'));
+    return;
+  }
+
+  let metadata = {};
+  try { metadata = JSON.parse(order.error_detail || '{}'); } catch (e) {}
+  metadata.payment_status = 'proof_received';
+  metadata.proof_file_id = fileId;
+  metadata.proof_message_id = ctx.message.message_id;
+  await db.updateShopOrder(order.id, { status: 'pending_cup_review', error_detail: JSON.stringify(metadata) });
+  shopCupProofState.delete(userId);
+
+  for (const adminId of ADMIN_IDS) {
+    try {
+      const caption = `💳 <b>COMPRA EN CUP — REVISAR COMPROBANTE</b>\n\n` +
+        `🧾 <b>Orden:</b> #${order.id}\n` +
+        `👤 <b>Usuario:</b> ${escapeShopHtml(ctx.from.first_name || 'Usuario')} ${ctx.from.username ? `(@${escapeShopHtml(ctx.from.username)})` : ''}\n` +
+        `🆔 <b>Telegram ID:</b> <code>${escapeShopHtml(userId)}</code>\n` +
+        `📦 <b>Producto:</b> ${escapeShopHtml(order.shop_products?.name || `#${order.product_id}`)}\n` +
+        `🔢 <b>Cantidad:</b> ${Number(order.qty || metadata.qty || 1)}\n` +
+        `💵 <b>Precio final:</b> $${Number(metadata.total_usd || order.price_charged_usd || 0).toFixed(2)} USDT\n` +
+        `💳 <b>Total a pagar:</b> ${Number(metadata.total_cup || 0).toLocaleString('es-CU')} CUP\n` +
+        `💳 <b>Tarjeta:</b> <code>${SHOP_CUP_CARD}</code>\n📱 <b>Número a confirmar:</b> <code>${SHOP_CUP_PHONE}</code>`;
+      await bot.telegram.sendPhoto(adminId, fileId, {
+        caption,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[
+          createButton('✅ Aprobar pago y procesar orden', { callback_data: `shop_cup_approve:${order.id}`, style: 'success' }),
+          createButton('❌ Rechazar', { callback_data: `shop_cup_reject:${order.id}`, style: 'danger' })
+        ]] }
+      });
+    } catch (e) {
+      console.error(`No se pudo enviar comprobante CUP al admin ${adminId}:`, e.message);
+    }
+  }
+  await ctx.reply(t(lang, 'cup_proof_received'));
+});
+
+bot.action(/^shop_cup_reject:(\d+)$/, async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) {
+    await ctx.answerCbQuery('No autorizado', { show_alert: true });
+    return;
+  }
+  await ctx.answerCbQuery();
+  const order = await db.getShopOrderById(ctx.match[1]).catch(() => null);
+  if (!order || order.status !== 'pending_cup_review') {
+    await ctx.reply('La orden no está pendiente de revisión.');
+    return;
+  }
+  let metadata = {};
+  try { metadata = JSON.parse(order.error_detail || '{}'); } catch (e) {}
+  metadata.payment_status = 'rejected';
+  await db.updateShopOrder(order.id, { status: 'failed', error_detail: JSON.stringify(metadata) });
+  try { await bot.telegram.sendMessage(order.telegram_id, t(await getUserLang(order.telegram_id), 'cup_payment_rejected')); } catch (e) {}
+  await ctx.editMessageCaption(`${ctx.callbackQuery.message.caption || ''}\n\n❌ <b>Pago rechazado por ${escapeShopHtml(ctx.from.first_name || 'admin')}.</b>`, { parse_mode: 'HTML' }).catch(() => {});
+});
+
+bot.action(/^shop_cup_approve:(\d+)$/, async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) {
+    await ctx.answerCbQuery('No autorizado', { show_alert: true });
+    return;
+  }
+  await ctx.answerCbQuery();
+  const order = await db.getShopOrderById(ctx.match[1]).catch(() => null);
+  if (!order || order.status !== 'pending_cup_review') {
+    await ctx.reply('La orden no está pendiente de revisión.');
+    return;
+  }
+  const product = await db.getShopProductById(order.product_id).catch(() => null);
+  if (!product || !product.active || isShopSoldOut(product)) {
+    await ctx.reply(`La orden #${order.id} no se puede procesar: el producto ya no está disponible. No se ha marcado como entregada.`);
+    return;
+  }
+  let metadata = {};
+  try { metadata = JSON.parse(order.error_detail || '{}'); } catch (e) {}
+  const qty = normalizeShopQty(product, Number(metadata.qty || order.qty || 1));
+  if (qty === null) {
+    await ctx.reply(`La orden #${order.id} tiene una cantidad no válida. Revisión manual necesaria.`);
+    return;
+  }
+
+  metadata.payment_status = 'approved';
+  metadata.approved_by = ctx.from.id.toString();
+  metadata.approved_at = new Date().toISOString();
+  await db.updateShopOrder(order.id, { status: 'processing_cup', error_detail: JSON.stringify(metadata) });
+  try { await bot.telegram.sendMessage(order.telegram_id, t(await getUserLang(order.telegram_id), 'cup_payment_approved')); } catch (e) {}
+
+  const idempotencyKey = `shop_cup_order_${order.id}`;
+  let result;
+  try {
+    if (product.source === 'digitalcore') {
+      result = await digitalcoreConnector.createOrder({ productId: product.external_id, qty });
+    } else if (product.source === 'vexoran') {
+      result = await vexoranConnector.createOrder({ productId: product.external_id, idempotencyKey, qty });
+    } else {
+      result = { success: false, safeToRefund: false, ambiguous: true, error: { code: 'unsupported_source', message: `Fuente no soportada: ${product.source}` } };
+    }
+  } catch (err) {
+    result = { success: false, safeToRefund: false, ambiguous: true, error: { code: 'unexpected_error', message: err.message } };
+  }
+
+  if (result.success) {
+    const deliveredContent = (result.items || []).join('\n\n');
+    metadata.payment_status = 'approved_and_processed';
+    await db.updateShopOrder(order.id, {
+      status: 'completed',
+      external_order_code: result.external_order_code || null,
+      delivered_content: deliveredContent,
+      instructions: result.instructions || '',
+      error_detail: JSON.stringify(metadata),
+    });
+    const lang = await getUserLang(order.telegram_id);
+    const deliveryText = `<b>${t(lang, 'order_completed')}</b> #${order.id}\n\n${escapeShopHtml(product.name)}\n\n${escapeShopHtml(deliveredContent)}` +
+      (result.instructions ? `\n\n📋 ${escapeShopHtml(result.instructions)}` : '');
+    try { await bot.telegram.sendMessage(order.telegram_id, deliveryText, { parse_mode: 'HTML' }); }
+    catch (e) { console.error('No se pudo enviar la entrega de la orden CUP:', e.message); }
+    await ctx.editMessageCaption(`${ctx.callbackQuery.message.caption || ''}\n\n✅ <b>Pago aprobado y orden procesada.</b>`, { parse_mode: 'HTML' }).catch(() => {});
+    return;
+  }
+
+  // El pago ya fue aprobado; no se devuelve ni se repite automáticamente si el resultado del proveedor es incierto.
+  metadata.provider_error = result.error || null;
+  metadata.payment_status = result.safeToRefund ? 'approved_provider_failed' : 'approved_provider_uncertain';
+  await db.updateShopOrder(order.id, {
+    status: result.safeToRefund ? 'failed' : 'reserved',
+    error_detail: JSON.stringify(metadata),
+  });
+  const userMessage = result.safeToRefund
+    ? `⚠️ El pago de la orden #${order.id} fue aprobado, pero el proveedor no pudo completar la compra. Contacta con soporte para resolverlo.`
+    : `⚠️ El pago de la orden #${order.id} fue aprobado. La respuesta del proveedor es incierta y la orden requiere revisión manual. No vuelvas a pagar.`;
+  try { await bot.telegram.sendMessage(order.telegram_id, userMessage); } catch (e) {}
+  await ctx.reply(`⚠️ Orden #${order.id}: pago aprobado, pero el proveedor no confirmó la entrega. Revisar manualmente antes de intentar otra compra.`);
 });
 
 // ==================== COMPRA REAL ====================
