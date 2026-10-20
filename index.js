@@ -19,7 +19,7 @@ const { syncShopCatalog } = require('./shop_sync');
 const digitalcoreConnector = require('./digitalcore_connector');
 const vexoranConnector = require('./vexoran_connector');
 
-// ==================== PLAN TYPES ====================
+// =================== PLAN TYPES ====================
 // Todos los tipos de plan con pool propio
 const PLAN_TYPES = ['basico', 'avanzado', 'cuba_vip', 'premium', 'gaming_pro', 'anual', 'express'];
 
