@@ -1998,6 +1998,47 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     return { ...w, reseller_telegram_id: reseller.telegram_id };
   },
 
+  // ========== REFERIDOS DE TIENDA: saldo y retiros atómicos en Supabase ==========
+  async creditShopReferralReward(orderId, buyerTelegramId) {
+    const { data, error } = await dbClient.rpc('credit_shop_referral_reward', {
+      p_shop_order_id: String(orderId),
+      p_buyer_telegram_id: String(buyerTelegramId).trim()
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async getReferralWallet(telegramId) {
+    const { data, error } = await dbClient.rpc('get_referral_wallet', {
+      p_telegram_id: String(telegramId).trim()
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async requestReferralWithdrawal(telegramId, amount) {
+    const { data, error } = await dbClient.rpc('request_referral_withdrawal', {
+      p_telegram_id: String(telegramId).trim(), p_amount: Number(amount)
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async getPendingReferralWithdrawals() {
+    const { data, error } = await dbClient.from('referral_withdrawals')
+      .select('*').eq('status', 'pending').order('requested_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async resolveReferralWithdrawal(withdrawalId, action, note = '') {
+    const { data, error } = await dbClient.rpc('resolve_referral_withdrawal', {
+      p_withdrawal_id: Number(withdrawalId), p_action: action, p_note: String(note || '')
+    });
+    if (error) throw error;
+    return data;
+  },
+
   async getResellerRanking() {
     const { data, error } = await dbClient.from('resellers').select('username, telegram_id, month_sales').eq('status', 'active').order('month_sales', { ascending: false }).limit(10);
     if (error) throw error;

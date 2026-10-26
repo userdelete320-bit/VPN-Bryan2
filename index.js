@@ -623,6 +623,31 @@ function getReferralInfoHtml(userId, referralStats) {
            `<tg-emoji emoji-id="5929216723088576715">🎁</tg-emoji> Comparte tu enlace y empieza a ganar.`;
 }
 
+async function creditStoreReferral(order, buyerTelegramId) {
+  try {
+    // El RPC valida que la orden esté completada y evita duplicados por id de orden.
+    const result = await db.creditShopReferralReward(order.id, buyerTelegramId);
+    if (result?.credited && result?.referrer_telegram_id) {
+      try {
+        await bot.telegram.sendMessage(result.referrer_telegram_id,
+          `🎉 <b>¡Recompensa por referido!</b>
+
+Tu referido completó una compra en la tienda.
+💰 Ganancia: <b>0.10 USDT</b>
+🧾 Orden: <code>#${escapeShopHtml(String(order.id))}</code>
+
+El saldo se puede retirar al alcanzar 5 USDT.`,
+          { parse_mode: 'HTML' });
+      } catch (notifyError) { console.error('No se pudo notificar recompensa de referido:', notifyError.message); }
+    }
+    return result;
+  } catch (error) {
+    // La compra ya se completó: un fallo de recompensa no debe invalidar la entrega.
+    console.error(`Error acreditando referido de orden #${order.id}:`, error.message);
+    return null;
+  }
+}
+
 function getHowItWorksHtml() {
     return `<tg-emoji emoji-id="5873121512445187130">🚀</tg-emoji> <b>¿CÓMO FUNCIONA VPN CUBA?</b>\n\n` +
            `Descubre cómo optimizamos tu conexión para gaming y navegación.\n\n` +
@@ -4282,6 +4307,7 @@ bot.action(/^shop_cup_approve:(\d+)$/, async (ctx) => {
       instructions: result.instructions || '',
       error_detail: JSON.stringify(metadata),
     });
+    await creditStoreReferral(order, order.telegram_id);
     const lang = await getUserLang(order.telegram_id);
     const deliveryText = `<b>${t(lang, 'order_completed')}</b> #${order.id}\n\n${escapeShopHtml(product.name)}\n\n${escapeShopHtml(deliveredContent)}` +
       (result.instructions ? `\n\n📋 ${escapeShopHtml(result.instructions)}` : '');
@@ -4437,6 +4463,8 @@ bot.action(/^shop_confirm:(\d+):(\d+)$/, async (ctx) => {
       error_detail: null,
     });
 
+    await creditStoreReferral(order, userId);
+
     const deliveryText =
       `<b>${t(lang, 'order_completed')}</b> #${order.id}\n\n` +
       `${product.name}\n\n${deliveredContent}` +
@@ -4551,6 +4579,11 @@ bot.action('shop_profile', async (ctx) => {
   try { orders = await db.getUserShopOrders(userId); } catch (e) {}
   const completedOrders = orders.filter(o => o.status === 'completed');
   const totalSpent = completedOrders.reduce((sum, o) => sum + Number(o.price_charged_usd), 0);
+  let referralWallet = { available_balance: 0, pending_balance: 0 };
+  try { referralWallet = await db.getReferralWallet(userId) || referralWallet; }
+  catch (e) { console.error('No se pudo consultar el saldo de referidos del perfil:', e.message); }
+  const referralAvailable = Number(referralWallet.available_balance || 0);
+  const referralPending = Number(referralWallet.pending_balance || 0);
 
   const labelUser = t(lang, 'label_user');
   const labelId = t(lang, 'label_id');
@@ -4562,12 +4595,15 @@ bot.action('shop_profile', async (ctx) => {
     `${labelUser}: ${ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name}\n` +
     `🆔 ${labelId}: <code>${userId}</code>\n` +
     `💰 ${labelBalance}: <b>$${Number(balance.balance_usd).toFixed(2)} USD</b>\n` +
+    `🤝 USDT disponible para retirar: <b>${referralAvailable.toFixed(2)} USDT</b>\n` +
+    `⏳ Retiros en revisión: <b>${referralPending.toFixed(2)} USDT</b>\n` +
     `📦 ${labelOrders}: ${completedOrders.length}\n` +
     `💵 ${labelSpent}: $${totalSpent.toFixed(2)} USD`;
 
   await ctx.reply(text, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [
+      [createButton('💸 SOLICITAR RETIRO DE REFERIDOS', { callback_data: 'shop_referral_withdraw' })],
       [createButton(t(lang, 'topup').toUpperCase(), { callback_data: 'shop_topup', icon_custom_emoji_id: SHOP_EMOJIS.recargar })],
       [createButton(t(lang, 'orders').toUpperCase(), { callback_data: 'shop_orders', icon_custom_emoji_id: SHOP_EMOJIS.ordenes })],
       [createButton(t(lang, 'back').toUpperCase(), { callback_data: 'shop_menu', icon_custom_emoji_id: SHOP_EMOJIS.volver })],
@@ -5075,7 +5111,7 @@ bot.action('referral_info', async (ctx) => {
     if (user) try { referralStats = await db.getReferralStats(userId); } catch (e) {}
     await ctx.answerCbQuery();
     const imgPath = path.join(__dirname, 'assets', 'referidos.jpg');
-    const keyboard = { reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } };
+    const keyboard = { reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("💰 SALDO DE REFERIDOS", { callback_data: 'referral_wallet' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } };
     try {
       await bot.telegram.sendPhoto(ctx.chat.id, { source: imgPath }, { caption: getReferralInfoHtml(userId, referralStats), parse_mode: 'HTML', ...keyboard });
     } catch (e) {
@@ -5104,6 +5140,46 @@ bot.action('main_menu', async (ctx) => {
     parse_mode: 'HTML',
     ...keyboard
 });
+});
+
+// Solicita el retiro del saldo completo disponible desde el botón del perfil.
+bot.action('shop_referral_withdraw', async (ctx) => {
+  await ctx.answerCbQuery();
+  const telegramId = ctx.from.id.toString();
+  try {
+    const wallet = await db.getReferralWallet(telegramId);
+    const available = Number(wallet?.available_balance || 0);
+    if (available < 5) {
+      return ctx.reply(`❌ Necesitas al menos 5.00 USDT disponibles para retirar.\n\nSaldo disponible: ${available.toFixed(2)} USDT.`);
+    }
+    const amount = Math.floor(available * 100) / 100;
+    const result = await db.requestReferralWithdrawal(telegramId, amount);
+    if (!result?.success) return ctx.reply(result?.message || '❌ No se pudo crear la solicitud.');
+
+    const user = await db.getUser(telegramId);
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await bot.telegram.sendMessage(adminId,
+          `💸 <b>RETIRO DE REFERIDOS</b>\n\nUsuario: ${escapeShopHtml(user?.username ? '@' + user.username : String(telegramId))}\nTelegram ID: <code>${telegramId}</code>\nMonto: <b>${amount.toFixed(2)} USDT</b>\nSolicitud: #${result.withdrawal_id}`,
+          { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[
+            createButton('✅ Marcar pagado', { callback_data: `refwithdraw_pay:${result.withdrawal_id}` }),
+            createButton('❌ Rechazar', { callback_data: `refwithdraw_reject:${result.withdrawal_id}` })
+          ]] } });
+      } catch (e) { console.error('No se pudo notificar retiro de referido:', e.message); }
+    }
+    await ctx.reply(`✅ Solicitud de retiro #${result.withdrawal_id} creada por ${amount.toFixed(2)} USDT. Tiempo de revisión: 1–24 horas.`);
+  } catch (error) {
+    console.error('shop_referral_withdraw:', error.message);
+    await ctx.reply(`❌ ${error.message || 'No se pudo procesar el retiro. Verifica la configuración de Supabase.'}`);
+  }
+});
+
+bot.action('referral_wallet', async (ctx) => {
+  await ctx.answerCbQuery();
+  try {
+    const wallet = await db.getReferralWallet(ctx.from.id.toString());
+    await ctx.reply(`💰 <b>Saldo de referidos</b>\n\nDisponible: <b>${Number(wallet?.available_balance || 0).toFixed(2)} USDT</b>\nEn revisión: <b>${Number(wallet?.pending_balance || 0).toFixed(2)} USDT</b>\nRetiro mínimo: <b>5.00 USDT</b>\n\nSolicita con <code>/retirar_referidos 5</code>. La revisión tarda entre 1 y 24 horas.`, { parse_mode: 'HTML' });
+  } catch (error) { await ctx.reply('❌ No se pudo consultar el saldo. Ejecuta primero el SQL de referidos en Supabase.'); }
 });
 
 bot.action('copy_referral_link', async (ctx) => {
@@ -5267,9 +5343,64 @@ bot.command('referidos', async (ctx) => {
     const user = await db.getUser(userId);
     let referralStats = null;
     if (user) try { referralStats = await db.getReferralStats(userId); } catch (e) {}
-    await ctx.reply(getReferralInfoHtml(userId, referralStats), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
+    await ctx.reply(getReferralInfoHtml(userId, referralStats), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[createButton("COPIAR ENLACE", { callback_data: 'copy_referral_link' })], [createButton("💰 SALDO DE REFERIDOS", { callback_data: 'referral_wallet' })], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } });
   } catch (error) { await ctx.reply(`🤝 Tu enlace: \`https://t.me/vpncubaw_bot?start=ref${userId}\``, { parse_mode: 'Markdown' }); }
 });
+// Consulta de saldo y solicitud de retiro del monedero de referidos.
+bot.command('saldo_referidos', async (ctx) => {
+  try {
+    const wallet = await db.getReferralWallet(ctx.from.id.toString());
+    const available = Number(wallet?.available_balance || 0);
+    const pending = Number(wallet?.pending_balance || 0);
+    await ctx.reply(`💰 <b>Saldo de referidos</b>
+
+Disponible: <b>${available.toFixed(2)} USDT</b>
+En revisión: <b>${pending.toFixed(2)} USDT</b>
+Retiro mínimo: <b>5.00 USDT</b>
+
+Para solicitar un retiro, escribe:
+<code>/retirar_referidos 5</code>`, { parse_mode: 'HTML' });
+  } catch (error) { console.error('saldo_referidos:', error.message); await ctx.reply('❌ No se pudo consultar el saldo. Verifica que hayas ejecutado el SQL de referidos en Supabase.'); }
+});
+
+bot.command('retirar_referidos', async (ctx) => {
+  const amount = Number((ctx.message.text || '').split(/\s+/)[1]);
+  if (!Number.isFinite(amount) || amount < 5) return ctx.reply('❌ El retiro mínimo es 5 USDT. Uso: /retirar_referidos 5');
+  try {
+    const result = await db.requestReferralWithdrawal(ctx.from.id.toString(), amount);
+    if (!result?.success) return ctx.reply(result?.message || '❌ No se pudo crear la solicitud.');
+    const user = await db.getUser(ctx.from.id.toString());
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await bot.telegram.sendMessage(adminId,
+          `💸 <b>RETIRO DE REFERIDOS</b>\n\nUsuario: ${escapeShopHtml(user?.username ? '@' + user.username : String(ctx.from.id))}\nTelegram ID: <code>${ctx.from.id}</code>\nMonto: <b>${amount.toFixed(2)} USDT</b>\nSolicitud: #${result.withdrawal_id}`,
+          { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[
+            createButton('✅ Marcar pagado', { callback_data: `refwithdraw_pay:${result.withdrawal_id}` }),
+            createButton('❌ Rechazar', { callback_data: `refwithdraw_reject:${result.withdrawal_id}` })
+          ]] } });
+      } catch (e) { console.error('No se pudo notificar retiro de referido:', e.message); }
+    }
+    await ctx.reply(`✅ Solicitud de retiro #${result.withdrawal_id} creada por ${amount.toFixed(2)} USDT. Tiempo de revisión: 1–24 horas.`);
+  } catch (error) { console.error('retirar_referidos:', error.message); await ctx.reply(`❌ ${error.message || 'No se pudo procesar la solicitud.'}`); }
+});
+
+bot.action(/^refwithdraw_(pay|reject):(\d+)$/, async (ctx) => {
+  if (!isAdmin(ctx.from.id.toString())) { await ctx.answerCbQuery('No autorizado', { show_alert: true }); return; }
+  const action = ctx.match[1];
+  const withdrawalId = ctx.match[2];
+  try {
+    const result = await db.resolveReferralWithdrawal(withdrawalId, action === 'pay' ? 'paid' : 'rejected', 'Resuelto por administrador');
+    await ctx.answerCbQuery(action === 'pay' ? 'Retiro marcado como pagado' : 'Retiro rechazado');
+    if (result?.telegram_id) {
+      try { await bot.telegram.sendMessage(result.telegram_id, action === 'pay'
+        ? `✅ Tu retiro de ${Number(result.amount).toFixed(2)} USDT fue marcado como pagado.`
+        : `❌ Tu solicitud de retiro de ${Number(result.amount).toFixed(2)} USDT fue rechazada. El saldo fue liberado.`); } catch (e) {}
+    }
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+    await ctx.reply(`Solicitud de retiro #${withdrawalId}: ${action === 'pay' ? 'pagada' : 'rechazada'}.`);
+  } catch (error) { console.error('resolver retiro referido:', error.message); await ctx.answerCbQuery('Error al resolver retiro', { show_alert: true }); }
+});
+
 bot.command('trialstatus', async (ctx) => {
   const eligibility = await db.checkTrialEligibility(ctx.from.id);
   await ctx.reply(eligibility.eligible ? `✅ *Puedes solicitar una prueba*\n\n${eligibility.reason}. Usa el botón VER PLANES.` : `❌ *No puedes solicitar prueba*\n\n${eligibility.reason}`, { parse_mode: 'Markdown' });
