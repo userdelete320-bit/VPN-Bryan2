@@ -779,7 +779,7 @@ function getResellerLevel(salesCount, thresholds) {
 function getPlanName(planType) {
   const plans = {
     'basico': 'Básico (1 mes)',
-    'avanzado': 'Avanzado (2 meses)',
+    'avanzado': 'Avanzado (3 meses)',
     'cuba_vip': 'Cuba VIP (1 mes)',
     'premium': 'Gaming (1 mes)',
     'gaming_pro': 'Gaming Pro (1 mes)',
@@ -823,7 +823,7 @@ function calcularDiasRestantes(user) {
     let duracionDias;
     switch(user.plan.toLowerCase()) {
         case 'basico': duracionDias = 30; break;
-        case 'avanzado': duracionDias = 60; break;
+        case 'avanzado': duracionDias = 90; break;
         case 'cuba_vip': duracionDias = 30; break;
         case 'premium': duracionDias = 30; break;
         case 'gaming_pro': duracionDias = 30; break;
@@ -2239,7 +2239,7 @@ const TON_CONFIG = {
 
 const TON_PLAN_LABELS = {
   basico:   'Plan Básico (1 mes)',
-  avanzado: 'Plan Avanzado (2 meses)',
+  avanzado: 'Plan Avanzado (3 meses)',
   cuba_vip: 'Plan VIP Cuba (1 mes)',
   premium:  'Plan Gaming (1 mes)',
   gaming_pro: 'Plan Gaming Pro (1 mes)',
@@ -6055,7 +6055,7 @@ bot.on('successful_payment', async (ctx) => {
 
             // Calculamos días adicionales manteniendo coherencia con calcularDiasRestantes
             let diasAdicionales = 30;
-            if (planType === 'avanzado') diasAdicionales = 60;
+            if (planType === 'avanzado') diasAdicionales = 90;
             if (planType === 'anual') diasAdicionales = 365;
 
             let nuevaFechaInicio = new Date();
