@@ -10,6 +10,8 @@ process.env.SUPABASE_ANON_KEY = 'test-anon-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
 process.env.BOT_TOKEN = 'test-telegram-bot-token';
 process.env.OPENROUTER_API_KEY = 'test-openrouter-api-key';
+process.env.ZAI_API_KEY = 'test-zai-api-key';
+process.env.NOVITA_API_KEY = 'test-novita-api-key';
 process.env.CLOUDFLARE_API_TOKEN = 'test-cloudflare-api-token';
 process.env.CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
 process.env.NOVA_ENABLED = 'true';
@@ -20,6 +22,8 @@ const queryLog = [];
 let dbFailure = false;
 let settingsFailure = false;
 let openRouterCalls = 0;
+let zaiCalls = 0;
+let novitaCalls = 0;
 let cloudflareCalls = 0;
 let capturedProviderBody = null;
 let capturedOpenRouterUrl = null;
@@ -138,9 +142,9 @@ test('el estado informa qué proveedores están configurados sin exponer secreto
   };
   statusHandler({}, response);
   assert.equal(response.body.enabled, true);
-  assert.deepEqual(response.body.providers, { openrouter: true, cloudflare: true });
+  assert.deepEqual(response.body.providers, { openrouter: true, zai: true, novita: true, cloudflare: true });
   assert.equal(response.headers['Cache-Control'], 'no-store');
-  assert.doesNotMatch(JSON.stringify(response.body), /test-openrouter-api-key|test-cloudflare-api-token/);
+  assert.doesNotMatch(JSON.stringify(response.body), /test-openrouter-api-key|test-zai-api-key|test-novita-api-key|test-cloudflare-api-token/);
 });
 
 async function invokeChat({ message = '¿Qué plan tengo y cuándo vence?', authId = '123456789', body = {}, invalidAuth = false } = {}) {
@@ -169,6 +173,10 @@ test('NOVA lee el perfil y los pagos usando solamente el Telegram ID validado', 
       openRouterCalls += 1;
       capturedProviderBody = JSON.parse(options.body);
       capturedOpenRouterUrl = url;
+    } else if (url.includes('api.z.ai')) {
+      zaiCalls += 1;
+    } else if (url.includes('api.novita.ai')) {
+      novitaCalls += 1;
     } else if (url.includes('api.cloudflare.com')) {
       cloudflareCalls += 1;
     }
@@ -211,6 +219,8 @@ test('NOVA lee el perfil y los pagos usando solamente el Telegram ID validado', 
   assert.doesNotMatch(paymentQuery.selection, /screenshot|notes|txid|address|config_file/i);
   assert.match(paymentQuery.selection, /original_price/);
   assert.equal(openRouterCalls, 1);
+  assert.equal(zaiCalls, 0);
+  assert.equal(novitaCalls, 0);
   assert.equal(cloudflareCalls, 0);
   assert.equal(capturedOpenRouterUrl, 'https://openrouter.ai/api/v1/chat/completions');
   assert.equal(capturedProviderBody.model, 'openrouter/free');
@@ -316,17 +326,35 @@ test('NOVA ignora historial falso enviado por el navegador y solo usa el mensaje
   assert.match(prompt, /¿Qué plan tengo y cuándo vence\?/);
 });
 
-test('si OpenRouter falla, NOVA utiliza Cloudflare Workers AI como respaldo gratuito', async () => {
-  const beforeOpenRouter = openRouterCalls;
-  const beforeCloudflare = cloudflareCalls;
+test('NOVA recorre OpenRouter -> Z.AI -> Novita -> Cloudflare y se detiene en el primer proveedor válido', async () => {
+  const before = { openRouterCalls, zaiCalls, novitaCalls, cloudflareCalls };
   const previousConfiguredModel = process.env.NOVA_OPENROUTER_MODEL;
   process.env.NOVA_OPENROUTER_MODEL = 'openai/model-with-paid-pricing';
+  const callOrder = [];
   global.fetch = async (url, options) => {
     if (url.includes('openrouter.ai')) {
+      callOrder.push('openrouter');
       openRouterCalls += 1;
       return { ok: false, status: 429, async json() { return { error: 'rate limited' }; } };
     }
+    if (url.includes('api.z.ai')) {
+      callOrder.push('zai');
+      zaiCalls += 1;
+      const body = JSON.parse(options.body);
+      assert.equal(body.model, 'glm-4.7-flash');
+      assert.equal(options.headers.Authorization, 'Bearer test-zai-api-key');
+      return { ok: false, status: 503, async json() { return { error: 'temporarily unavailable' }; } };
+    }
+    if (url.includes('api.novita.ai')) {
+      callOrder.push('novita');
+      novitaCalls += 1;
+      const body = JSON.parse(options.body);
+      assert.equal(body.model, 'apodex/apodex-1.1-mini');
+      assert.equal(options.headers.Authorization, 'Bearer test-novita-api-key');
+      return { ok: false, status: 429, async json() { return { error: 'rate limited' }; } };
+    }
     if (url.includes('api.cloudflare.com')) {
+      callOrder.push('cloudflare');
       cloudflareCalls += 1;
       const body = JSON.parse(options.body);
       assert.equal(body.model, '@cf/zai-org/glm-4.7-flash');
@@ -346,15 +374,74 @@ test('si OpenRouter falla, NOVA utiliza Cloudflare Workers AI como respaldo grat
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.success, true);
   assert.equal(response.body.provider, 'Cloudflare Workers AI');
-  assert.equal(openRouterCalls, beforeOpenRouter + 1);
-  assert.equal(cloudflareCalls, beforeCloudflare + 1);
+  assert.deepEqual(callOrder, ['openrouter', 'zai', 'novita', 'cloudflare']);
+  assert.equal(openRouterCalls, before.openRouterCalls + 1);
+  assert.equal(zaiCalls, before.zaiCalls + 1);
+  assert.equal(novitaCalls, before.novitaCalls + 1);
+  assert.equal(cloudflareCalls, before.cloudflareCalls + 1);
+  if (previousConfiguredModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+  else process.env.NOVA_OPENROUTER_MODEL = previousConfiguredModel;
+});
+
+test('NOVA se detiene en Z.AI cuando OpenRouter falla y Z.AI responde correctamente', async () => {
+  const before = { openRouterCalls, zaiCalls, novitaCalls, cloudflareCalls };
+  global.fetch = async (url, options) => {
+    if (url.includes('openrouter.ai')) {
+      openRouterCalls += 1;
+      return { ok: false, status: 429, async json() { return { error: 'rate limited' }; } };
+    }
+    assert.ok(url.includes('api.z.ai'));
+    assert.equal(JSON.parse(options.body).model, 'glm-4.7-flash');
+    zaiCalls += 1;
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo ayudarte con la información actual de tu cuenta.' } }] }; } };
+  };
+  const response = await invokeChat({ authId: '123456776' });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.provider, 'Z.AI GLM-4.7-Flash');
+  assert.equal(openRouterCalls, before.openRouterCalls + 1);
+  assert.equal(zaiCalls, before.zaiCalls + 1);
+  assert.equal(novitaCalls, before.novitaCalls);
+  assert.equal(cloudflareCalls, before.cloudflareCalls);
+});
+
+test('NOVA usa Novita después de fallos de OpenRouter y Z.AI, sin llamar a Cloudflare si Novita responde', async () => {
+  const before = { openRouterCalls, zaiCalls, novitaCalls, cloudflareCalls };
+  const order = [];
+  global.fetch = async (url, options) => {
+    if (url.includes('openrouter.ai')) {
+      order.push('openrouter'); openRouterCalls += 1;
+      return { ok: false, status: 429, async json() { return { error: 'rate limited' }; } };
+    }
+    if (url.includes('api.z.ai')) {
+      order.push('zai'); zaiCalls += 1;
+      return { ok: false, status: 503, async json() { return { error: 'unavailable' }; } };
+    }
+    assert.ok(url.includes('api.novita.ai'));
+    order.push('novita'); novitaCalls += 1;
+    assert.equal(JSON.parse(options.body).model, 'apodex/apodex-1.1-mini');
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo revisar la información registrada de tu cuenta.' } }] }; } };
+  };
+  const response = await invokeChat({ authId: '123456775' });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.provider, 'Novita Apodex 1.1 Mini');
+  assert.deepEqual(order, ['openrouter', 'zai', 'novita']);
+  assert.equal(openRouterCalls, before.openRouterCalls + 1);
+  assert.equal(zaiCalls, before.zaiCalls + 1);
+  assert.equal(novitaCalls, before.novitaCalls + 1);
+  assert.equal(cloudflareCalls, before.cloudflareCalls);
 });
 
 test('NOVA puede funcionar solo con Cloudflare cuando no hay clave de OpenRouter', async () => {
   const previousOpenRouterKey = process.env.OPENROUTER_API_KEY;
+  const previousZaiKey = process.env.ZAI_API_KEY;
+  const previousNovitaKey = process.env.NOVITA_API_KEY;
   const beforeOpenRouter = openRouterCalls;
+  const beforeZai = zaiCalls;
+  const beforeNovita = novitaCalls;
   const beforeCloudflare = cloudflareCalls;
   process.env.OPENROUTER_API_KEY = '';
+  process.env.ZAI_API_KEY = '';
+  process.env.NOVITA_API_KEY = '';
   global.fetch = async (url, options) => {
     assert.ok(url.includes('api.cloudflare.com'));
     assert.equal(options.headers.Authorization, 'Bearer test-cloudflare-api-token');
@@ -372,9 +459,13 @@ test('NOVA puede funcionar solo con Cloudflare cuando no hay clave de OpenRouter
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.provider, 'Cloudflare Workers AI');
     assert.equal(openRouterCalls, beforeOpenRouter);
+    assert.equal(zaiCalls, beforeZai);
+    assert.equal(novitaCalls, beforeNovita);
     assert.equal(cloudflareCalls, beforeCloudflare + 1);
   } finally {
     process.env.OPENROUTER_API_KEY = previousOpenRouterKey;
+    process.env.ZAI_API_KEY = previousZaiKey;
+    process.env.NOVITA_API_KEY = previousNovitaKey;
   }
 });
 

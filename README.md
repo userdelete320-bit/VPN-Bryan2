@@ -19,6 +19,6 @@ Configura las credenciales del proyecto como secretos/variables de entorno del s
 
 ## NOVA — atención al cliente con IA
 
-NOVA aparece como una conversación separada dentro del Centro de soporte. Usa OpenRouter Free como proveedor principal y Cloudflare Workers AI como respaldo gratuito. Para habilitarla, configura `OPENROUTER_API_KEY`, `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, y cambia `NOVA_ENABLED=true` después de probar en staging. El interruptor permanece en `false` por defecto.
+NOVA aparece como una conversación separada dentro del Centro de soporte. Usa una cadena secuencial de cuatro proveedores: OpenRouter Free → Z.AI GLM-4.7-Flash → Novita Apodex 1.1 Mini → Cloudflare Workers AI. Para habilitarla, configura `OPENROUTER_API_KEY`, `ZAI_API_KEY`, `NOVITA_API_KEY`, `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, y cambia `NOVA_ENABLED=true` después de probar en staging. El interruptor permanece en `false` por defecto.
 
 Consulta **[NOVA_SETUP.md](NOVA_SETUP.md)** para crear las claves, comprender las cuotas gratuitas, revisar privacidad y conocer los límites operativos. Los tickets tradicionales siguen funcionando de manera independiente.

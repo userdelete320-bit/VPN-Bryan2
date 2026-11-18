@@ -65,3 +65,7 @@ También se ejecutaron comprobaciones sintácticas de `routes/nova.js`, `supabas
 ## Requisito operativo antes de habilitar
 
 Configurar `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` como secretos del servidor. Mantener `NOVA_ENABLED=false` hasta terminar una prueba controlada. OpenRouter usa el alias gratuito `openrouter/free` con filtros `data_collection=deny`, `zdr=true`, `allow_fallbacks=false` y `max_price={prompt:0, completion:0}`; Cloudflare Workers AI (`@cf/zai-org/glm-4.7-flash`) actúa como respaldo. La integración no modifica la base de datos y no conserva historial del chat en Supabase.
+
+## Anexo — actualización de proveedores (18 de noviembre de 2026)
+
+La versión posterior a esta auditoría amplía el sistema de dos proveedores descrito en este documento a una cadena secuencial de cuatro: OpenRouter → Z.AI (`glm-4.7-flash`) → Novita (`apodex/apodex-1.1-mini`) → Cloudflare Workers AI (`@cf/zai-org/glm-4.7-flash`). La versión ampliada mantiene las restricciones de solo lectura, el filtro por Telegram ID, la validación de Telegram y el enrutamiento de comandos slash; incorpora pruebas simuladas del orden de respaldo. Ver `NOVA_PROVIDERS_REPORT.md` para los detalles actuales. La suite completa de esta versión da 21 pruebas superadas y 0 fallidas. No se han probado las claves externas ni la base de datos de producción.

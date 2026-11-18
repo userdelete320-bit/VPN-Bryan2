@@ -13,6 +13,8 @@ function isCloudflareAccountId(value) {
 function providerConfiguration() {
   return {
     openrouter: Boolean(process.env.OPENROUTER_API_KEY),
+    zai: Boolean(process.env.ZAI_API_KEY),
+    novita: Boolean(process.env.NOVITA_API_KEY),
     cloudflare: Boolean(process.env.CLOUDFLARE_API_TOKEN && isCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)),
   };
 }
@@ -21,13 +23,17 @@ router.get('/status', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   const providers = providerConfiguration();
   res.json({
-    enabled: process.env.NOVA_ENABLED === 'true' && (providers.openrouter || providers.cloudflare),
+    enabled: process.env.NOVA_ENABLED === 'true' && Object.values(providers).some(Boolean),
     providers,
   });
 });
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_OPENROUTER_MODEL = 'openrouter/free';
+const ZAI_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
+const ZAI_MODEL = 'glm-4.7-flash';
+const NOVITA_URL = 'https://api.novita.ai/openai/chat/completions';
+const NOVITA_MODEL = 'apodex/apodex-1.1-mini';
 const CLOUDFLARE_MODEL = '@cf/zai-org/glm-4.7-flash';
 
 function getOpenRouterFreeModel() {
@@ -337,6 +343,36 @@ async function callOpenRouter(messages) {
   });
 }
 
+async function callZai(messages) {
+  if (!process.env.ZAI_API_KEY) return { ok: false, kind: 'not_configured' };
+  return sendChatCompletion({
+    providerName: 'Z.AI GLM-4.7-Flash',
+    url: ZAI_URL,
+    apiKey: process.env.ZAI_API_KEY,
+    messages,
+    body: {
+      model: ZAI_MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      temperature: 0.25,
+    },
+  });
+}
+
+async function callNovita(messages) {
+  if (!process.env.NOVITA_API_KEY) return { ok: false, kind: 'not_configured' };
+  return sendChatCompletion({
+    providerName: 'Novita Apodex 1.1 Mini',
+    url: NOVITA_URL,
+    apiKey: process.env.NOVITA_API_KEY,
+    messages,
+    body: {
+      model: NOVITA_MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      temperature: 0.25,
+    },
+  });
+}
+
 async function callCloudflare(messages, estimatedInputTokens) {
   const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID } = process.env;
   if (!CLOUDFLARE_API_TOKEN || !isCloudflareAccountId(CLOUDFLARE_ACCOUNT_ID)) return { ok: false, kind: 'not_configured' };
@@ -360,9 +396,20 @@ async function callConfiguredProviders(messages, estimatedInputTokens) {
   const attempts = [];
   const providers = providerConfiguration();
 
-  // OpenRouter Free is primary. Cloudflare Workers AI is the independent free fallback.
+  // Sequential fallback chain: OpenRouter -> Z.AI -> Novita -> Cloudflare.
+  // Only the first valid Spanish response is returned; providers are never called in parallel.
   if (providers.openrouter) {
     const result = await callOpenRouter(messages);
+    if (result.ok) return result;
+    attempts.push(result);
+  }
+  if (providers.zai) {
+    const result = await callZai(messages);
+    if (result.ok) return result;
+    attempts.push(result);
+  }
+  if (providers.novita) {
+    const result = await callNovita(messages);
     if (result.ok) return result;
     attempts.push(result);
   }
@@ -552,7 +599,7 @@ async function generateNovaReply(telegramId, message, history = []) {
   }
 
   const providers = providerConfiguration();
-  if (!providers.openrouter && !providers.cloudflare) {
+  if (!Object.values(providers).some(Boolean)) {
     return { ok: false, status: 503, code: 'NOVA_NOT_CONFIGURED', reply: 'NOVA no está configurada. Contacta con @luvnt para recibir asistencia.' };
   }
   if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
