@@ -1,6 +1,6 @@
 # NOVA — instalación y operación
 
-NOVA aparece en el Centro de soporte como una conversación separada. Permanece desactivada por defecto (`NOVA_ENABLED=false`), por lo que el ZIP puede desplegarse sin activar el chat. Los tickets humanos y las rutas de soporte existentes siguen separados.
+NOVA está conectada al chat privado directo del bot de Telegram y también conserva el endpoint de la Web App. Permanece desactivada por defecto (`NOVA_ENABLED=false`), por lo que el ZIP puede desplegarse sin activar el chat. Los tickets humanos y las rutas de soporte existentes siguen separados.
 
 ## Proveedores de IA
 
@@ -10,6 +10,20 @@ NOVA usa dos APIs, en este orden:
 2. **Cloudflare Workers AI (respaldo)** — modelo `@cf/zai-org/glm-4.7-flash`, disponible en Workers Free. Cloudflare ofrece 10.000 neurons al día sin coste en Workers Free; NOVA reserva como máximo 7.500 neurons estimadas al día y añade un margen del 50% al cálculo. Si OpenRouter devuelve error, agota su cuota, o genera una respuesta inválida/no española, NOVA intenta Cloudflare.
 
 Los límites cambian y dependen de la cuenta, modelo y proveedor. Estas APIs gratuitas no son ilimitadas, no garantizan capacidad para 10.000 clientes y no constituyen un SLA de producción. En OpenRouter la cuota básica indicada es 50 solicitudes/día; para Cloudflare el cupo gratuito se mide en neurons, no en un número fijo de solicitudes.
+
+
+
+## Conversación directa por Telegram
+
+- En el chat privado del bot, cualquier mensaje de texto normal que no esté siendo utilizado por un flujo existente de compra, búsqueda, comprobante, recarga o administración se envía a NOVA.
+- Los mensajes que comienzan con `/` quedan reservados para comandos y no se envían a la IA. La excepción `/nova` se reconoce sin distinguir mayúsculas (`/nova`, `/Nova`) y presenta a NOVA. También admite una consulta en la misma línea, por ejemplo: `/nova ¿Qué plan tengo?`.
+- Después de presentar NOVA, el usuario puede escribir normalmente; no hay que anteponer el comando en cada mensaje.
+- `/start`, `/help`, `/menu` y los demás comandos continúan enrutándose a sus controladores originales. Los manejadores de flujos pendientes dejan pasar los mensajes slash para que no consuman comandos.
+- NOVA solo responde en chats privados. En grupos no se mostrarán datos de cuenta para evitar que información personal quede expuesta a otros miembros.
+- La conversación reciente de cada Telegram ID se conserva solo en memoria del proceso durante un máximo de 30 minutos. No se guarda en Supabase y no se comparte entre usuarios.
+- El webhook de Telegram se configura con `secret_token`; el endpoint `/webhook` rechaza peticiones que no incluyan el encabezado secreto esperado. Si `TELEGRAM_WEBHOOK_SECRET` no está configurado, el servidor deriva un secreto estable del `BOT_TOKEN`. El secreto nunca se envía al cliente.
+
+La única función que obtiene información privada es `respondToTelegramMessage`, que recibe el ID del remitente proporcionado por el contexto de Telegram después de recibir el update por el webhook validado. El servidor vuelve a leer el perfil y los pagos desde Supabase para ese ID en cada mensaje.
 
 ## Crear las claves
 
@@ -74,6 +88,7 @@ La cuenta consultada se determina únicamente por el Telegram ID extraído de `X
 3. Prueba en un entorno de staging con una cuenta de cliente autorizada. Comprueba primero OpenRouter y después simula un error para verificar el fallback de Cloudflare.
 4. Comprueba que los tickets humanos, pagos y las demás rutas siguen funcionando.
 5. Solo después cambia `NOVA_ENABLED=true`.
+6. Abre el chat privado del bot y prueba `/nova`, luego escribe una pregunta sin `/`. Comprueba también que `/start`, `/help`, `/menu` y otros comandos originales siguen funcionando.
 
 Los contadores de cuota de esta versión son locales al proceso Node. Si despliegas varias instancias, cada una tendrá su propio contador; no existe una cuota global distribuida ni se creó una tabla para ello. Mantén las cuotas de cuenta de los proveedores como límite definitivo y monitoriza respuestas 429/503.
 

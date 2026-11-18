@@ -437,3 +437,90 @@ test('las funciones nuevas de lectura existen en la capa Supabase', async () => 
   assert.ok(privateQueries.every(query => typeof query.filters.telegram_id === 'string'));
   assert.equal(queryLog.some(query => ['insert', 'update', 'delete', 'upsert'].some(action => query.actions.includes(action))), false);
 });
+
+const telegramResponder = router.respondToTelegramMessage;
+
+test('el chat directo de Telegram usa el mismo motor y consulta solo el Telegram ID del remitente', async () => {
+  assert.equal(typeof telegramResponder, 'function');
+  const beforeQueries = queryLog.length;
+  const beforeOpenRouter = openRouterCalls;
+  let requestBody = null;
+  global.fetch = async (url, options) => {
+    assert.match(url, /openrouter\.ai/);
+    requestBody = JSON.parse(options.body);
+    openRouterCalls += 1;
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { choices: [{ message: { content: 'Tu cuenta muestra el plan Básico y un pago aprobado. La vigencia no puede calcularse porque falta una duración confirmada.' } }] };
+      },
+    };
+  };
+
+  const result = await telegramResponder('123456789', '¿Qué plan tengo y cómo está mi pago?');
+  assert.equal(result.ok, true);
+  assert.match(result.reply, /plan Básico/i);
+  assert.equal(result.provider, 'OpenRouter');
+  assert.equal(openRouterCalls, beforeOpenRouter + 1);
+  assert.match(requestBody.messages[0].content, /"current_plan":"basico"/);
+  assert.doesNotMatch(requestBody.messages[0].content, /private_other_customer_plan|999999999|99999/);
+
+  const newQueries = queryLog.slice(beforeQueries);
+  const userQuery = newQueries.find(query => query.table === 'users');
+  const paymentsQuery = newQueries.find(query => query.table === 'payments');
+  assert.equal(userQuery.filters.telegram_id, '123456789');
+  assert.equal(paymentsQuery.filters.telegram_id, '123456789');
+  assert.equal(newQueries.some(query => ['insert', 'update', 'delete', 'upsert'].some(action => query.actions.includes(action))), false);
+});
+
+test('el chat de Telegram conserva únicamente el historial efímero del mismo remitente', async () => {
+  const captured = [];
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    captured.push(body.messages.slice(1));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { choices: [{ message: { content: 'Puedo ayudarte con esa consulta de VPN CUBA.' } }] };
+      },
+    };
+  };
+  const userId = '123456780';
+  const first = await telegramResponder(userId, 'Hola, tengo una duda sobre mi plan.');
+  const second = await telegramResponder(userId, '¿Puedes explicarme un poco más?');
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  assert.ok(captured[1].some(message => message.role === 'user' && /duda sobre mi plan/.test(message.content)));
+  assert.ok(captured[1].some(message => message.role === 'assistant' && /Puedo ayudarte/.test(message.content)));
+});
+
+test('el mensaje inglés en Telegram se rechaza antes de consultar Supabase o los proveedores', async () => {
+  const beforeQueries = queryLog.length;
+  const beforeOpenRouter = openRouterCalls;
+  const beforeCloudflare = cloudflareCalls;
+  const result = await telegramResponder('123456781', 'Hello, what is my plan?');
+  assert.equal(result.ok, true);
+  assert.equal(result.languageRejected, true);
+  assert.match(result.reply, /solo puedo atenderte en español/i);
+  assert.equal(queryLog.length, beforeQueries);
+  assert.equal(openRouterCalls, beforeOpenRouter);
+  assert.equal(cloudflareCalls, beforeCloudflare);
+});
+
+test('el enrutamiento del bot deja pasar los comandos slash y solo NOVA se añade como excepción', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
+  const messageMiddlewareCount = (indexSource.match(/bot\.on\('message', async \(ctx, next\) => \{/g) || []).length;
+  const slashGuards = (indexSource.match(/commandGuardText\.trim\(\)\.startsWith\('\/'\)/g) || []).length;
+  assert.equal(messageMiddlewareCount, 5);
+  assert.equal(slashGuards, messageMiddlewareCount);
+  assert.match(indexSource, /bot\.hears\(\/\^\\\/nova[\s\S]*?\$\/i/);
+  assert.match(indexSource, /if \(text\.startsWith\('\/'\)\) return;/);
+  assert.match(indexSource, /command: 'nova', description: 'Hablar con NOVA/);
+  assert.match(indexSource, /else \{ await sendTelegramNovaReply\(ctx, text\); \}/);
+  assert.match(indexSource, /x-telegram-bot-api-secret-token/);
+  assert.match(indexSource, /setWebhook\(webhookUrl, \{ secret_token: TELEGRAM_WEBHOOK_SECRET \}\)/);
+});

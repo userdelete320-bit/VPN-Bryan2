@@ -11,11 +11,16 @@ const pendingTrialLocks = new Map(); // userId -> timestamp
 // Tiempo de inicio del bot (para uptime)
 const START_TIME = Date.now();
 const crypto = require('crypto');
+const configuredTelegramWebhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
+const TELEGRAM_WEBHOOK_SECRET = /^[A-Za-z0-9_-]{1,256}$/.test(configuredTelegramWebhookSecret)
+  ? configuredTelegramWebhookSecret
+  : crypto.createHash('sha256').update(`${process.env.BOT_TOKEN || ''}:vpn-cuba-webhook-secret`).digest('hex');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const db = require('./supabase');
+const novaService = require('./routes/nova');
 const { syncShopCatalog } = require('./shop_sync');
 const digitalcoreConnector = require('./digitalcore_connector');
 const vexoranConnector = require('./vexoran_connector');
@@ -708,7 +713,7 @@ function isGroupCtx(ctx) {
 app.use(cors());
 app.use(express.json());
 // NOVA is isolated from payment, account, VPN and administration endpoints.
-app.use('/api/nova', require('./routes/nova'));
+app.use('/api/nova', novaService);
 app.use(express.static('public'));
 app.use('/assets', express.static('assets'));
 
@@ -4084,6 +4089,8 @@ bot.action(/^shop_qty_custom:(\d+)$/, async (ctx) => {
 
 // Captura "Otra cantidad" sin interferir con los demás mensajes del bot.
 bot.on('message', async (ctx, next) => {
+  const commandGuardText = ctx.message?.text;
+  if (typeof commandGuardText === 'string' && commandGuardText.trim().startsWith('/')) return next();
   const userId = ctx.from?.id?.toString();
   if (!userId) return next();
 
@@ -4172,6 +4179,8 @@ bot.action(/^shop_buy_cup:(\d+):(\d+)$/, async (ctx) => {
 
 // El comprobante se asocia a la orden pendiente y se envía a los administradores.
 bot.on('message', async (ctx, next) => {
+  const commandGuardText = ctx.message?.text;
+  if (typeof commandGuardText === 'string' && commandGuardText.trim().startsWith('/')) return next();
   const userId = ctx.from?.id?.toString();
   const pending = userId ? shopCupProofState.get(userId) : null;
   if (!pending) return next();
@@ -4648,6 +4657,8 @@ bot.action('shop_topup_custom', async (ctx) => {
 
 // Captura la cantidad personalizada o el comprobante (texto/foto) del flujo de recarga
 bot.on('message', async (ctx, next) => {
+  const commandGuardText = ctx.message?.text;
+  if (typeof commandGuardText === 'string' && commandGuardText.trim().startsWith('/')) return next();
   const userId = ctx.from?.id?.toString();
   if (!userId) return next();
   const state = shopTopupState.get(userId);
@@ -4877,6 +4888,8 @@ bot.action('shop_admin_find_user', async (ctx) => {
   await ctx.reply('👤 Manda el Telegram ID del usuario que quieres consultar:');
 });
 bot.on('message', async (ctx, next) => {
+  const commandGuardText = ctx.message?.text;
+  if (typeof commandGuardText === 'string' && commandGuardText.trim().startsWith('/')) return next();
   const adminId = ctx.from?.id?.toString();
   if (!adminId || !isAdmin(adminId) || !shopAdminFindUserState.get(adminId)) return next();
   shopAdminFindUserState.delete(adminId);
@@ -5605,6 +5618,8 @@ bot.action('bc_confirm_send', async (ctx) => {
 
 // Captura el mensaje del admin como contenido del broadcast (cualquier tipo: texto, foto, etc.)
 bot.on('message', async (ctx, next) => {
+  const commandGuardText = ctx.message?.text;
+  if (typeof commandGuardText === 'string' && commandGuardText.trim().startsWith('/')) return next();
   const adminId = ctx.from?.id?.toString();
   if (!adminId || !isAdmin(adminId)) return next();
   const state = broadcastState.get(adminId);
@@ -5620,6 +5635,37 @@ bot.on('message', async (ctx, next) => {
       [{ text: '❌ Cancelar', callback_data: 'bc_cancel' }],
     ] },
   });
+});
+
+async function sendTelegramNovaReply(ctx, userMessage) {
+  if (ctx.chat?.type !== 'private') {
+    await ctx.reply('🔒 Para proteger tus datos, NOVA solo atiende consultas en el chat privado del bot. Abre nuestro chat privado y escribe /nova.');
+    return;
+  }
+  try {
+    await ctx.sendChatAction('typing').catch(() => {});
+    const result = await novaService.respondToTelegramMessage(ctx.from.id.toString(), userMessage);
+    await ctx.reply(result.reply || 'NOVA no pudo responder ahora mismo. Contacta con @luvnt.', {
+      disable_web_page_preview: true,
+    });
+  } catch (error) {
+    console.error('[NOVA Telegram] No se pudo procesar el mensaje:', error.message);
+    await ctx.reply('NOVA no pudo responder ahora mismo. Inténtalo más tarde o contacta con @luvnt.');
+  }
+}
+
+// /nova funciona sin distinguir mayúsculas y también acepta una pregunta en la misma línea.
+// El comando solamente presenta NOVA si se envía sin texto; no activa un modo que capture comandos.
+bot.hears(/^\/nova(?:@\w+)?(?:\s+([\s\S]+))?$/i, async (ctx) => {
+  const text = String(ctx.message?.text || '').replace(/^\/nova(?:@\w+)?/i, '').trim();
+  if (text) return sendTelegramNovaReply(ctx, text);
+  if (ctx.chat?.type !== 'private') {
+    return ctx.reply('🔒 Para proteger tus datos, abre el chat privado del bot y escribe /nova.');
+  }
+  if (!novaService.isEnabled()) {
+    return ctx.reply('NOVA está desactivada o sus proveedores no están configurados. Contacta con @luvnt para recibir asistencia.');
+  }
+  return ctx.reply('¡Hola! Soy NOVA, la asistente virtual de VPN CUBA. 😊\n\nPuedes preguntarme sobre tu cuenta, tus pagos y los planes disponibles. Te responderé en español usando los datos actuales de Supabase.\n\nTambién puedes escribirme directamente sin comando. Los mensajes que comiencen con / se reservan para los comandos del bot.');
 });
 
 bot.on('text', async (ctx) => {
@@ -5644,6 +5690,7 @@ bot.on('text', async (ctx) => {
   const webappUrl = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
   if (text === '📁 VER PLANES') { await ctx.reply('📋 *NUESTROS PLANES*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR WEB DE PLANES", wa(`${webappUrl}/app.html?userId=${userId}`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
   else if (text === '⌨ PANEL ADMIN' && esAdmin) { await ctx.reply('🔧 *PANEL DE ADMINISTRACIÓN*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[createButton("ABRIR PANEL WEB", wa(`${webappUrl}/admin.html?userId=${userId}&admin=true`, ctx))], [createButton("MENÚ PRINCIPAL", { callback_data: 'main_menu' })]] } }); }
+  else { await sendTelegramNovaReply(ctx, text); }
 });
 
 // ==================== ANUNCIO POP-UP DEL SITIO ====================
@@ -5949,12 +5996,21 @@ app.post('/api/support/tickets/:id/status', async (req, res) => {
   }
 });
 
-app.post('/webhook', (req, res) => { bot.handleUpdate(req.body, res); });
+app.post('/webhook', (req, res) => {
+  const providedSecret = req.get('x-telegram-bot-api-secret-token') || '';
+  const expectedSecret = TELEGRAM_WEBHOOK_SECRET;
+  const providedBuffer = Buffer.from(providedSecret);
+  const expectedBuffer = Buffer.from(expectedSecret);
+  const validSecret = providedBuffer.length === expectedBuffer.length
+    && crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+  if (!validSecret) return res.status(403).send('Forbidden');
+  return bot.handleUpdate(req.body, res);
+});
 
 async function setWebhook() {
     const webhookUrl = `${process.env.WEBAPP_URL}/webhook`;
     try {
-        await bot.telegram.setWebhook(webhookUrl);
+        await bot.telegram.setWebhook(webhookUrl, { secret_token: TELEGRAM_WEBHOOK_SECRET });
         console.log(`✅ Webhook establecido en: ${webhookUrl}`);
     } catch (error) {
         console.error('❌ Error estableciendo webhook:', error);
@@ -5988,6 +6044,7 @@ app.listen(PORT, '0.0.0.0', async () => {
             { command: 'start', description: 'Iniciar el bot / Ver menú' },
             { command: 'menu', description: 'Mostrar menú principal' },
             { command: 'help', description: 'Mostrar ayuda' },
+            { command: 'nova', description: 'Hablar con NOVA — atención al cliente' },
             { command: 'referidos', description: 'Obtener enlace de referidos' },
             { command: 'trialstatus', description: 'Ver estado de prueba gratuita' },
             { command: 'admin', description: 'Panel de administración (solo admins)' }

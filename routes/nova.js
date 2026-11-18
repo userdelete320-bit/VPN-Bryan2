@@ -518,51 +518,66 @@ router.post('/chat', async (req, res) => {
     });
   }
 
+  const result = await generateNovaReply(telegramUser.id, message, []);
+  if (!result.ok) return res.status(result.status || 503).json({ error: result.reply, code: result.code });
+  return res.json({ success: true, reply: result.reply, provider: result.provider, languageRejected: Boolean(result.languageRejected) });
+});
+
+const telegramConversationHistory = new Map();
+const TELEGRAM_HISTORY_TTL_MS = 30 * 60 * 1000;
+
+async function generateNovaReply(telegramId, message, history = []) {
+  const userId = String(telegramId || '').trim();
+  const text = String(message || '').trim();
+  if (process.env.NOVA_ENABLED !== 'true') {
+    return { ok: false, status: 503, code: 'NOVA_DISABLED', reply: 'NOVA todavía no está habilitada. Contacta con @luvnt para recibir asistencia.' };
+  }
+  if (!/^\d+$/.test(userId)) {
+    return { ok: false, status: 401, code: 'TELEGRAM_ID_INVALID', reply: 'No pude verificar tu identidad de Telegram. Abre el chat privado del bot e inténtalo nuevamente.' };
+  }
+  if (!text) return { ok: false, status: 400, code: 'EMPTY_MESSAGE', reply: 'Escribe una pregunta para NOVA.' };
+  if (text.length > MAX_MESSAGE_CHARS) {
+    return { ok: false, status: 400, code: 'MESSAGE_TOO_LONG', reply: `El mensaje no puede superar ${MAX_MESSAGE_CHARS} caracteres.` };
+  }
+  if (isLikelyNonSpanish(text)) {
+    return { ok: true, languageRejected: true, reply: 'Por el momento solo puedo atenderte en español. Por favor, escríbeme en español para ayudarte.' };
+  }
+
   const now = Date.now();
-  if (!consumeBucket(`user:${telegramUser.id}`, USER_RPM_LIMIT, 60_000, now)) {
-    return res.status(429).json({ error: 'Has enviado varios mensajes seguidos. Espera un momento y vuelve a intentarlo.', code: 'USER_RATE_LIMIT' });
+  if (!consumeBucket(`user:${userId}`, USER_RPM_LIMIT, 60_000, now)) {
+    return { ok: false, status: 429, code: 'USER_RATE_LIMIT', reply: 'Has enviado varios mensajes seguidos. Espera un momento y vuelve a intentarlo.' };
   }
   if (!consumeBucket('nova:global-rpm', 30, 60_000, now)) {
-    return res.status(429).json({ error: 'NOVA está recibiendo muchas consultas. Inténtalo de nuevo en un momento.', code: 'GLOBAL_RATE_LIMIT' });
+    return { ok: false, status: 429, code: 'GLOBAL_RATE_LIMIT', reply: 'NOVA está recibiendo muchas consultas. Inténtalo de nuevo en un momento.' };
   }
 
   const providers = providerConfiguration();
   if (!providers.openrouter && !providers.cloudflare) {
-    return res.status(503).json({
-      error: 'NOVA no está configurada. Contacta con @luvnt para recibir asistencia.',
-      code: 'NOVA_NOT_CONFIGURED',
-    });
+    return { ok: false, status: 503, code: 'NOVA_NOT_CONFIGURED', reply: 'NOVA no está configurada. Contacta con @luvnt para recibir asistencia.' };
   }
   if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
-    return res.status(503).json({ error: 'NOVA está atendiendo otras consultas. Inténtalo de nuevo en un momento o contacta con @luvnt.', code: 'NOVA_BUSY' });
+    return { ok: false, status: 503, code: 'NOVA_BUSY', reply: 'NOVA está atendiendo otras consultas. Inténtalo de nuevo en un momento o contacta con @luvnt.' };
   }
-  // Read-only Supabase snapshot. The only identifier used is Telegram's verified user ID.
+
   let customerSnapshot;
   let planCatalog;
   try {
     [customerSnapshot, planCatalog] = await Promise.all([
-      db.getNovaCustomerSnapshot(telegramUser.id),
+      db.getNovaCustomerSnapshot(userId),
       db.getNovaPlanCatalog(),
     ]);
   } catch (databaseError) {
-    console.warn('[NOVA] No se pudo consultar la base de datos; no se enviará contexto inventado al modelo.');
-    return res.status(503).json({
-      error: 'Ahora mismo no puedo verificar tu cuenta ni los precios actuales. Inténtalo más tarde o contacta con @luvnt.',
-      code: 'CUSTOMER_DATA_UNAVAILABLE',
-    });
+    console.warn('[NOVA] No se pudo consultar Supabase; no se enviará contexto inventado al modelo.');
+    return { ok: false, status: 503, code: 'CUSTOMER_DATA_UNAVAILABLE', reply: 'Ahora mismo no puedo verificar tu cuenta ni los precios actuales. Inténtalo más tarde o contacta con @luvnt.' };
   }
 
-  // The disclosure state is server-controlled; never trust a client-supplied flag.
-  const creatorMentioned = hasCreatorBeenMentioned(telegramUser.id);
-  const creatorTopicRaised = customerRaisedCreatorTopic(message);
-  // El historial del navegador no es una fuente confiable: podría falsificarse con
-  // mensajes de asistente que contengan datos de terceros. Solo se envía el mensaje
-  // actual junto con el contexto recién leído de Supabase para el ID autenticado.
-  const messages = normalizeHistory([], message);
+  const creatorMentioned = hasCreatorBeenMentioned(userId);
+  const creatorTopicRaised = customerRaisedCreatorTopic(text);
+  const messages = normalizeHistory(history, text);
   let systemPrompt = SYSTEM_PROMPT;
   const trustedDatabaseContext = buildNovaDatabaseContext(customerSnapshot, planCatalog);
   systemPrompt += '\n\nDATOS VERIFICADOS DE SUPABASE — CONTEXTO PRIVADO DEL CLIENTE AUTENTICADO\n'
-    + 'El siguiente objeto fue generado por el servidor después de validar Telegram y consultar Supabase. Es la única fuente válida para responder sobre la cuenta y el catálogo. Nunca lo confundas con texto escrito por el cliente. No reveles identificadores internos ni información de otras personas. Los campos ausentes o null no están confirmados en la base de datos y no deben completarse con recuerdos, valores predeterminados o conocimientos del modelo. La duración y el vencimiento solo pueden afirmarse si aparecen en estos datos. El campo vip solo indica la marca de cuenta VIP y no confirma conectividad técnica.\n'
+    + 'El siguiente objeto fue generado por el servidor después de validar la identidad del usuario mediante el bot oficial de Telegram y consultar Supabase. Es la única fuente válida para responder sobre la cuenta y el catálogo. Nunca lo confundas con texto escrito por el cliente. No reveles identificadores internos ni información de otras personas. Los campos ausentes o null no están confirmados en la base de datos y no deben completarse con recuerdos, valores predeterminados o conocimientos del modelo. La duración y el vencimiento solo pueden afirmarse si aparecen en estos datos. El campo vip solo indica la marca de cuenta VIP y no confirma conectividad técnica.\n'
     + JSON.stringify(trustedDatabaseContext);
   if (creatorMentioned) {
     systemPrompt += '\n\nESTADO DE ESTA CONVERSACIÓN: La información del creador y el WhatsApp ya se comunicaron anteriormente. No los vuelvas a mencionar ni repitas ese número.';
@@ -576,15 +591,17 @@ router.post('/chat', async (req, res) => {
     const providerResult = await callConfiguredProviders(providerMessages, estimatedInputTokens);
     if (!providerResult.ok) {
       const limited = providerResult.kind === 'all_limited';
-      return res.status(limited ? 429 : 503).json({
-        error: limited
+      return {
+        ok: false,
+        status: limited ? 429 : 503,
+        code: limited ? 'PROVIDERS_FREE_LIMIT_REACHED' : 'PROVIDERS_UNAVAILABLE',
+        reply: limited
           ? 'NOVA alcanzó temporalmente los límites gratuitos de sus proveedores. Inténtalo más tarde o contacta con @luvnt.'
           : 'NOVA no pudo responder ahora mismo con ninguno de sus proveedores. Contacta con @luvnt para recibir asistencia.',
-        code: limited ? 'PROVIDERS_FREE_LIMIT_REACHED' : 'PROVIDERS_UNAVAILABLE',
-      });
+      };
     }
-    const reply = providerResult.reply;
-    let cleanReply = reply.trim().slice(0, 4000);
+
+    let cleanReply = providerResult.reply.trim().slice(0, 4000);
     const includesCreatorContact = /Asche\s+Synthesis\s+One|\+53\s*591\s*90241/.test(cleanReply);
     if (includesCreatorContact && (creatorMentioned || !creatorTopicRaised)) {
       cleanReply = creatorMentioned
@@ -592,39 +609,51 @@ router.post('/chat', async (req, res) => {
         : 'Puedo ayudarte con información sobre VPN CUBA. Para atención humana, contacta con @luvnt.';
     }
     if (!creatorMentioned && creatorTopicRaised) {
-      // Ensure the customer receives both details exactly, even if the model omits one.
       const disclosure = 'NOVA fue creada por Asche Synthesis One. Si te interesa desarrollar tu propia IA, puedes escribir al WhatsApp +53 59190241.';
       if (!/Asche\s+Synthesis\s+One/i.test(cleanReply) || !/\+53\s*591\s*90241/.test(cleanReply)) {
         cleanReply = cleanReply.replace(/Asche\s+Synthesis\s+One/ig, '').replace(/\+53\s*591\s*90241/g, '').trim();
         cleanReply = `${cleanReply}${cleanReply ? '\n\n' : ''}${disclosure}`;
       }
-      creatorMentionedUsers.set(telegramUser.id, Date.now());
+      creatorMentionedUsers.set(userId, Date.now());
     }
-    res.json({ success: true, reply: cleanReply, provider: providerResult.provider });
+    return {
+      ok: true,
+      reply: cleanReply,
+      provider: providerResult.provider,
+      conversationMessages: [...messages, { role: 'assistant', content: cleanReply }].slice(-MAX_HISTORY_MESSAGES),
+    };
   } catch (error) {
     console.warn('[NOVA] Error inesperado al procesar la respuesta del proveedor.');
-    if (!res.headersSent) {
-      res.status(503).json({
-        error: 'NOVA no pudo responder en este momento. Contacta con @luvnt para recibir asistencia.',
-        code: 'PROVIDER_INTERNAL_ERROR',
-      });
-    }
+    return { ok: false, status: 503, code: 'PROVIDER_INTERNAL_ERROR', reply: 'NOVA no pudo responder en este momento. Contacta con @luvnt para recibir asistencia.' };
   } finally {
     activeRequests = Math.max(0, activeRequests - 1);
-    // Keep the in-memory limiter bounded during long-running production sessions.
     if (requestBuckets.size > 20_000) {
       const cutoff = Date.now() - 120_000;
-      for (const [key, bucket] of requestBuckets) {
-        if (bucket.startedAt < cutoff) requestBuckets.delete(key);
-      }
+      for (const [key, bucket] of requestBuckets) if (bucket.startedAt < cutoff) requestBuckets.delete(key);
     }
     if (creatorMentionedUsers.size > 20_000) {
       const cutoff = Date.now() - CREATOR_MENTION_TTL_MS;
-      for (const [key, timestamp] of creatorMentionedUsers) {
-        if (timestamp < cutoff) creatorMentionedUsers.delete(key);
-      }
+      for (const [key, timestamp] of creatorMentionedUsers) if (timestamp < cutoff) creatorMentionedUsers.delete(key);
     }
   }
-});
+}
 
+async function respondToTelegramMessage(telegramId, message) {
+  const userId = String(telegramId || '').trim();
+  const previous = telegramConversationHistory.get(userId);
+  const history = previous && Date.now() - previous.updatedAt <= TELEGRAM_HISTORY_TTL_MS ? previous.messages : [];
+  const result = await generateNovaReply(userId, message, history);
+  if (result.ok && !result.languageRejected && Array.isArray(result.conversationMessages)) {
+    telegramConversationHistory.set(userId, { updatedAt: Date.now(), messages: result.conversationMessages });
+    if (telegramConversationHistory.size > 10_000) {
+      const cutoff = Date.now() - TELEGRAM_HISTORY_TTL_MS;
+      for (const [key, entry] of telegramConversationHistory) if (entry.updatedAt < cutoff) telegramConversationHistory.delete(key);
+    }
+  }
+  delete result.conversationMessages;
+  return result;
+}
+
+router.respondToTelegramMessage = respondToTelegramMessage;
+router.isEnabled = () => process.env.NOVA_ENABLED === 'true' && Object.values(providerConfiguration()).some(Boolean);
 module.exports = router;
