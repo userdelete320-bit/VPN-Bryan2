@@ -60,12 +60,12 @@ El servidor consulta en modo exclusivamente lectura los datos del cliente autent
 
 ## Datos de Supabase consultados
 
-- `users`: plan, marca VIP, velocidades, datos de prueba y estado de mensajería del bot.
-- `payments`: hasta 25 registros recientes del mismo Telegram ID. Se remiten al modelo solo los últimos 8 y campos permitidos; nunca capturas, notas, TXID ni archivos de conexión.
-- `plan_prices`: tarifas estándar actuales, con fallback marcado cuando el catálogo público usa un valor predeterminado.
-- `settings` (`key=plan_availability`): disponibilidad actual. Si la consulta falla, NOVA no inventa disponibilidad ni llama al modelo.
+- `users`: consulta del registro cuyo `telegram_id` coincide exactamente con el ID autenticado.
+- `payments`: hasta 25 registros recientes filtrados por el mismo `telegram_id`. Se remiten al modelo solo los últimos 8 y campos permitidos; nunca capturas, notas, TXID ni archivos de conexión.
+- `plan_prices`: catálogo general. NOVA muestra exclusivamente filas y valores realmente guardados en esta tabla; no utiliza `plan-price-defaults.js` ni ningún fallback del código.
+- `settings` (`key=plan_availability`): disponibilidad general. Si no existe el valor o falla la consulta, la disponibilidad queda sin confirmar y NOVA no llama al modelo cuando la consulta falla.
 
-La cuenta consultada se determina únicamente por el Telegram ID extraído de `X-Telegram-Init-Data` y su firma validada con `BOT_TOKEN`. El cliente no puede sustituir ese ID desde el cuerpo de la solicitud. NOVA solo puede informar sobre ese mismo cliente; no puede consultar a terceros.
+La cuenta consultada se determina únicamente por el Telegram ID extraído de `X-Telegram-Init-Data` y su firma validada con `BOT_TOKEN`. El cliente no puede sustituir ese ID desde el cuerpo de la solicitud. Los datos de `users` y `payments` siempre usan ese mismo filtro. `plan_prices` y `settings` son datos generales de la empresa y no contienen consultas de cuentas ajenas. NOVA no permite consultar terceros.
 
 ## Activación gradual y pruebas
 
@@ -79,6 +79,6 @@ Los contadores de cuota de esta versión son locales al proceso Node. Si desplie
 
 ## Restricciones funcionales
 
-NOVA lee la cuenta y el catálogo, pero no escribe datos. No activa, renueva ni cancela servicios; no aprueba pagos; no modifica saldos; no entrega configuraciones; no diagnostica el estado técnico de los túneles. Los planes Express siguen sin guardar duración elegida en `payments`, por lo que NOVA no calcula su vencimiento y deriva a `@luvnt`.
+NOVA lee la cuenta y el catálogo, pero no escribe datos. No activa, renueva ni cancela servicios; no aprueba pagos; no modifica saldos; no entrega configuraciones; no diagnostica el estado técnico de los túneles. NOVA no calcula ningún vencimiento mientras la duración aplicable no esté disponible como dato verificado en Supabase. Tampoco afirma descripciones o características de planes que no existan en los datos consultados.
 
-Las pruebas incluidas son simuladas: no contactan APIs externas ni Supabase real. Las cuentas y claves reales deben validarse en staging antes de activar el chat en producción.
+Las pruebas incluidas son simuladas: no contactan APIs externas ni Supabase real. Verifican también que el filtro por Telegram ID excluye registros de otros clientes, que el navegador no puede inyectar historial falso y que NOVA no usa precios predeterminados, descripciones ni duraciones incrustadas en el código. Las cuentas y claves reales deben validarse en staging antes de activar el chat en producción.

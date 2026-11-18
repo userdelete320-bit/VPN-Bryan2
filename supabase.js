@@ -1,7 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs').promises;
 const path = require('path');
-const DEFAULT_PLAN_PRICES = require('./plan-price-defaults');
 require('dotenv').config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -724,33 +723,15 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
   // disponibilidad guardada; nunca escribe ni usa valores estáticos como si fueran actuales.
   async getNovaPlanCatalog() {
     assertNovaServiceKey();
+
+    // NOVA muestra solamente filas que existen realmente en plan_prices.
+    // A diferencia del catálogo público, esta consulta NO mezcla constantes
+    // de respaldo ni valores predeterminados definidos en archivos del proyecto.
     const { data: priceRows, error: priceError } = await dbClient
       .from('plan_prices')
       .select('plan, cup, mobile, usdt, stars, ton, updated_at')
       .order('plan', { ascending: true });
     if (priceError) throw priceError;
-
-    const databasePriceMap = new Map((priceRows || []).map(row => [row.plan, row]));
-    const databasePricePlanKeys = [...databasePriceMap.keys()];
-    // Express tiene opciones por duración en el frontend, pero no se persisten
-    // como filas independientes en plan_prices en el flujo actual.
-    const prices = Object.entries(DEFAULT_PLAN_PRICES)
-      .filter(([plan]) => plan !== 'express')
-      .map(([plan, defaults]) => {
-      const dbRow = databasePriceMap.get(plan);
-      const source = dbRow ? 'supabase_plan_prices' : 'project_default_used_by_public_catalog';
-      const effective = dbRow || defaults;
-      return {
-        plan,
-        cup: Number(effective.cup),
-        mobile: Number(effective.mobile),
-        usdt: Number(effective.usdt),
-        stars: Number(effective.stars),
-        ton: Number(effective.ton),
-        updated_at: dbRow?.updated_at || null,
-        price_source: source,
-      };
-    });
 
     let savedAvailability = null;
     const { data: settingsRow, error: settingsError } = await dbClient
@@ -759,29 +740,32 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
       .eq('key', 'plan_availability')
       .maybeSingle();
     if (settingsError) throw settingsError;
+
     if (settingsRow?.value != null) {
       try {
         const raw = settingsRow.value;
-        savedAvailability = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (!savedAvailability || typeof savedAvailability !== 'object' || Array.isArray(savedAvailability)) savedAvailability = null;
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          savedAvailability = parsed;
+        }
       } catch (_) {
         savedAvailability = null;
       }
     }
-    // La aplicación pública inicializa todos los planes como disponibles (false)
-    // y luego mezcla cualquier valor guardado en settings.
-    const availability = Object.fromEntries(Object.keys(DEFAULT_PLAN_PRICES).map(plan => [plan, false]));
-    if (savedAvailability) {
-      for (const plan of Object.keys(availability)) {
-        if (typeof savedAvailability[plan] === 'boolean') availability[plan] = savedAvailability[plan];
-      }
-    }
 
     return {
-      prices,
-      availability,
-      availability_source: savedAvailability ? 'supabase_settings' : 'project_default_used_by_public_catalog',
-      database_price_plan_keys: databasePricePlanKeys,
+      prices: (priceRows || []).map(row => ({
+        plan: row.plan,
+        cup: row.cup ?? null,
+        mobile: row.mobile ?? null,
+        usdt: row.usdt ?? null,
+        stars: row.stars ?? null,
+        ton: row.ton ?? null,
+        updated_at: row.updated_at || null,
+      })),
+      availability: savedAvailability,
+      availability_source: savedAvailability ? 'supabase_settings' : null,
+      database_price_plan_keys: (priceRows || []).map(row => row.plan).filter(Boolean),
     };
   },
 
