@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>VPN CUBA</title>
-<script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -502,6 +502,14 @@
   .chat-send-btn{ width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg, var(--indigo-1), var(--indigo-2)); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
   .chat-send-btn svg{ width:17px; height:17px; }
   .chat-closed-note{ text-align:center; font-size:11.5px; color:var(--muted-2); background:var(--card-2); border:1px dashed var(--border); border-radius:12px; padding:12px; line-height:1.6; }
+  .nova-chat-shell{ background:var(--card-2); border:1px solid var(--border); border-radius:16px; padding:12px; margin-top:12px; }
+  .nova-chat-thread{ min-height:250px; max-height:56vh; overflow-y:auto; }
+  .nova-chat-thread .chat-bubble{ white-space:pre-wrap; overflow-wrap:anywhere; }
+  .nova-chat-thread .chat-bubble.nova-error{ border-color:rgba(245,185,66,.35); color:var(--muted); }
+  .nova-typing{ align-self:flex-start; color:var(--muted-2); font-size:11px; padding:8px 12px; }
+  .nova-disclaimer{ color:var(--muted-2); font-size:10.5px; line-height:1.55; margin:10px 3px 4px; }
+  .nova-send-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
 
   .ticket-status-bar{ display:flex; gap:7px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; margin-bottom:16px; }
   .ticket-status-bar::-webkit-scrollbar{ display:none; }
@@ -1116,6 +1124,32 @@
       <div class="ahi-icon icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2.5 1.8-2.5 3.5M12 17h.01"/></svg></div>
       <div class="ahi-text"><div class="ahi-title">Preguntas frecuentes</div><div class="ahi-sub">Soluciona problemas comunes al instante</div></div>
       <svg class="menu-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+    <div class="admin-hub-item" id="novaSupportEntry" style="display:none" onclick="openNovaChat()">
+      <div class="ahi-icon icon-indigo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 3a8 8 0 00-8 8v2a3 3 0 003 3h1v-5H6a6 6 0 0112 0h-2v5h1a3 3 0 003-3v-2a8 8 0 00-8-8z"/><path d="M9 19h6"/></svg></div>
+      <div class="ahi-text"><div class="ahi-title">Hablar con NOVA</div><div class="ahi-sub">Asistente virtual de VPN CUBA · atención en español</div></div>
+      <svg class="menu-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCREEN: CHAT CON NOVA ============ -->
+<div class="screen" id="screen-nova-chat">
+  <div class="topbar">
+    <div class="back-btn" onclick="goBack()">←</div>
+    <div class="topbar-title">✨ NOVA · Asistente virtual</div>
+    <div style="width:38px"></div>
+  </div>
+  <div class="wrap">
+    <div class="nova-disclaimer">NOVA puede consultar en modo de solo lectura tu perfil de VPN CUBA, tu plan, la vigencia disponible y el estado de tus pagos/configuración, además del catálogo actual de planes y precios. Para generar respuestas, se envía al proveedor de IA que esté disponible (OpenRouter o Cloudflare Workers AI) un resumen mínimo de esos datos. NOVA no puede modificar cuentas, aprobar pagos, activar servicios ni cambiar configuraciones. No envíes contraseñas, códigos ni datos bancarios. Atención humana: <b>@luvnt</b>.</div>
+    <div class="nova-chat-shell">
+      <div class="chat-thread nova-chat-thread" id="novaChatThread" aria-live="polite"></div>
+      <div class="chat-input-bar">
+        <input type="text" id="novaChatInput" maxlength="1200" placeholder="Escribe tu consulta en español..." autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();sendNovaMessage();}">
+        <button class="chat-send-btn nova-send-btn" id="novaSendBtn" onclick="sendNovaMessage()" aria-label="Enviar mensaje">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1967,8 +2001,111 @@
   }
   function categoryMeta(key){ return TICKET_CATEGORIES.find(c => c.key === key) || { icon:'🎫', label:key }; }
 
+  // ==================== NOVA: asistente de atención al cliente ====================
+  const novaWelcomeMessage = '¡Hola! Soy NOVA, el asistente virtual de VPN CUBA. Puedo ayudarte con información sobre los planes, el funcionamiento del servicio y dudas frecuentes. ¿Qué necesitas saber?';
+  let novaMessages = [{ role:'assistant', content:novaWelcomeMessage }];
+  let novaIsSending = false;
+
+  function openNovaChat(){
+    goTo('screen-nova-chat');
+    renderNovaChat();
+    setTimeout(() => document.getElementById('novaChatInput')?.focus(), 80);
+  }
+
+  function renderNovaChat(typing = false){
+    const thread = document.getElementById('novaChatThread');
+    if (!thread) return;
+    thread.replaceChildren();
+    novaMessages.forEach((message) => {
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble ' + (message.role === 'assistant' ? 'staff' : 'user');
+      if (message.role === 'assistant') {
+        const name = document.createElement('div');
+        name.className = 'cb-name';
+        name.textContent = 'NOVA';
+        bubble.appendChild(name);
+      }
+      const body = document.createElement('div');
+      body.textContent = message.content;
+      bubble.appendChild(body);
+      thread.appendChild(bubble);
+    });
+    if (typing) {
+      const indicator = document.createElement('div');
+      indicator.className = 'nova-typing';
+      indicator.textContent = 'NOVA está escribiendo…';
+      thread.appendChild(indicator);
+    }
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function addNovaNotice(message){
+    novaMessages.push({ role:'assistant', content:message });
+    renderNovaChat();
+  }
+
+  async function sendNovaMessage(){
+    const input = document.getElementById('novaChatInput');
+    const sendBtn = document.getElementById('novaSendBtn');
+    if (!input || novaIsSending) return;
+    const message = input.value.trim();
+    if (!message) return;
+    if (message.length > 1200) { showToast('Tu mensaje es demasiado largo.'); return; }
+    if (!tgWebApp?.initData) {
+      addNovaNotice('Para utilizar NOVA, abre VPN CUBA desde el bot oficial de Telegram.');
+      return;
+    }
+
+    input.value = '';
+    novaMessages.push({ role:'user', content:message });
+    novaIsSending = true;
+    input.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
+    renderNovaChat(true);
+
+    try {
+      const history = novaMessages.slice(-8).map(item => ({ role:item.role, content:item.content }));
+      const response = await fetch('/api/nova/chat', {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'X-Telegram-Init-Data':tgWebApp.initData,
+        },
+        body:JSON.stringify({ message, history }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        addNovaNotice(data.error || 'NOVA no está disponible en este momento. Para recibir asistencia, contacta con @luvnt.');
+      } else {
+        const reply = String(data.reply || '').trim();
+        if (!reply) throw new Error('NOVA no devolvió una respuesta.');
+        novaMessages.push({ role:'assistant', content:reply });
+        renderNovaChat();
+      }
+    } catch (error) {
+      addNovaNotice('No se pudo conectar con NOVA en este momento. Para recibir asistencia, contacta con @luvnt.');
+    } finally {
+      novaIsSending = false;
+      input.disabled = false;
+      if (sendBtn) sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
   // ==================== USUARIO: centro de soporte ====================
+  async function updateNovaSupportVisibility(){
+    const entry = document.getElementById('novaSupportEntry');
+    if (!entry) return;
+    entry.style.display = 'none';
+    try {
+      const response = await fetch('/api/nova/status', { cache:'no-store' });
+      const status = await response.json();
+      if (response.ok && status.enabled === true) entry.style.display = '';
+    } catch (e) { /* NOVA stays hidden if the status endpoint is unavailable. */ }
+  }
+
   async function renderSupportHub(){
+    updateNovaSupportVisibility();
     if (!currentUser.id) return;
     try {
       const res = await fetch(`/api/support/tickets/user/${encodeURIComponent(currentUser.id)}`);
@@ -3936,6 +4073,7 @@ PersistentKeepalive = 25`;
     if (id === 'screen-admin-resellers-finance') renderAdminFinance();
     if (id === 'screen-admin-resellers-config') renderResellerConfigScreen();
     if (id === 'screen-support') renderSupportHub();
+    if (id === 'screen-nova-chat') renderNovaChat();
     if (id === 'screen-support-tickets') renderMyTickets();
     if (id === 'screen-support-faq') renderFaq();
     if (id === 'screen-admin-support'){ renderAdminTicketFilterBar(); renderAdminTicketsList(); }

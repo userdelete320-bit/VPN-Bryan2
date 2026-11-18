@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs').promises;
 const path = require('path');
+const DEFAULT_PLAN_PRICES = require('./plan-price-defaults');
 require('dotenv').config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -18,6 +19,12 @@ if (!supabaseServiceKey) {
   console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY no configurada. Usando anon key para admin. Algunas operaciones pueden fallar por RLS.');
 }
 const dbClient = supabaseAdmin;
+
+function assertNovaServiceKey() {
+  if (!supabaseServiceKey) {
+    throw new Error('NOVA requiere SUPABASE_SERVICE_ROLE_KEY configurada en el servidor para consultar los datos con seguridad.');
+  }
+}
 
 const db = {
   // ========== STORAGE ==========
@@ -672,6 +679,110 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
       console.error('❌ Error en getUserPayments:', error);
       return [];
     }
+  },
+
+  // ========== NOVA: CONSULTAS EXCLUSIVAMENTE DE LECTURA ==========
+  // Estas consultas devuelven una lista explícita de campos permitidos.
+  // El telegram_id siempre se recibe del servidor después de validar Telegram initData.
+  async getNovaCustomerSnapshot(telegramId) {
+    assertNovaServiceKey();
+    const userId = String(telegramId || '').trim();
+    if (!/^\d{5,20}$/.test(userId)) throw new Error('Identificador de cliente inválido');
+
+    const userFields = [
+      'vip', 'plan', 'speed_download', 'speed_upload',
+      'is_active', 'trial_requested', 'trial_received', 'trial_requested_at',
+      'trial_sent_at', 'trial_plan_type'
+    ].join(',');
+
+    const { data: user, error: userError } = await dbClient
+      .from('users')
+      .select(userFields)
+      .eq('telegram_id', userId)
+      .maybeSingle();
+    if (userError) throw userError;
+
+    // Solo columnas que el código de producción crea o actualiza de forma explícita.
+    // No se seleccionan capturas, notas, direcciones, TXID ni archivos de configuración.
+    const paymentFields = [
+      'plan', 'price', 'original_price', 'method', 'status', 'created_at', 'approved_at',
+      'rejected_at', 'config_sent', 'config_sent_at'
+    ].join(',');
+
+    const { data: payments, error: paymentsError } = await dbClient
+      .from('payments')
+      .select(paymentFields)
+      .eq('telegram_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(25);
+    if (paymentsError) throw paymentsError;
+
+    return { user: user || null, payments: payments || [] };
+  },
+
+  // El catálogo de NOVA lee exclusivamente precios administrativos actuales y
+  // disponibilidad guardada; nunca escribe ni usa valores estáticos como si fueran actuales.
+  async getNovaPlanCatalog() {
+    assertNovaServiceKey();
+    const { data: priceRows, error: priceError } = await dbClient
+      .from('plan_prices')
+      .select('plan, cup, mobile, usdt, stars, ton, updated_at')
+      .order('plan', { ascending: true });
+    if (priceError) throw priceError;
+
+    const databasePriceMap = new Map((priceRows || []).map(row => [row.plan, row]));
+    const databasePricePlanKeys = [...databasePriceMap.keys()];
+    // Express tiene opciones por duración en el frontend, pero no se persisten
+    // como filas independientes en plan_prices en el flujo actual.
+    const prices = Object.entries(DEFAULT_PLAN_PRICES)
+      .filter(([plan]) => plan !== 'express')
+      .map(([plan, defaults]) => {
+      const dbRow = databasePriceMap.get(plan);
+      const source = dbRow ? 'supabase_plan_prices' : 'project_default_used_by_public_catalog';
+      const effective = dbRow || defaults;
+      return {
+        plan,
+        cup: Number(effective.cup),
+        mobile: Number(effective.mobile),
+        usdt: Number(effective.usdt),
+        stars: Number(effective.stars),
+        ton: Number(effective.ton),
+        updated_at: dbRow?.updated_at || null,
+        price_source: source,
+      };
+    });
+
+    let savedAvailability = null;
+    const { data: settingsRow, error: settingsError } = await dbClient
+      .from('settings')
+      .select('value')
+      .eq('key', 'plan_availability')
+      .maybeSingle();
+    if (settingsError) throw settingsError;
+    if (settingsRow?.value != null) {
+      try {
+        const raw = settingsRow.value;
+        savedAvailability = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!savedAvailability || typeof savedAvailability !== 'object' || Array.isArray(savedAvailability)) savedAvailability = null;
+      } catch (_) {
+        savedAvailability = null;
+      }
+    }
+    // La aplicación pública inicializa todos los planes como disponibles (false)
+    // y luego mezcla cualquier valor guardado en settings.
+    const availability = Object.fromEntries(Object.keys(DEFAULT_PLAN_PRICES).map(plan => [plan, false]));
+    if (savedAvailability) {
+      for (const plan of Object.keys(availability)) {
+        if (typeof savedAvailability[plan] === 'boolean') availability[plan] = savedAvailability[plan];
+      }
+    }
+
+    return {
+      prices,
+      availability,
+      availability_source: savedAvailability ? 'supabase_settings' : 'project_default_used_by_public_catalog',
+      database_price_plan_keys: databasePricePlanKeys,
+    };
   },
 
   // ========== PAGOS USDT ==========

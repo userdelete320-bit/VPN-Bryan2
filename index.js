@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -10,7 +12,6 @@ const pendingTrialLocks = new Map(); // userId -> timestamp
 const START_TIME = Date.now();
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
 
 const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -225,15 +226,7 @@ const USDT_CONFIG = {
 };
 
 // Precios por defecto (fallback si la BD aún no tiene datos)
-const DEFAULT_PLAN_PRICES = {
-    basico:   { cup: 900,   mobile: 400,   usdt: 0.7,  stars: 150,  ton: 2.0 },
-    avanzado: { cup: 1800,  mobile: 900,   usdt: 1.4,  stars: 270,  ton: 3.0 },
-    cuba_vip: { cup: 1200,  mobile: 500,   usdt: 2.0,  stars: 180,  ton: 2.2 },
-    premium:  { cup: 1500,  mobile: 700,   usdt: 1.1,  stars: 210,  ton: 2.5 },
-    gaming_pro: { cup: 2000, mobile: 1300, usdt: 4.0,  stars: 300,  ton: 3.5 },
-    anual:    { cup: 15000, mobile: 10000, usdt: 30,   stars: 2100, ton: 26.0 },
-    express:  { cup: 300,   mobile: 150,   usdt: 1.0,  stars: 100,  ton: 1.5 }
-};
+const DEFAULT_PLAN_PRICES = require('./plan-price-defaults');
 
 // Clave del pool de configs según plan y duración
 function getConfigPlanKey(plan, duration) {
@@ -714,6 +707,8 @@ function isGroupCtx(ctx) {
 
 app.use(cors());
 app.use(express.json());
+// NOVA is isolated from payment, account, VPN and administration endpoints.
+app.use('/api/nova', require('./routes/nova'));
 app.use(express.static('public'));
 app.use('/assets', express.static('assets'));
 

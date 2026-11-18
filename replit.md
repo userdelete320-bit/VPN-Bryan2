@@ -66,3 +66,11 @@ Configured as a **VM deployment** (always-on) since it runs a persistent Telegra
 Run command: `node index.js`
 
 **Note**: When deployed to production, update `WEBAPP_URL` and `API_BASE_URL` to the production `.replit.app` domain so the Telegram webhook points correctly.
+
+## NOVA — AI customer support
+
+- The separate `NOVA` chat is exposed in the support hub and powered server-side by OpenRouter Free with Cloudflare Workers AI as a fallback.
+- Configure `OPENROUTER_API_KEY`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` as deployment secrets; set `NOVA_ENABLED=true` only after staging tests. It defaults to disabled. Do not expose the key to the frontend.
+- Configure `NOVA_OPENROUTER_MODEL`, `NOVA_OPENROUTER_DAILY_LIMIT`, `NOVA_OPENROUTER_RPM_LIMIT`, and `NOVA_CLOUDFLARE_DAILY_NEURON_LIMIT` as needed. The Cloudflare model is fixed to a verified Workers Free model and the OpenRouter model selector rejects paid model IDs. The free tier is rate-limited and not a production SLA; see `NOVA_SETUP.md`.
+- `routes/nova.js` validates Telegram Web App `initData` using `BOT_TOKEN`; it does not connect the model to payments, account changes, VPN configuration, or admin tools.
+- NOVA does not require new Supabase tables. Existing support tickets continue to work independently.

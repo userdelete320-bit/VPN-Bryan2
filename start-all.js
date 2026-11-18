@@ -1,4 +1,4 @@
-# Crear un archivo start-all.js
+// Crear un archivo start-all.js
 const { exec } = require('child_process');
 const fs = require('fs');
 
