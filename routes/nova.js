@@ -34,7 +34,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_OPENROUTER_MODEL = 'openrouter/free';
 const ZAI_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
 const ZAI_MODEL = 'glm-4.7-flash';
-const NOVITA_URL = 'https://api.novita.ai/openai/chat/completions';
+const NOVITA_URL = 'https://api.novita.ai/v3/openai/chat/completions';
 const NOVITA_MODEL = 'apodex/apodex-1.1-mini';
 const CLOUDFLARE_MODEL = '@cf/zai-org/glm-4.7-flash';
 
@@ -131,13 +131,9 @@ function summarizeReferralRows(rows, available = true) {
   const safeRows = Array.isArray(rows) ? rows : [];
   const summarizeLevel = (level) => {
     const levelRows = safeRows.filter(row => Number(row.level) === level);
-    const paidRows = levelRows.filter(row => row.has_paid === true);
-    const unusedPaidRows = paidRows.filter(row => !row.discount_used_at);
     return {
       total: levelRows.length,
-      paid: paidRows.length,
-      paid_discount_unused: unusedPaidRows.length,
-      discount_already_used: paidRows.length - unusedPaidRows.length,
+      paid: levelRows.filter(row => row.has_paid === true).length,
     };
   };
   const level1 = summarizeLevel(1);
@@ -148,8 +144,8 @@ function summarizeReferralRows(rows, available = true) {
     level2,
     total_referrals: level1.total + level2.total,
     total_paid: level1.paid + level2.paid,
-    paid_discount_unused: level1.paid_discount_unused + level2.paid_discount_unused,
-    available_discount_percentage_from_current_referral_rules: Math.min(100, level1.paid_discount_unused * 20 + level2.paid_discount_unused * 10),
+    discount_tracking_available: false,
+    discount_note: 'Se pueden confirmar las cantidades de referidos y los que han pagado, pero la tabla actual no permite verificar si los descuentos ya fueron utilizados. No se calcula un descuento disponible.',
     privacy_note: 'Solo agregados propios; no se incluyen nombres, usuarios ni Telegram ID de los referidos.',
   };
 }
@@ -431,6 +427,21 @@ function extractAssistantText(payload) {
   return '';
 }
 
+function getSafeProviderError(payload) {
+  const errorObject = payload?.error && typeof payload.error === 'object' ? payload.error : payload;
+  const rawCode = errorObject?.code ?? errorObject?.type ?? payload?.code ?? null;
+  const rawMessage = (typeof payload?.error === 'string' ? payload.error : null)
+    ?? errorObject?.message ?? payload?.message
+    ?? (Array.isArray(payload?.errors) ? payload.errors.map(item => item?.message || item?.code).filter(Boolean).join('; ') : '');
+  // Provider diagnostics are useful, but never print credentials or unbounded response data.
+  const cleanMessage = String(rawMessage || '')
+    .replace(/Bearer\s+[^\s"']+/gi, 'Bearer [redacted]')
+    .replace(/(?:sk-or-v1-|sk_live_|sk_|cfat_|vex_sk_|qamify_|WAR_)[A-Za-z0-9._-]+/gi, '[redacted]')
+    .replace(/[\r\n\t]+/g, ' ')
+    .slice(0, 240);
+  return { code: rawCode == null ? null : String(rawCode).slice(0, 60), message: cleanMessage };
+}
+
 async function sendChatCompletion({ providerName, url, apiKey, messages, body, extraHeaders = {} }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
@@ -447,8 +458,15 @@ async function sendChatCompletion({ providerName, url, apiKey, messages, body, e
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      console.warn(`[NOVA] ${providerName} devolvió HTTP ${response.status}.`);
-      return { ok: false, kind: response.status === 429 ? 'rate_limit' : 'http_error', status: response.status };
+      const diagnostic = getSafeProviderError(payload);
+      const detail = [diagnostic.code && `código ${diagnostic.code}`, diagnostic.message].filter(Boolean).join(' — ');
+      console.warn(`[NOVA] ${providerName} devolvió HTTP ${response.status}${detail ? ` (${detail})` : ' (sin detalle de error en la respuesta)'}.`);
+      return {
+        ok: false,
+        kind: response.status === 429 ? 'rate_limit' : response.status === 401 || response.status === 403 ? 'authentication_error' : 'http_error',
+        status: response.status,
+        providerCode: diagnostic.code,
+      };
     }
     const reply = extractAssistantText(payload);
     if (!reply || looksLikeNonSpanishReply(reply)) {
@@ -481,21 +499,24 @@ async function callOpenRouter(messages) {
       model: getOpenRouterFreeModel(),
       max_tokens: MAX_OUTPUT_TOKENS,
       temperature: 0.25,
-      // Free model selection is restricted to providers that reject training/retention.
+      // The selected :free model may only have free endpoints that do not advertise ZDR.
+      // Requiring zdr/data_collection=deny here can make OpenRouter return 404 even when
+      // the model exists. Keep a strict $0 ceiling so no paid endpoint can be selected.
       provider: {
-        data_collection: 'deny',
-        zdr: true,
-        allow_fallbacks: false,
-        // Hard ceiling: never route to a paid inference endpoint.
+        allow_fallbacks: true,
         max_price: { prompt: 0, completion: 0 },
       },
     },
   });
 }
 
+// GLM Flash free accounts can enforce a very low concurrent-request limit.
+// Serialize Z.AI calls per process so simultaneous Telegram messages do not
+// unnecessarily trigger its 429 concurrency limit.
+let zaiRequestQueue = Promise.resolve();
 async function callZai(messages) {
   if (!process.env.ZAI_API_KEY) return { ok: false, kind: 'not_configured' };
-  return sendChatCompletion({
+  const run = () => sendChatCompletion({
     providerName: 'Z.AI GLM-4.7-Flash',
     url: ZAI_URL,
     apiKey: process.env.ZAI_API_KEY,
@@ -506,6 +527,9 @@ async function callZai(messages) {
       temperature: 0.25,
     },
   });
+  const pending = zaiRequestQueue.then(run, run);
+  zaiRequestQueue = pending.then(() => undefined, () => undefined);
+  return pending;
 }
 
 async function callNovita(messages) {

@@ -16,6 +16,7 @@ process.env.CLOUDFLARE_API_TOKEN = 'test-cloudflare-api-token';
 process.env.CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
 process.env.NOVA_ENABLED = 'true';
 process.env.NOVA_OPENROUTER_DAILY_LIMIT = '45';
+process.env.NOVA_OPENROUTER_MODEL = 'google/gemma-4-26b-a4b-it:free';
 process.env.NOVA_CLOUDFLARE_DAILY_NEURON_LIMIT = '7500';
 
 const queryLog = [];
@@ -196,7 +197,7 @@ async function invokeChat({ message = '¿Qué plan tengo y cuándo vence?', auth
 test('NOVA lee el perfil y los pagos usando solamente el Telegram ID validado', async () => {
   const before = queryLog.length;
   const previousConfiguredModel = process.env.NOVA_OPENROUTER_MODEL;
-  process.env.NOVA_OPENROUTER_MODEL = 'openai/model-with-paid-pricing';
+  process.env.NOVA_OPENROUTER_MODEL = 'google/gemma-4-26b-a4b-it:free';
   global.fetch = async (url, options) => {
     if (url.includes('openrouter.ai')) {
       openRouterCalls += 1;
@@ -252,12 +253,12 @@ test('NOVA lee el perfil y los pagos usando solamente el Telegram ID validado', 
   assert.equal(novitaCalls, 0);
   assert.equal(cloudflareCalls, 0);
   assert.equal(capturedOpenRouterUrl, 'https://openrouter.ai/api/v1/chat/completions');
-  assert.equal(capturedProviderBody.model, 'openrouter/free');
+  assert.equal(capturedProviderBody.model, 'google/gemma-4-26b-a4b-it:free');
   if (previousConfiguredModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
   else process.env.NOVA_OPENROUTER_MODEL = previousConfiguredModel;
-  assert.equal(capturedProviderBody.provider.data_collection, 'deny');
-  assert.equal(capturedProviderBody.provider.zdr, true);
-  assert.equal(capturedProviderBody.provider.allow_fallbacks, false);
+  assert.equal(capturedProviderBody.provider.data_collection, undefined);
+  assert.equal(capturedProviderBody.provider.zdr, undefined);
+  assert.equal(capturedProviderBody.provider.allow_fallbacks, true);
   assert.deepEqual(capturedProviderBody.provider.max_price, { prompt: 0, completion: 0 });
 });
 
@@ -446,7 +447,7 @@ test('NOVA usa Novita después de fallos de OpenRouter y Z.AI, sin llamar a Clou
       order.push('zai'); zaiCalls += 1;
       return { ok: false, status: 503, async json() { return { error: 'unavailable' }; } };
     }
-    assert.ok(url.includes('api.novita.ai'));
+    assert.equal(url, 'https://api.novita.ai/v3/openai/chat/completions');
     order.push('novita'); novitaCalls += 1;
     assert.equal(JSON.parse(options.body).model, 'apodex/apodex-1.1-mini');
     return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo revisar la información registrada de tu cuenta.' } }] }; } };
@@ -607,7 +608,8 @@ test('NOVA puede consultar las secciones propias adicionales sin filtrar datos d
   assert.equal(response.statusCode, 200);
   const prompt = capturedProviderBody.messages[0].content;
   assert.match(prompt, /"total_referrals":1/);
-  assert.match(prompt, /"paid_discount_unused":1/);
+  assert.match(prompt, /"discount_tracking_available":false/);
+  assert.match(prompt, /no se calcula un descuento disponible/i);
   assert.match(prompt, /"available":false/);
   assert.match(prompt, /monedero de referidos no pudo consultarse/);
   assert.match(prompt, /"balance_usd":12.5/);
@@ -619,6 +621,9 @@ test('NOVA puede consultar las secciones propias adicionales sin filtrar datos d
   assert.doesNotMatch(prompt, /555000001|otro_usuario|999999999|no_revelar|private-wallet-address|0x[a]{40,64}|"txid"|"address"|"note":"interno"/);
 
   const reads = queryLog.slice(before);
+  const referralsQuery = reads.find(item => item.table === 'referrals');
+  assert.equal(referralsQuery.selection, 'level,has_paid,created_at');
+  assert.doesNotMatch(referralsQuery.selection, /discount_used_at/);
   const expectedScoped = {
     users: 'telegram_id', payments: 'telegram_id', referrals: 'referrer_id', trial_history: 'telegram_id',
     xp_log: 'telegram_id', coupon_usage: 'telegram_id', shop_balances: 'telegram_id', shop_topups: 'telegram_id',

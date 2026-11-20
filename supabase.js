@@ -724,7 +724,8 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
         if (result?.error) throw result.error;
         return { available: true, data: result?.data ?? null };
       } catch (error) {
-        console.warn(`[NOVA DB] Lectura opcional no disponible: ${name} (${error?.code || 'error'}).`);
+        const detail = String(error?.message || '').replace(/[\r\n\t]+/g, ' ').slice(0, 180);
+        console.warn(`[NOVA DB] Lectura opcional no disponible: ${name} (${error?.code || 'error'}${detail ? `: ${detail}` : ''}).`);
         return { available: false, data: null };
       }
     };
@@ -743,7 +744,7 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
 
     const reads = await Promise.all([
       optionalReadAllPages('referrals', (from, to) => dbClient.from('referrals')
-        .select('level,has_paid,discount_used_at,created_at')
+        .select('level,has_paid,created_at')
         .eq('referrer_id', userId).order('created_at', { ascending: false }).range(from, to)),
       optionalRead('trial_history', () => dbClient.from('trial_history')
         .select('plan,sent_at,auto_sent').eq('telegram_id', userId)
