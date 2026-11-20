@@ -4,11 +4,13 @@ const path = require('path');
 require('dotenv').config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+// On this server, SUPABASE_SERVICE_ROLE_KEY can also initialize the base client.
+// Keep the service-role key server-side only; NOVA uses it for read-only scoped queries.
+const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Error: Faltan variables de entorno SUPABASE_URL o SUPABASE_KEY/SUPABASE_ANON_KEY');
+  console.error('❌ Error: Falta SUPABASE_URL o una clave Supabase (SUPABASE_KEY, SUPABASE_ANON_KEY o SUPABASE_SERVICE_ROLE_KEY).');
   process.exit(1);
 }
 

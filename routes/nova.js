@@ -765,15 +765,29 @@ async function generateNovaReply(telegramId, message, history = []) {
 
   let customerSnapshot;
   let planCatalog;
-  try {
-    [customerSnapshot, planCatalog] = await Promise.all([
-      db.getNovaCustomerSnapshot(userId),
-      db.getNovaPlanCatalog(),
-    ]);
-  } catch (databaseError) {
-    console.warn('[NOVA] No se pudo consultar Supabase; no se enviará contexto inventado al modelo.');
+  // Keep the customer lookup and public catalog errors separate so Render logs show
+  // which Supabase query failed (table/column/permissions), without exposing row data.
+  const [customerResult, catalogResult] = await Promise.allSettled([
+    db.getNovaCustomerSnapshot(userId),
+    db.getNovaPlanCatalog(),
+  ]);
+  if (customerResult.status === 'rejected' || catalogResult.status === 'rejected') {
+    const describeDbError = (error) => {
+      const code = typeof error?.code === 'string' ? error.code : 'NO_CODE';
+      const message = String(error?.message || error || 'Unknown Supabase error')
+        .replace(/[\r\n\t]+/g, ' ').slice(0, 350);
+      return `${code}: ${message}`;
+    };
+    if (customerResult.status === 'rejected') {
+      console.error(`[NOVA DB] getNovaCustomerSnapshot falló: ${describeDbError(customerResult.reason)}`);
+    }
+    if (catalogResult.status === 'rejected') {
+      console.error(`[NOVA DB] getNovaPlanCatalog falló: ${describeDbError(catalogResult.reason)}`);
+    }
     return { ok: false, status: 503, code: 'CUSTOMER_DATA_UNAVAILABLE', reply: 'Ahora mismo no puedo verificar tu cuenta ni los precios actuales. Inténtalo más tarde o contacta con @luvnt.' };
   }
+  customerSnapshot = customerResult.value;
+  planCatalog = catalogResult.value;
 
   const creatorMentioned = hasCreatorBeenMentioned(userId);
   const creatorTopicRaised = customerRaisedCreatorTopic(text);

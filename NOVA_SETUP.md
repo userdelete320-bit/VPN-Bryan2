@@ -34,6 +34,12 @@ El texto normativo de NOVA se mantiene en `NOVA_MASTER_PROMPT.md` y se carga com
 
 La única función que obtiene información privada es `respondToTelegramMessage`, que recibe el ID del remitente del contexto confiable del bot de Telegram o de `initData` firmado y validado en la Web App. El servidor vuelve a consultar en modo de solo lectura los datos de cuenta y las secciones pertinentes de Supabase en cada mensaje. Nunca entrega credenciales de Supabase al modelo.
 
+## Supabase — variables necesarias para NOVA
+
+Configura `SUPABASE_URL` con la URL del mismo proyecto que emitió la clave service-role. `SUPABASE_SERVICE_ROLE_KEY` es obligatoria para las consultas protegidas de NOVA. `SUPABASE_ANON_KEY`/`SUPABASE_KEY` es opcional en esta versión si ya está configurada `SUPABASE_SERVICE_ROLE_KEY`; el servidor usa esta última como clave de inicialización cuando falta la clave anon. No mezcles URL y claves de proyectos Supabase diferentes.
+
+Si NOVA no puede consultar la base, los logs ahora distinguen `getNovaCustomerSnapshot` de `getNovaPlanCatalog` y muestran el código/mensaje de Supabase (sin imprimir claves ni filas de clientes), para identificar tablas, columnas o permisos que no coincidan.
+
 ## Crear las claves
 
 ### OpenRouter
