@@ -34,7 +34,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_OPENROUTER_MODEL = 'openrouter/free';
 const ZAI_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
 const ZAI_MODEL = 'glm-4.7-flash';
-const NOVITA_URL = 'https://api.novita.ai/v3/openai/chat/completions';
+const NOVITA_URL = 'https://api.novita.ai/openai/v1/chat/completions';
 const NOVITA_MODEL = 'apodex/apodex-1.1-mini';
 const CLOUDFLARE_MODEL = '@cf/zai-org/glm-4.7-flash';
 
@@ -427,19 +427,34 @@ function extractAssistantText(payload) {
   return '';
 }
 
-function getSafeProviderError(payload) {
+function cleanProviderDiagnostic(value, maxLength = 120) {
+  return String(value || '')
+    .replace(/Bearer\s+[^\s"']+/gi, 'Bearer [redacted]')
+    .replace(/(?:sk-or-v1-|sk_live_|sk_|cfat_|vex_sk_|qamify_|WAR_)[A-Za-z0-9._-]+/gi, '[redacted]')
+    .replace(/[\r\n\t]+/g, ' ')
+    .slice(0, maxLength);
+}
+
+function getSafeProviderError(payload, response = null) {
   const errorObject = payload?.error && typeof payload.error === 'object' ? payload.error : payload;
   const rawCode = errorObject?.code ?? errorObject?.type ?? payload?.code ?? null;
   const rawMessage = (typeof payload?.error === 'string' ? payload.error : null)
     ?? errorObject?.message ?? payload?.message
     ?? (Array.isArray(payload?.errors) ? payload.errors.map(item => item?.message || item?.code).filter(Boolean).join('; ') : '');
-  // Provider diagnostics are useful, but never print credentials or unbounded response data.
-  const cleanMessage = String(rawMessage || '')
-    .replace(/Bearer\s+[^\s"']+/gi, 'Bearer [redacted]')
-    .replace(/(?:sk-or-v1-|sk_live_|sk_|cfat_|vex_sk_|qamify_|WAR_)[A-Za-z0-9._-]+/gi, '[redacted]')
-    .replace(/[\r\n\t]+/g, ' ')
-    .slice(0, 240);
-  return { code: rawCode == null ? null : String(rawCode).slice(0, 60), message: cleanMessage };
+  const metadata = errorObject?.metadata || payload?.metadata || {};
+  const metadataHeaders = metadata?.headers || {};
+  const getHeader = name => metadataHeaders[name] ?? metadataHeaders[name.toLowerCase()] ?? response?.headers?.get?.(name) ?? null;
+  // OpenRouter's 429 can be our free-tier cap or an upstream model-provider limit.
+  // Preserve the source/reset hints without dumping the full error payload into logs.
+  return {
+    code: rawCode == null ? null : cleanProviderDiagnostic(rawCode, 60),
+    message: cleanProviderDiagnostic(rawMessage, 240),
+    limitSource: cleanProviderDiagnostic(metadata?.limit_source, 80),
+    upstreamProvider: cleanProviderDiagnostic(metadata?.provider_name, 80),
+    remedyHint: cleanProviderDiagnostic(metadata?.remedy_hint, 120),
+    retryAfter: cleanProviderDiagnostic(getHeader('Retry-After'), 40),
+    rateLimitReset: cleanProviderDiagnostic(getHeader('X-RateLimit-Reset'), 40),
+  };
 }
 
 async function sendChatCompletion({ providerName, url, apiKey, messages, body, extraHeaders = {} }) {
@@ -458,8 +473,16 @@ async function sendChatCompletion({ providerName, url, apiKey, messages, body, e
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      const diagnostic = getSafeProviderError(payload);
-      const detail = [diagnostic.code && `código ${diagnostic.code}`, diagnostic.message].filter(Boolean).join(' — ');
+      const diagnostic = getSafeProviderError(payload, response);
+      const detail = [
+        diagnostic.code && `código ${diagnostic.code}`,
+        diagnostic.message,
+        diagnostic.limitSource && `origen ${diagnostic.limitSource}`,
+        diagnostic.upstreamProvider && `proveedor ${diagnostic.upstreamProvider}`,
+        diagnostic.retryAfter && `Retry-After ${diagnostic.retryAfter}s`,
+        diagnostic.rateLimitReset && `reset ${diagnostic.rateLimitReset}`,
+        diagnostic.remedyHint && `indicación ${diagnostic.remedyHint}`,
+      ].filter(Boolean).join(' — ');
       console.warn(`[NOVA] ${providerName} devolvió HTTP ${response.status}${detail ? ` (${detail})` : ' (sin detalle de error en la respuesta)'}.`);
       return {
         ok: false,
@@ -516,17 +539,27 @@ async function callOpenRouter(messages) {
 let zaiRequestQueue = Promise.resolve();
 async function callZai(messages) {
   if (!process.env.ZAI_API_KEY) return { ok: false, kind: 'not_configured' };
-  const run = () => sendChatCompletion({
-    providerName: 'Z.AI GLM-4.7-Flash',
-    url: ZAI_URL,
-    apiKey: process.env.ZAI_API_KEY,
-    messages,
-    body: {
-      model: ZAI_MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.25,
-    },
-  });
+  const run = async () => {
+    const request = () => sendChatCompletion({
+      providerName: 'Z.AI GLM-4.7-Flash',
+      url: ZAI_URL,
+      apiKey: process.env.ZAI_API_KEY,
+      messages,
+      body: {
+        model: ZAI_MODEL,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        temperature: 0.25,
+      },
+    });
+    let result = await request();
+    // Z.AI code 1305 is transient provider overload. Retry once after a brief pause;
+    // do not loop indefinitely or retry ordinary authentication/quota errors.
+    if (result.status === 429 && result.providerCode === '1305') {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      result = await request();
+    }
+    return result;
+  };
   const pending = zaiRequestQueue.then(run, run);
   zaiRequestQueue = pending.then(() => undefined, () => undefined);
   return pending;

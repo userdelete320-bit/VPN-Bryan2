@@ -435,6 +435,74 @@ test('NOVA se detiene en Z.AI cuando OpenRouter falla y Z.AI responde correctame
   assert.equal(cloudflareCalls, before.cloudflareCalls);
 });
 
+test('NOVA reintenta una sola vez Z.AI cuando responde con código 1305', async () => {
+  const before = { openRouterCalls, zaiCalls, novitaCalls, cloudflareCalls };
+  let zaiAttempts = 0;
+  global.fetch = async url => {
+    if (url.includes('openrouter.ai')) {
+      openRouterCalls += 1;
+      return { ok: false, status: 429, async json() { return { error: 'rate limited' }; } };
+    }
+    assert.ok(url.includes('api.z.ai'));
+    zaiCalls += 1;
+    zaiAttempts += 1;
+    if (zaiAttempts === 1) {
+      return {
+        ok: false,
+        status: 429,
+        async json() { return { error: { code: '1305', message: 'The service may be temporarily overloaded, please try again later' } }; },
+      };
+    }
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Ya pude consultar tu información registrada.' } }] }; } };
+  };
+  const response = await invokeChat({ authId: '123456774' });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.provider, 'Z.AI GLM-4.7-Flash');
+  assert.equal(zaiAttempts, 2);
+  assert.equal(openRouterCalls, before.openRouterCalls + 1);
+  assert.equal(zaiCalls, before.zaiCalls + 2);
+  assert.equal(novitaCalls, before.novitaCalls);
+  assert.equal(cloudflareCalls, before.cloudflareCalls);
+});
+
+test('NOVA registra el origen y el proveedor de un HTTP 429 de OpenRouter', async () => {
+  const beforeZai = zaiCalls;
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  global.fetch = async url => {
+    if (url.includes('openrouter.ai')) {
+      openRouterCalls += 1;
+      return {
+        ok: false,
+        status: 429,
+        headers: { get(name) { return name.toLowerCase() === 'retry-after' ? '3' : null; } },
+        async json() {
+          return { error: { code: 429, message: 'Provider returned error', metadata: {
+            limit_source: 'upstream_provider_shared_pool', provider_name: 'Google AI Studio', remedy_hint: 'Retry shortly',
+          } } };
+        },
+      };
+    }
+    assert.ok(url.includes('api.z.ai'));
+    zaiCalls += 1;
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo ayudarte con la información de VPN CUBA.' } }] }; } };
+  };
+  try {
+    const response = await invokeChat({ authId: '123456773' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.provider, 'Z.AI GLM-4.7-Flash');
+    const warning = warnings.find(line => line.includes('OpenRouter devolvió HTTP 429')) || '';
+    assert.match(warning, /origen upstream_provider_shared_pool/);
+    assert.match(warning, /proveedor Google AI Studio/);
+    assert.match(warning, /Retry-After 3s/);
+    assert.match(warning, /indicación Retry shortly/);
+    assert.equal(zaiCalls, beforeZai + 1);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 test('NOVA usa Novita después de fallos de OpenRouter y Z.AI, sin llamar a Cloudflare si Novita responde', async () => {
   const before = { openRouterCalls, zaiCalls, novitaCalls, cloudflareCalls };
   const order = [];
@@ -447,7 +515,7 @@ test('NOVA usa Novita después de fallos de OpenRouter y Z.AI, sin llamar a Clou
       order.push('zai'); zaiCalls += 1;
       return { ok: false, status: 503, async json() { return { error: 'unavailable' }; } };
     }
-    assert.equal(url, 'https://api.novita.ai/v3/openai/chat/completions');
+    assert.equal(url, 'https://api.novita.ai/openai/v1/chat/completions');
     order.push('novita'); novitaCalls += 1;
     assert.equal(JSON.parse(options.body).model, 'apodex/apodex-1.1-mini');
     return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo revisar la información registrada de tu cuenta.' } }] }; } };
