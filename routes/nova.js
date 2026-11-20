@@ -72,7 +72,10 @@ const MAX_MESSAGE_CHARS = 1200;
 const MAX_HISTORY_MESSAGES = 8;
 const USER_RPM_LIMIT = 6;
 const MAX_CONCURRENT_REQUESTS = 8;
-const MAX_OUTPUT_TOKENS = 360;
+const MAX_OUTPUT_TOKENS = 900;
+function getOpenRouterAttemptLimit() {
+  return Math.min(3, Math.max(1, Number.parseInt(process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE || '2', 10) || 2));
+}
 const PROVIDER_TIMEOUT_MS = 15_000;
 
 // OpenRouter Free: 20 RPM / 50 RPD. Keep a local margin and never raise above the published caps.
@@ -388,8 +391,10 @@ const requestBuckets = new Map();
 const creatorMentionedUsers = new Map();
 let openRouterQuota = { day: new Date().toISOString().slice(0, 10), requests: 0, minute: Math.floor(Date.now() / 60_000), requestsThisMinute: 0 };
 const openRouterModelCooldowns = new Map();
-const OPENROUTER_MODEL_COOLDOWN_MS = 60_000;
-const OPENROUTER_INVALID_MODEL_COOLDOWN_MS = 15 * 60_000;
+const OPENROUTER_MODEL_COOLDOWN_MS = 5 * 60_000;
+const OPENROUTER_INVALID_MODEL_COOLDOWN_MS = 60 * 60_000;
+const OPENROUTER_INVALID_RESPONSE_COOLDOWN_MS = 5 * 60_000;
+let openRouterModelCursor = 0;
 let cloudflareQuota = { day: new Date().toISOString().slice(0, 10), neurons: 0 };
 let activeRequests = 0;
 
@@ -445,12 +450,65 @@ function reserveCloudflareNeurons(inputTokens, outputTokens = MAX_OUTPUT_TOKENS,
 }
 
 function extractAssistantText(payload) {
-  const content = payload?.choices?.[0]?.message?.content;
+  const choice = payload?.choices?.[0];
+  const message = choice?.message || {};
+  const content = message.content;
   if (typeof content === 'string') return content.trim();
   if (Array.isArray(content)) {
-    return content.map(part => typeof part === 'string' ? part : typeof part?.text === 'string' ? part.text : '').join('').trim();
+    return content.map(part => {
+      if (typeof part === 'string') return part;
+      // Read only user-facing text blocks. Never expose a provider's hidden reasoning.
+      const type = String(part?.type || '').toLowerCase();
+      return typeof part?.text === 'string' && (!type || type === 'text' || type === 'output_text') ? part.text : '';
+    }).join('').trim();
   }
+  if (typeof message.output_text === 'string') return message.output_text.trim();
+  if (typeof choice?.text === 'string') return choice.text.trim();
   return '';
+}
+
+function getSafeCompletionDiagnostic(payload) {
+  const choice = payload?.choices?.[0] || {};
+  const message = choice.message || {};
+  const usage = payload?.usage || {};
+  const completionDetails = usage.completion_tokens_details || {};
+  const content = message.content;
+  const contentType = content === null ? 'null' : Array.isArray(content) ? 'array' : typeof content;
+  const contentLength = typeof content === 'string' ? content.length
+    : Array.isArray(content) ? content.reduce((sum, part) => sum + (typeof part?.text === 'string' ? part.text.length : typeof part === 'string' ? part.length : 0), 0)
+    : 0;
+  const allowedKeys = ['content', 'reasoning', 'reasoning_content', 'reasoning_details', 'refusal', 'tool_calls'];
+  const messageKeys = Object.keys(message).filter(key => allowedKeys.includes(key)).join(',') || 'none';
+  const finishReason = cleanProviderDiagnostic(choice.finish_reason || 'missing', 40);
+  const outputTokens = Number(usage.completion_tokens || 0);
+  const reasoningTokens = Number(completionDetails.reasoning_tokens || 0);
+  return {
+    finishReason,
+    contentType,
+    contentLength,
+    messageKeys,
+    reasoningPresent: Boolean(message.reasoning || message.reasoning_content || message.reasoning_details),
+    refusalPresent: Boolean(message.refusal),
+    toolCalls: Array.isArray(message.tool_calls) ? message.tool_calls.length : 0,
+    outputTokens,
+    reasoningTokens,
+  };
+}
+
+function formatCompletionDiagnostic(info) {
+  return `finish_reason=${info.finishReason}, content=${info.contentType}/${info.contentLength} chars, output_tokens=${info.outputTokens}, reasoning_tokens=${info.reasoningTokens}, message_keys=${info.messageKeys}, refusal=${info.refusalPresent}, tool_calls=${info.toolCalls}`;
+}
+
+function getOpenRouterModelOptions(model) {
+  // These model families document a per-request reasoning switch. Disable it for
+  // short customer-support turns so the output budget is reserved for visible text.
+  if (model === 'baidu/ernie-5.5-flash-preview:free'
+    || model === 'inclusionai/ling-3.2-flash:free'
+    || model === 'dots-studio/dots-3-note-preview:free'
+    || model.startsWith('google/gemma-4-')) {
+    return { reasoning: { enabled: false } };
+  }
+  return {};
 }
 
 function cleanProviderDiagnostic(value, maxLength = 120) {
@@ -520,9 +578,15 @@ async function sendChatCompletion({ providerName, url, apiKey, messages, body, e
       };
     }
     const reply = extractAssistantText(payload);
-    if (!reply || looksLikeNonSpanishReply(reply)) {
-      console.warn(`[NOVA] ${providerName} devolvió una respuesta vacía o no válida en español.`);
-      return { ok: false, kind: 'invalid_response' };
+    if (!reply) {
+      const diagnostic = getSafeCompletionDiagnostic(payload);
+      console.warn(`[NOVA] ${providerName} devolvió HTTP 200 sin texto final (${formatCompletionDiagnostic(diagnostic)}).`);
+      return { ok: false, kind: 'invalid_response', responseDiagnostic: diagnostic };
+    }
+    if (looksLikeNonSpanishReply(reply)) {
+      const diagnostic = getSafeCompletionDiagnostic(payload);
+      console.warn(`[NOVA] ${providerName} devolvió texto en un idioma no permitido (${formatCompletionDiagnostic(diagnostic)}).`);
+      return { ok: false, kind: 'invalid_language_response', responseDiagnostic: diagnostic };
     }
     return { ok: true, reply, usage: payload?.usage || null, provider: providerName };
   } catch (error) {
@@ -541,14 +605,19 @@ async function callOpenRouter(messages) {
   if (process.env.OPENROUTER_SITE_URL) extraHeaders['HTTP-Referer'] = process.env.OPENROUTER_SITE_URL;
   const models = getOpenRouterFreeModels();
   const attempted = [];
+  const startIndex = openRouterModelCursor % models.length;
+  const orderedModels = models.slice(startIndex).concat(models.slice(0, startIndex));
+  let modelAttempts = 0;
 
-  for (const model of models) {
+  for (const model of orderedModels) {
+    if (modelAttempts >= getOpenRouterAttemptLimit()) break;
     const cooldownUntil = openRouterModelCooldowns.get(model) || 0;
     if (cooldownUntil > Date.now()) continue;
     if (cooldownUntil) openRouterModelCooldowns.delete(model);
 
     const quotaError = reserveOpenRouterRequest();
     if (quotaError) return { ok: false, kind: 'local_limit', code: quotaError, attempted };
+    modelAttempts += 1;
 
     const result = await sendChatCompletion({
       providerName: `OpenRouter ${model}`,
@@ -560,6 +629,7 @@ async function callOpenRouter(messages) {
         model,
         max_tokens: MAX_OUTPUT_TOKENS,
         temperature: 0.25,
+        ...getOpenRouterModelOptions(model),
         // Hard ceiling: OpenRouter may only select endpoints with $0 input AND $0 output.
         provider: {
           allow_fallbacks: true,
@@ -568,20 +638,26 @@ async function callOpenRouter(messages) {
       },
     });
 
+    const modelIndex = models.indexOf(model);
+    openRouterModelCursor = (modelIndex + 1) % models.length;
     if (result.ok) {
       openRouterModelCooldowns.delete(model);
       return { ...result, provider: 'OpenRouter', model };
     }
 
     attempted.push({ model, kind: result.kind, status: result.status || null });
-    // A broken/saturated model should not be retried for every customer message.
+    // Avoid hammering the same exhausted shared provider on every customer turn.
     if (result.status === 400 || result.status === 404) {
       openRouterModelCooldowns.set(model, Date.now() + OPENROUTER_INVALID_MODEL_COOLDOWN_MS);
-    } else if ((result.status === 429 && String(result.limitSource || '').startsWith('upstream_provider'))
-      || result.status >= 500 || result.kind === 'timeout' || result.kind === 'connection_error' || result.kind === 'invalid_response') {
-      // Only cool a model for an upstream-provider 429. A generic OpenRouter 429
-      // may be an account-wide limit, so cooling one model would hide useful diagnostics.
-      openRouterModelCooldowns.set(model, Date.now() + OPENROUTER_MODEL_COOLDOWN_MS);
+    } else if (result.status === 429 && String(result.limitSource || '').startsWith('upstream_provider')) {
+      const retrySeconds = Number.parseInt(result.retryAfter || '', 10);
+      const cooldown = Number.isFinite(retrySeconds) && retrySeconds > 0
+        ? Math.max(OPENROUTER_MODEL_COOLDOWN_MS, retrySeconds * 1000)
+        : OPENROUTER_MODEL_COOLDOWN_MS;
+      openRouterModelCooldowns.set(model, Date.now() + cooldown);
+    } else if (result.status >= 500 || result.kind === 'timeout' || result.kind === 'connection_error'
+      || result.kind === 'invalid_response' || result.kind === 'invalid_language_response') {
+      openRouterModelCooldowns.set(model, Date.now() + OPENROUTER_INVALID_RESPONSE_COOLDOWN_MS);
     }
     // A documented OpenRouter-wide 429 applies to the whole free account, not one model.
     // Stop model rotation in that case so we do not burn the remaining daily request quota.

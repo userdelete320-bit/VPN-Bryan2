@@ -15,7 +15,9 @@ process.env.NOVITA_API_KEY = 'test-novita-api-key';
 process.env.CLOUDFLARE_API_TOKEN = 'test-cloudflare-api-token';
 process.env.CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
 process.env.NOVA_ENABLED = 'true';
-process.env.NOVA_OPENROUTER_DAILY_LIMIT = '45';
+process.env.NOVA_OPENROUTER_DAILY_LIMIT = '50';
+process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE = '2';
+process.env.NOVA_OPENROUTER_RPM_LIMIT = '20';
 process.env.NOVA_OPENROUTER_MODEL = 'google/gemma-4-26b-a4b-it:free';
 process.env.NOVA_CLOUDFLARE_DAILY_NEURON_LIMIT = '7500';
 
@@ -784,6 +786,8 @@ test('el enrutamiento del bot deja pasar los comandos slash y solo NOVA se añad
 test('NOVA admite varios modelos OpenRouter separados por coma y mantiene el precio estrictamente en cero', async () => {
   const previousModels = process.env.NOVA_OPENROUTER_MODELS;
   const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  const previousMaxAttempts = process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE;
+  process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE = '3';
   process.env.NOVA_OPENROUTER_MODELS = 'NOVA_OPENROUTER_MODELS=dots-studio/dots-3-note-preview:free, particle-ai/particle-1:free, recursive/flint-v1.0:free';
   process.env.NOVA_OPENROUTER_MODEL = '';
   const seen = [];
@@ -821,6 +825,8 @@ test('NOVA admite varios modelos OpenRouter separados por coma y mantiene el pre
     else process.env.NOVA_OPENROUTER_MODELS = previousModels;
     if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
     else process.env.NOVA_OPENROUTER_MODEL = previousModel;
+    if (previousMaxAttempts === undefined) delete process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE;
+    else process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE = previousMaxAttempts;
   }
 });
 
@@ -850,10 +856,108 @@ test('NOVA corrige automáticamente el prefijo accidental NOVA_OPENROUTER_MODEL=
 });
 
 
+
+test('NOVA limita los intentos de modelos OpenRouter por mensaje para proteger el cupo compartido', async () => {
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  const previousMaxAttempts = process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE;
+  process.env.NOVA_OPENROUTER_MODELS = 'test/provider-a:free,test/provider-b:free,test/provider-c:free,test/provider-d:free';
+  process.env.NOVA_OPENROUTER_MODEL = '';
+  process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE = '2';
+process.env.NOVA_OPENROUTER_RPM_LIMIT = '20';
+  const seen = [];
+  global.fetch = async (url, options) => {
+    if (url.includes('openrouter.ai')) {
+      const body = JSON.parse(options.body);
+      seen.push(body);
+      openRouterCalls += 1;
+      return { ok: false, status: 429, async json() { return { error: { code: 429, message: 'Provider returned error', metadata: { limit_source: 'upstream_provider_shared_pool', provider_name: 'test-provider' } } }; } };
+    }
+    if (url.includes('api.z.ai')) {
+      zaiCalls += 1;
+      return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo ayudarte con tu cuenta.' } }] }; } };
+    }
+    throw new Error('URL inesperada');
+  };
+  try {
+    const response = await invokeChat({ authId: '123456768' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(seen.length, 2);
+    assert.ok(seen.every(body => body.max_tokens === 900));
+    assert.ok(seen.every(body => body.provider.max_price.prompt === 0 && body.provider.max_price.completion === 0));
+  } finally {
+    if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+    else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+    if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+    else process.env.NOVA_OPENROUTER_MODEL = previousModel;
+    if (previousMaxAttempts === undefined) delete process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE;
+    else process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE = previousMaxAttempts;
+  }
+});
+
+test('NOVA desactiva el razonamiento de Ling 3.2 para priorizar la respuesta visible', async () => {
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  process.env.NOVA_OPENROUTER_MODELS = 'inclusionai/ling-3.2-flash:free';
+  process.env.NOVA_OPENROUTER_MODEL = '';
+  let sentBody = null;
+  global.fetch = async (url, options) => {
+    assert.match(url, /openrouter\.ai/);
+    sentBody = JSON.parse(options.body);
+    openRouterCalls += 1;
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo ayudarte con tu servicio.' } }] }; } };
+  };
+  try {
+    const response = await invokeChat({ authId: '123456767' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(sentBody.reasoning.enabled, false);
+    assert.equal(sentBody.max_tokens, 900);
+  } finally {
+    if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+    else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+    if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+    else process.env.NOVA_OPENROUTER_MODEL = previousModel;
+  }
+});
+
+test('NOVA diagnostica respuestas 200 vacías sin registrar contenido privado ni razonamiento', async () => {
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  process.env.NOVA_OPENROUTER_MODELS = 'test/reasoning-model:free';
+  process.env.NOVA_OPENROUTER_MODEL = '';
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  global.fetch = async url => {
+    if (url.includes('openrouter.ai')) {
+      openRouterCalls += 1;
+      return { ok: true, status: 200, async json() { return { choices: [{ finish_reason: 'length', message: { content: '', reasoning: 'PRIVATE INTERNAL REASONING' } }], usage: { completion_tokens: 900, completion_tokens_details: { reasoning_tokens: 900 } } }; } };
+    }
+    if (url.includes('api.z.ai')) {
+      zaiCalls += 1;
+      return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo ayudarte con la información de tu cuenta.' } }] }; } };
+    }
+    throw new Error('URL inesperada');
+  };
+  try {
+    const response = await invokeChat({ authId: '123456766' });
+    assert.equal(response.statusCode, 200);
+    assert.ok(warnings.some(line => /finish_reason=length/.test(line)));
+    assert.ok(warnings.some(line => /reasoning_tokens=900/.test(line)));
+    assert.ok(warnings.every(line => !line.includes('PRIVATE INTERNAL REASONING')));
+  } finally {
+    console.warn = originalWarn;
+    if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+    else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+    if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+    else process.env.NOVA_OPENROUTER_MODEL = previousModel;
+  }
+});
+
 test('NOVA no rota a otro modelo cuando el límite 429 pertenece a toda la cuenta OpenRouter', async () => {
   const previousModels = process.env.NOVA_OPENROUTER_MODELS;
   const previousModel = process.env.NOVA_OPENROUTER_MODEL;
-  process.env.NOVA_OPENROUTER_MODELS = 'google/gemma-4-31b-it:free, recursive/flint-v1.0:free';
+  process.env.NOVA_OPENROUTER_MODELS = 'test/account-limited:free, test/account-spare:free';
   process.env.NOVA_OPENROUTER_MODEL = '';
   const seen = [];
   global.fetch = async (url, options) => {
@@ -874,7 +978,7 @@ test('NOVA no rota a otro modelo cuando el límite 429 pertenece a toda la cuent
   try {
     const response = await invokeChat({ authId: '123456770' });
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(seen, ['google/gemma-4-31b-it:free']);
+    assert.deepEqual(seen, ['test/account-limited:free']);
   } finally {
     if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
     else process.env.NOVA_OPENROUTER_MODELS = previousModels;
