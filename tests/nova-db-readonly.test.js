@@ -20,6 +20,8 @@ process.env.NOVA_OPENROUTER_MAX_MODEL_ATTEMPTS_PER_MESSAGE = '2';
 process.env.NOVA_OPENROUTER_RPM_LIMIT = '20';
 process.env.NOVA_OPENROUTER_MODEL = 'google/gemma-4-26b-a4b-it:free';
 process.env.NOVA_CLOUDFLARE_DAILY_NEURON_LIMIT = '7500';
+// Existing provider failover tests explicitly exercise all providers; production defaults to Cloudflare only.
+process.env.NOVA_PROVIDER_ORDER = 'openrouter,zai,novita,cloudflare';
 
 const queryLog = [];
 let dbFailure = false;
@@ -390,7 +392,8 @@ test('NOVA recorre OpenRouter -> Z.AI -> Novita -> Cloudflare y se detiene en el
       callOrder.push('cloudflare');
       cloudflareCalls += 1;
       const body = JSON.parse(options.body);
-      assert.equal(body.model, '@cf/zai-org/glm-4.7-flash');
+      assert.equal(body.model, '@cf/ibm-granite/granite-4.0-h-micro');
+      assert.equal(body.max_tokens, 600);
       assert.equal(body.stream, false);
       return {
         ok: true,
@@ -406,7 +409,7 @@ test('NOVA recorre OpenRouter -> Z.AI -> Novita -> Cloudflare y se detiene en el
   const response = await invokeChat({ authId: '123456780' });
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.success, true);
-  assert.equal(response.body.provider, 'Cloudflare Workers AI');
+  assert.equal(response.body.provider, 'Cloudflare Workers AI · IBM Granite 4.0 H Micro');
   assert.deepEqual(callOrder, ['openrouter', 'zai', 'novita', 'cloudflare']);
   assert.equal(openRouterCalls, before.openRouterCalls + 1);
   assert.equal(zaiCalls, before.zaiCalls + 1);
@@ -574,7 +577,7 @@ test('NOVA puede funcionar solo con Cloudflare cuando no hay clave de OpenRouter
   try {
     const response = await invokeChat({ authId: '123456779' });
     assert.equal(response.statusCode, 200);
-    assert.equal(response.body.provider, 'Cloudflare Workers AI');
+    assert.equal(response.body.provider, 'Cloudflare Workers AI · IBM Granite 4.0 H Micro');
     assert.equal(openRouterCalls, beforeOpenRouter);
     assert.equal(zaiCalls, beforeZai);
     assert.equal(novitaCalls, beforeNovita);
@@ -583,6 +586,41 @@ test('NOVA puede funcionar solo con Cloudflare cuando no hay clave de OpenRouter
     process.env.OPENROUTER_API_KEY = previousOpenRouterKey;
     process.env.ZAI_API_KEY = previousZaiKey;
     process.env.NOVITA_API_KEY = previousNovitaKey;
+  }
+});
+
+
+test('NOVA usa Cloudflare Granite como único proveedor por defecto, incluso si hay otras claves configuradas', async () => {
+  const previousOrder = process.env.NOVA_PROVIDER_ORDER;
+  delete process.env.NOVA_PROVIDER_ORDER;
+  const before = { openRouterCalls, zaiCalls, novitaCalls, cloudflareCalls };
+  let calledUrl = null;
+  let body = null;
+  global.fetch = async (url, options) => {
+    calledUrl = url;
+    body = JSON.parse(options.body);
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { choices: [{ message: { content: 'Puedo ayudarte con los datos de tu cuenta VPN CUBA.' } }] };
+      },
+    };
+  };
+  try {
+    const response = await invokeChat({ authId: '123456772' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.provider, 'Cloudflare Workers AI · IBM Granite 4.0 H Micro');
+    assert.match(calledUrl, /api\.cloudflare\.com\/client\/v4\/accounts\/[a-f0-9]{32}\/ai\/v1\/chat\/completions$/);
+    assert.equal(body.model, '@cf/ibm-granite/granite-4.0-h-micro');
+    assert.equal(body.max_tokens, 600);
+    assert.equal(openRouterCalls, before.openRouterCalls);
+    assert.equal(zaiCalls, before.zaiCalls);
+    assert.equal(novitaCalls, before.novitaCalls);
+    assert.equal(cloudflareCalls, before.cloudflareCalls);
+  } finally {
+    if (previousOrder === undefined) delete process.env.NOVA_PROVIDER_ORDER;
+    else process.env.NOVA_PROVIDER_ORDER = previousOrder;
   }
 });
 
@@ -650,13 +688,15 @@ const telegramResponder = router.respondToTelegramMessage;
 
 test('el chat directo de Telegram usa el mismo motor y consulta solo el Telegram ID del remitente', async () => {
   assert.equal(typeof telegramResponder, 'function');
+  const previousOrder = process.env.NOVA_PROVIDER_ORDER;
+  process.env.NOVA_PROVIDER_ORDER = 'cloudflare';
   const beforeQueries = queryLog.length;
-  const beforeOpenRouter = openRouterCalls;
+  const beforeCloudflare = cloudflareCalls;
   let requestBody = null;
   global.fetch = async (url, options) => {
-    assert.match(url, /openrouter\.ai/);
+    assert.match(url, /api\.cloudflare\.com/);
     requestBody = JSON.parse(options.body);
-    openRouterCalls += 1;
+    cloudflareCalls += 1;
     return {
       ok: true,
       status: 200,
@@ -669,8 +709,8 @@ test('el chat directo de Telegram usa el mismo motor y consulta solo el Telegram
   const result = await telegramResponder('123456789', '¿Qué plan tengo y cómo está mi pago?');
   assert.equal(result.ok, true);
   assert.match(result.reply, /plan Básico/i);
-  assert.equal(result.provider, 'OpenRouter');
-  assert.equal(openRouterCalls, beforeOpenRouter + 1);
+  assert.equal(result.provider, 'Cloudflare Workers AI · IBM Granite 4.0 H Micro');
+  assert.equal(cloudflareCalls, beforeCloudflare + 1);
   assert.match(requestBody.messages[0].content, /"current_plan":"basico"/);
   assert.doesNotMatch(requestBody.messages[0].content, /private_other_customer_plan|999999999|99999/);
 
@@ -680,6 +720,8 @@ test('el chat directo de Telegram usa el mismo motor y consulta solo el Telegram
   assert.equal(userQuery.filters.telegram_id, '123456789');
   assert.equal(paymentsQuery.filters.telegram_id, '123456789');
   assert.equal(newQueries.some(query => ['insert', 'update', 'delete', 'upsert'].some(action => query.actions.includes(action))), false);
+  if (previousOrder === undefined) delete process.env.NOVA_PROVIDER_ORDER;
+  else process.env.NOVA_PROVIDER_ORDER = previousOrder;
 });
 
 

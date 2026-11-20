@@ -172,3 +172,19 @@ NOVA_OPENROUTER_MODELS=baidu/ernie-5.5-flash-preview:free,inclusionai/ling-3.2-f
 ```
 
 No se incluyen los endpoints gratuitos de NVIDIA porque OpenRouter advierte expresamente que no se envíen datos confidenciales ni personales; tampoco se incluye Liquid LFM3 porque su ficha indica que puede conservar prompts y usarlos para entrenamiento. Modelos de audio, generación de imágenes, embeddings, reranking y clasificación no son alternativas adecuadas para el chat de soporte. Dots3-Note Preview tiene retirada anunciada para el 31 de diciembre de 2026.
+
+
+## Configuración recomendada: Cloudflare Workers AI como único proveedor
+
+En Render, establece:
+
+```env
+NOVA_PROVIDER_ORDER=cloudflare
+NOVA_CLOUDFLARE_DAILY_NEURON_LIMIT=8500
+```
+
+NOVA utilizará `@cf/ibm-granite/granite-4.0-h-micro` por la API REST de Cloudflare. No enviará mensajes a OpenRouter, Z.AI ni Novita con esta configuración, aunque sus claves sigan presentes. Para habilitar OpenRouter voluntariamente como respaldo, usa `NOVA_PROVIDER_ORDER=cloudflare,openrouter`; cualquier proveedor externo debe añadirse de forma explícita.
+
+Cloudflare publica 10.000 Neurons gratuitas al día para Workers Free. El límite interno recomendado de 8.500 deja margen para otras llamadas del mismo recurso/cuenta. Granite se factura por neuronas (1.542 por millón de tokens de entrada y 10.158 por millón de salida), así que no es literalmente $0 por millón; el uso de NOVA se mantiene dentro del cupo gratuito mediante el límite interno estimado. En Workers Free, superar los 10.000 Neurons diarios hace que nuevas inferencias fallen; en Workers Paid, el uso por encima del cupo se factura.
+
+La documentación de Cloudflare marca Granite 4.0 H Micro como alojado en Cloudflare, con Zero Data Retention, 131.000 tokens de contexto y llamadas a funciones. El compromiso de Workers AI establece que el contenido de los clientes no se conserva tras procesar inferencias estándar y no se usa para entrenar modelos.

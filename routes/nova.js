@@ -13,19 +13,33 @@ function isCloudflareAccountId(value) {
 }
 
 function providerConfiguration() {
+  const selected = new Set(getProviderOrder());
   return {
-    openrouter: Boolean(process.env.OPENROUTER_API_KEY),
-    zai: Boolean(process.env.ZAI_API_KEY),
-    novita: Boolean(process.env.NOVITA_API_KEY),
-    cloudflare: Boolean(process.env.CLOUDFLARE_API_TOKEN && isCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)),
+    openrouter: selected.has('openrouter') && Boolean(process.env.OPENROUTER_API_KEY),
+    zai: selected.has('zai') && Boolean(process.env.ZAI_API_KEY),
+    novita: selected.has('novita') && Boolean(process.env.NOVITA_API_KEY),
+    cloudflare: selected.has('cloudflare') && Boolean(process.env.CLOUDFLARE_API_TOKEN && isCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)),
   };
+}
+
+// Privacy-first routing: Cloudflare Workers AI is the only default provider.
+// Other providers run only when explicitly listed, e.g. cloudflare,openrouter.
+function getProviderOrder() {
+  const allowed = new Set(['cloudflare', 'openrouter', 'zai', 'novita']);
+  const configured = String(process.env.NOVA_PROVIDER_ORDER || 'cloudflare');
+  const order = [...new Set(configured.split(',').map(item => item.trim().toLowerCase()).filter(item => allowed.has(item)))];
+  return order.length ? order : ['cloudflare'];
+}
+
+function getAvailableProviderOrder(providers = providerConfiguration()) {
+  return getProviderOrder().filter(name => providers[name] === true);
 }
 
 router.get('/status', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   const providers = providerConfiguration();
   res.json({
-    enabled: process.env.NOVA_ENABLED === 'true' && Object.values(providers).some(Boolean),
+    enabled: process.env.NOVA_ENABLED === 'true' && getAvailableProviderOrder(providers).length > 0,
     providers,
   });
 });
@@ -36,7 +50,9 @@ const ZAI_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
 const ZAI_MODEL = 'glm-4.7-flash';
 const NOVITA_URL = 'https://api.novita.ai/v3/openai/chat/completions';
 const NOVITA_MODEL = 'apodex/apodex-1.1-mini';
-const CLOUDFLARE_MODEL = '@cf/zai-org/glm-4.7-flash';
+const CLOUDFLARE_MODEL = '@cf/ibm-granite/granite-4.0-h-micro';
+const CLOUDFLARE_MAX_OUTPUT_TOKENS = 600;
+const CLOUDFLARE_TIMEOUT_MS = 35_000;
 
 function getOpenRouterFreeModels() {
   // Supports both the new comma-separated variable and the old single-model variable.
@@ -82,7 +98,7 @@ const PROVIDER_TIMEOUT_MS = 15_000;
 const OPENROUTER_DAILY_LIMIT = Math.min(50, Math.max(1, Number.parseInt(process.env.NOVA_OPENROUTER_DAILY_LIMIT || '45', 10) || 45));
 const OPENROUTER_RPM_LIMIT = Math.min(20, Math.max(1, Number.parseInt(process.env.NOVA_OPENROUTER_RPM_LIMIT || '18', 10) || 18));
 // Cloudflare Workers AI Free: 10,000 neurons/day. Reserve only 7,500 locally as a safety margin.
-const CLOUDFLARE_DAILY_NEURON_LIMIT = Math.min(8000, Math.max(1000, Number.parseInt(process.env.NOVA_CLOUDFLARE_DAILY_NEURON_LIMIT || '7500', 10) || 7500));
+const CLOUDFLARE_DAILY_NEURON_LIMIT = Math.min(9500, Math.max(1000, Number.parseInt(process.env.NOVA_CLOUDFLARE_DAILY_NEURON_LIMIT || '8500', 10) || 8500));
 const CREATOR_MENTION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const SYSTEM_PROMPT = fs.readFileSync(path.join(__dirname, '..', 'NOVA_MASTER_PROMPT.md'), 'utf8').trim();
@@ -433,10 +449,11 @@ function reserveOpenRouterRequest(now = Date.now()) {
   return null;
 }
 
-function estimateCloudflareNeurons(inputTokens, outputTokens = MAX_OUTPUT_TOKENS) {
-  // Current GLM-4.7-Flash pricing: 5,500 neurons/M input tokens and 36,400/M output tokens.
-  // Apply a 1.5x margin because estimates are not the provider's authoritative token counter.
-  return Math.ceil(((inputTokens * 5500) + (outputTokens * 36400)) / 1_000_000 * 1.5);
+function estimateCloudflareNeurons(inputTokens, outputTokens = CLOUDFLARE_MAX_OUTPUT_TOKENS) {
+  // Cloudflare's published Granite 4.0 H Micro rates: 1,542 neurons/M input
+  // tokens and 10,158 neurons/M output tokens. Apply a 1.5x margin because
+  // the character-based input estimate is not the provider's authoritative counter.
+  return Math.ceil(((inputTokens * 1542) + (outputTokens * 10158)) / 1_000_000 * 1.5);
 }
 
 function reserveCloudflareNeurons(inputTokens, outputTokens = MAX_OUTPUT_TOKENS, now = Date.now()) {
@@ -464,6 +481,8 @@ function extractAssistantText(payload) {
   }
   if (typeof message.output_text === 'string') return message.output_text.trim();
   if (typeof choice?.text === 'string') return choice.text.trim();
+  if (typeof payload?.result?.response === 'string') return payload.result.response.trim();
+  if (typeof payload?.response === 'string') return payload.response.trim();
   return '';
 }
 
@@ -541,9 +560,9 @@ function getSafeProviderError(payload, response = null) {
   };
 }
 
-async function sendChatCompletion({ providerName, url, apiKey, messages, body, extraHeaders = {} }) {
+async function sendChatCompletion({ providerName, url, apiKey, messages, body, extraHeaders = {}, timeoutMs = PROVIDER_TIMEOUT_MS }) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -723,17 +742,18 @@ async function callNovita(messages) {
 async function callCloudflare(messages, estimatedInputTokens) {
   const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID } = process.env;
   if (!CLOUDFLARE_API_TOKEN || !isCloudflareAccountId(CLOUDFLARE_ACCOUNT_ID)) return { ok: false, kind: 'not_configured' };
-  const quota = reserveCloudflareNeurons(estimatedInputTokens);
+  const quota = reserveCloudflareNeurons(estimatedInputTokens, CLOUDFLARE_MAX_OUTPUT_TOKENS);
   if (quota.error) return { ok: false, kind: 'local_limit', code: quota.error };
   const url = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`;
   return sendChatCompletion({
-    providerName: 'Cloudflare Workers AI',
+    providerName: 'Cloudflare Workers AI · IBM Granite 4.0 H Micro',
     url,
     apiKey: CLOUDFLARE_API_TOKEN,
     messages,
+    timeoutMs: CLOUDFLARE_TIMEOUT_MS,
     body: {
       model: CLOUDFLARE_MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: CLOUDFLARE_MAX_OUTPUT_TOKENS,
       temperature: 0.25,
     },
   });
@@ -742,28 +762,22 @@ async function callCloudflare(messages, estimatedInputTokens) {
 async function callConfiguredProviders(messages, estimatedInputTokens) {
   const attempts = [];
   const providers = providerConfiguration();
+  const order = getAvailableProviderOrder(providers);
 
-  // Sequential fallback chain: OpenRouter -> Z.AI -> Novita -> Cloudflare.
-  // Only the first valid Spanish response is returned; providers are never called in parallel.
-  if (providers.openrouter) {
-    const result = await callOpenRouter(messages);
+  // Default: Cloudflare only. Additional providers are opt-in through NOVA_PROVIDER_ORDER.
+  // This prevents customer data from being sent to OpenRouter/Z.AI/Novita unexpectedly.
+  for (const provider of order) {
+    let result;
+    if (provider === 'cloudflare') result = await callCloudflare(messages, estimatedInputTokens);
+    else if (provider === 'openrouter') result = await callOpenRouter(messages);
+    else if (provider === 'zai') result = await callZai(messages);
+    else if (provider === 'novita') result = await callNovita(messages);
+    else continue;
+
     if (result.ok) return result;
-    attempts.push(result);
-  }
-  if (providers.zai) {
-    const result = await callZai(messages);
-    if (result.ok) return result;
-    attempts.push(result);
-  }
-  if (providers.novita) {
-    const result = await callNovita(messages);
-    if (result.ok) return result;
-    attempts.push(result);
-  }
-  if (providers.cloudflare) {
-    const result = await callCloudflare(messages, estimatedInputTokens);
-    if (result.ok) return result;
-    attempts.push(result);
+    attempts.push({ provider, ...result });
+    // A Cloudflare-only setup must fail promptly and transparently; it must not
+    // silently switch to a third party when its preferred private provider fails.
   }
 
   const allLimited = attempts.length > 0 && attempts.every(item => item.kind === 'local_limit' || item.kind === 'rate_limit');
@@ -953,7 +967,7 @@ async function generateNovaReply(telegramId, message, history = []) {
   }
 
   const providers = providerConfiguration();
-  if (!Object.values(providers).some(Boolean)) {
+  if (getAvailableProviderOrder(providers).length === 0) {
     return { ok: false, status: 503, code: 'NOVA_NOT_CONFIGURED', reply: 'NOVA no está configurada. Contacta con @luvnt para recibir asistencia.' };
   }
   if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
@@ -1070,5 +1084,5 @@ async function respondToTelegramMessage(telegramId, message) {
 }
 
 router.respondToTelegramMessage = respondToTelegramMessage;
-router.isEnabled = () => process.env.NOVA_ENABLED === 'true' && Object.values(providerConfiguration()).some(Boolean);
+router.isEnabled = () => process.env.NOVA_ENABLED === 'true' && getAvailableProviderOrder().length > 0;
 module.exports = router;
