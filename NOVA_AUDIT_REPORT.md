@@ -1,71 +1,68 @@
-# Auditoría de NOVA — acceso de solo lectura a Supabase
+# Auditoría de NOVA — versión con prompt maestro y contexto personal ampliado
 
-Fecha de revisión: 2026-11-18
+## Alcance de esta revisión
 
-## Resultado
+Esta revisión actualiza el sistema NOVA que usa cuatro proveedores IA secuenciales y atiende desde el chat privado de Telegram y la Web App. El prompt normativo ahora vive en `NOVA_MASTER_PROMPT.md` y se carga como prompt de sistema desde `routes/nova.js`.
 
-NOVA queda preparada para consultar en tiempo real el perfil del cliente autenticado, sus registros recientes de pagos, el catálogo de precios de los planes estándar y la disponibilidad. Las consultas se ejecutan desde el servidor mediante los métodos `getNovaCustomerSnapshot` y `getNovaPlanCatalog` de `supabase.js`. La nueva ruta solo utiliza operaciones de lectura (`select`, `eq`, `order`, `limit`, `maybeSingle`).
+## Información que NOVA puede consultar
 
-No se ha conectado esta revisión a Supabase de producción ni se ha enviado ningún dato al servidor real. No se ha alterado ninguna tabla. Las pruebas se realizaron con un cliente Supabase simulado y datos ficticios.
+### Datos personales filtrados por el Telegram ID autenticado
 
-## Alcance de lectura y seguridad
+- `users` y `payments`: perfil, plan, pagos y estados propios, usando una lista explícita de campos.
+- `referrals`: cantidades y niveles de referidos propios, estado de pago y descuentos agregados. No se pasan identidades de los referidos.
+- El saldo del monedero de referidos queda desactivado hasta auditar el SQL de `get_referral_wallet`; las cantidades de referidos se consultan directamente desde `referrals` con filtro de propietario.
+- `trial_history`, `xp_log`, `coupon_usage`: historial propio de pruebas, XP y cupones usados.
+- `shop_balances`, `shop_topups`, `shop_orders`: saldo, recargas y pedidos de la propia cuenta.
+- `support_tickets` y mensajes ligados a tickets previamente identificados como propios. Los mensajes se recortan y redactan.
+- `resellers`, `reseller_sales`, `reseller_withdrawals`, `reseller_clients`: estado, ingresos, retiradas y cantidades agregadas del propio revendedor, sin nombres ni IDs de sus clientes.
+- `reseller_clients`: indicador de si el cliente autenticado está vinculado a un revendedor, sin revelar su identidad.
+- `referral_withdrawals`: excluida hasta que se confirme una relación de propiedad segura, pues el código visible solo muestra una consulta global para administración.
 
-- La ruta `POST /api/nova/chat` valida `X-Telegram-Init-Data` con el `BOT_TOKEN`.
-- El ID consultado se extrae del objeto `user` dentro de los datos firmados. Los valores `telegramId` y `customerId` que pudiera enviar el navegador no se utilizan.
-- `users` se filtra por `telegram_id` validado. Se seleccionan solo los campos de estado VIP, plan, velocidades y prueba.
-- `payments` se filtra por el mismo `telegram_id` y obtiene los 25 registros más recientes. Al modelo se le envían como máximo 8, con campos de importe, método, estado y entrega de configuración.
-- `plan_prices` se consulta como catálogo general; NOVA solo utiliza filas que existen realmente en esa tabla, sin importar ni usar valores predeterminados del código.
-- `settings` se consulta por `key=plan_availability`. Un fallo en esta consulta produce un error controlado en lugar de asumir que todos los planes están disponibles.
-- El backend exige `SUPABASE_SERVICE_ROLE_KEY`; la clave permanece en el servidor y no se envía al navegador ni a OpenRouter Free / Cloudflare Workers AI.
-- Si falla cualquier lectura requerida, NOVA responde `503 CUSTOMER_DATA_UNAVAILABLE` y no consulta OpenRouter Free / Cloudflare Workers AI con información incompleta.
-- El contexto enviado a OpenRouter Free / Cloudflare Workers AI no incluye Telegram ID, capturas, notas internas, claves, TXID, datos de otros clientes ni archivos de configuración. El historial enviado por el navegador también se ignora para evitar que se falsifiquen mensajes de asistente con información ajena.
+### Información general permitida
 
-## Precisión de planes y vigencia
+- `plan_prices`: solo filas y precios realmente guardados.
+- `announcements` / `popup_announcement`: avisos públicos activos/vigentes.
+- `settings`: solo `key=plan_availability`.
+- `shop_products`: solo productos activos y campos comerciales seleccionados.
+- `coupons`: solo cupones activos, con stock y fecha de expiración revisados.
+- `reseller_config`: parámetros comerciales permitidos cuando existe un registro propio de revendedor.
+- `announcements` y `popup_announcement`: avisos públicos activos/vigentes.
+- `announcements` y `popup_announcement`: avisos globales activos y vigentes.
 
-NOVA no usa `plan-price-defaults.js`, mapas de precios, etiquetas comerciales, descripciones ni duraciones incrustadas en el código. El nombre/clave de plan se obtiene del campo `plan` de la fila correspondiente en `plan_prices`; los importes se obtienen de los campos guardados en esa fila. Si una fila, moneda o disponibilidad no existe en la base de datos, NOVA no la completa con valores predeterminados. Los precios o características que la interfaz pública pueda mostrar mediante defaults no se ofrecen como datos confirmados por NOVA.
+Los datos privados se consultan en el servidor con filtros exactos. El modelo no recibe credenciales de Supabase, no ejecuta SQL ni decide qué ID consultar. Las lecturas opcionales llevan indicadores de disponibilidad: un fallo de consulta nunca se convierte en «cero» ni en «no existe».
 
-`plan_prices` y `settings` son datos globales del catálogo. Los datos individuales se limitan a la fila del cliente autenticado en `users` y a sus pagos en `payments`, ambas consultas filtradas por el mismo `telegram_id` verificado. El navegador no puede sustituir ese ID desde el body. Además, NOVA ignora el historial de conversación enviado por el navegador porque podría falsificarse para inyectar mensajes que parezcan respuestas anteriores o información de terceros.
+## Exclusiones y protección
 
-NOVA no calcula fechas de vencimiento con periodos escritos en el código. Informa la fecha de entrega cuando figura en un pago propio, pero si Supabase no aporta también una duración confirmada, indica que la vigencia no se puede calcular y deriva a `@luvnt`. El indicador `users.vip` no prueba que el túnel esté conectado; `users.is_active` solo indica si el bot puede enviar mensajes.
+No se envían archivos WireGuard, capturas, notas internas, TXID, direcciones de billeteras, contraseñas, claves API, tokens, secretos, listas globales de usuarios, estadísticas administrativas ni datos individuales de otras personas. Los mensajes de tickets son redactados antes de enviarse al proveedor.
 
-## Archivos modificados / añadidos para esta etapa
+`usdt_payments` queda fuera mientras no exista una relación de propiedad inequívoca y comprobada por Telegram ID. `referral_withdrawals` también permanece excluida porque el código actual solo muestra un lector global administrativo y no confirma su columna de propietario. Tampoco se concede acceso arbitrario a todas las tablas: se permite consultar las tablas útiles y seguras, con filtros por usuario y campos permitidos. Las tablas administrativas o que contengan archivos/configuraciones permanecen excluidas.
 
-- `supabase.js`: añade métodos de lectura con listas de campos permitidos y filtro obligatorio por Telegram ID validado. Rechaza llamadas de NOVA si falta la service-role key.
-- `routes/nova.js`: crea un snapshot de cuenta y catálogo por consulta, construye contexto de datos verificados y lo entrega al modelo. No incorpora acciones de escritura.
-- `plan-price-defaults.js`: permanece para el catálogo público existente; NOVA ya no lo importa ni lo usa como fuente de precios.
-- `index.js`: importa esos mismos defaults compartidos; no cambia las rutas comerciales.
-- `public/app.html`: informa al cliente de la lectura de su propio perfil y del envío de un resumen mínimo al proveedor de IA.
-- `NOVA_SETUP.md`: documenta secretos, fuentes, permisos y limitaciones.
-- `tests/nova-db-readonly.test.js`: pruebas automatizadas simuladas.
+## Reglas comerciales del prompt
 
-## Pruebas locales
+El prompt maestro incorpora la información que proporcionó el propietario sobre planes, WireGuard, Gaming, navegación nacional, procedimientos de compra, recargas USDT, pedidos, reembolsos, renovaciones, referidos, soporte y estilo de atención.
 
-Comando ejecutado: `npm test`
+Los precios vigentes siguen subordinados a `plan_prices`. El lector actual expone `cup`, `mobile`, `usdt`, `stars` y `ton`, pero no una columna `usd`; por eso los importes USD de referencia incluidos en el nuevo texto no se han fijado como precios constantes. Para cotizar en USD, hay que guardar ese valor en Supabase y añadir la columna a la consulta.
 
-Resultado de la suite de NOVA tras esta corrección: 15 pruebas superadas y 0 fallidas. Incluye OpenRouter principal, fallback automático a Cloudflare, modo solo Cloudflare, validación de Telegram, aislamiento entre clientes por Telegram ID, rechazo de historial falso del navegador y protección de solo lectura.
+## Comprobaciones ejecutadas
 
-1. Endpoint de estado indica qué proveedores están configurados sin revelar claves.
-2. Perfil y pagos consultados usando exclusivamente el ID de Telegram validado.
-3. Catálogo con solo filas reales de `plan_prices` y disponibilidad existente en `settings`, sin defaults de código.
-4. No se calcula vencimiento si falta una duración confirmada en Supabase.
-5. Fallo de Supabase devuelve error controlado y no llama a OpenRouter Free / Cloudflare Workers AI.
-6. Una firma Telegram inválida se rechaza antes de consultar DB o proveedores.
-7. Mensaje en inglés se rechaza antes de consultar DB o proveedores.
-8. Una renovación aprobada sin entrega no borra la vigencia de la última configuración entregada.
-9. Un fallo específico en `settings` no se interpreta como disponibilidad confirmada ni llama a proveedores.
-10. OpenRouter 429 activa el fallback a Cloudflare Workers AI y devuelve respuesta.
-11. NOVA funciona con Cloudflare cuando falta la clave de OpenRouter.
-12. La capa simulada bloquea y verifica ausencia de escrituras.
-13. Existen los métodos nuevos de lectura y se verifica que faltan filas = datos ausentes, sin fallback.
-14. Un Telegram ID no recibe los datos de otro cliente, ni siquiera si el navegador envía un ID distinto.
-15. El historial falso enviado por el navegador se ignora y no llega al proveedor.
+- `node --check` para los archivos JavaScript modificados.
+- `npm test`: **22 pruebas superadas, 0 fallidas**.
+- Aislamiento por Telegram ID.
+- Lectura de nuevas secciones personales y filtros de propietario.
+- No filtración de identificadores de referidos/clientes, TXID, direcciones ni material de configuración dentro del contexto simulado.
+- Ninguna operación de escritura ejecutada por el motor NOVA en las pruebas.
+- La cadena OpenRouter → Z.AI → Novita → Cloudflare continúa funcionando en las pruebas de simulación.
+- Los comandos slash existentes y la excepción `/nova` siguen conservados.
 
-También se ejecutaron comprobaciones sintácticas de `routes/nova.js`, `supabase.js` e `index.js`. Pendiente como validación externa: iniciar el proyecto en un entorno de prueba con credenciales reales de Supabase/OpenRouter Free / Cloudflare Workers AI y verificar una cuenta de prueba. Esta validación no se hizo porque el usuario no autorizó acceso a la base de datos/servidor ni proporcionó credenciales.
+## Pendientes antes de producción
 
-## Requisito operativo antes de habilitar
+1. Antes de habilitar el saldo de referidos en NOVA, revisar en Supabase la definición SQL real de `get_referral_wallet`. La función permanece desactivada desde NOVA porque su cuerpo no está versionado; las estadísticas por filas de `referrals` sí están disponibles con filtro de propietario.
+2. Probar con staging y datos ficticios/una cuenta autorizada real; estas pruebas locales no contactan proveedores, Supabase ni Telegram reales.
+3. Revisar condiciones de privacidad de los cuatro proveedores. El contexto de cliente enviado a un proveedor puede haber sido recibido incluso si devuelve timeout; el fallback podría transmitirlo al siguiente.
+4. Mantener `NOVA_ENABLED=false` hasta cerrar estas verificaciones.
 
-Configurar `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` como secretos del servidor. Mantener `NOVA_ENABLED=false` hasta terminar una prueba controlada. OpenRouter usa el alias gratuito `openrouter/free` con filtros `data_collection=deny`, `zdr=true`, `allow_fallbacks=false` y `max_price={prompt:0, completion:0}`; Cloudflare Workers AI (`@cf/zai-org/glm-4.7-flash`) actúa como respaldo. La integración no modifica la base de datos y no conserva historial del chat en Supabase.
+## Archivos normativos
 
-## Anexo — actualización de proveedores (18 de noviembre de 2026)
-
-La versión posterior a esta auditoría amplía el sistema de dos proveedores descrito en este documento a una cadena secuencial de cuatro: OpenRouter → Z.AI (`glm-4.7-flash`) → Novita (`apodex/apodex-1.1-mini`) → Cloudflare Workers AI (`@cf/zai-org/glm-4.7-flash`). La versión ampliada mantiene las restricciones de solo lectura, el filtro por Telegram ID, la validación de Telegram y el enrutamiento de comandos slash; incorpora pruebas simuladas del orden de respaldo. Ver `NOVA_PROVIDERS_REPORT.md` para los detalles actuales. La suite completa de esta versión da 21 pruebas superadas y 0 fallidas. No se han probado las claves externas ni la base de datos de producción.
+- `NOVA_MASTER_PROMPT.md`: prompt maestro de NOVA.
+- `NOVA_SETUP.md`: configuración, proveedores y operación.
+- `NOVA_DB_ACCESS_SCOPE.md`: matriz de tablas, filtros, datos permitidos y exclusiones.

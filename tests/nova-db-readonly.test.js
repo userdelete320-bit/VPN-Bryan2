@@ -60,6 +60,27 @@ const fakeRows = {
     { plan: 'avanzado', cup: 1800, mobile: 900, usdt: 2.8, stars: 270, ton: 3.0, updated_at: '2026-11-16T08:00:00.000Z' },
   ],
   settings: { value: JSON.stringify({ basico: false, avanzado: true }) },
+  referrals: [
+    { referrer_id: '123456789', referred_id: '555000001', level: 1, has_paid: true, discount_used_at: null, created_at: '2026-11-10T10:00:00.000Z', referred_username: 'otro_usuario' },
+    { referrer_id: '999999999', referred_id: '555000002', level: 1, has_paid: true, discount_used_at: null },
+  ],
+  trial_history: [{ telegram_id: '123456789', plan: 'basico', sent_at: '2026-10-01T10:00:00.000Z', auto_sent: true }],
+  xp_log: [{ telegram_id: '123456789', amount: 50, reason: 'actividad', created_at: '2026-11-12T10:00:00.000Z' }],
+  coupon_usage: [{ telegram_id: '123456789', coupon_code: 'CLIENTE10', discount_applied: 10, used_at: '2026-11-12T10:00:00.000Z' }],
+  shop_balances: [{ telegram_id: '123456789', balance_usd: 12.5, updated_at: '2026-11-12T10:00:00.000Z' }],
+  shop_topups: [{ telegram_id: '123456789', amount_usd: 10, currency: 'USDT', network: 'BEP20', status: 'confirmed', requested_at: '2026-11-12T10:00:00.000Z', confirmed_at: '2026-11-12T10:05:00.000Z', txid: '0x' + 'a'.repeat(64), address: 'private-wallet-address' }],
+  shop_orders: [{ telegram_id: '123456789', source: 'catalog', qty: 1, price_charged_usd: 5, status: 'completed', created_at: '2026-11-12T10:00:00.000Z', updated_at: '2026-11-12T10:05:00.000Z', shop_products: { name: 'CapCut' } }],
+  shop_products: [{ active: true, name: 'CapCut', description: 'Suscripción digital', instructions: 'Entrega automática', final_price_usd: 5, stock: 3, min_qty: 1, max_qty: 2, raw_data: 'private raw' }],
+  coupons: [{ code: 'PUBLIC10', discount: 10, stock: 20, expiry: '2027-12-31', description: 'Promoción pública', status: 'active' }],
+  announcements: { active: true, text: 'Promoción oficial vigente', starts_at: '2026-01-01T00:00:00.000Z', ends_at: '2027-01-01T00:00:00.000Z' },
+  popup_announcement: { enabled: true, title: 'Aviso importante', message: 'Consulta el catálogo oficial.' },
+  support_tickets: [{ telegram_id: '123456789', id: 101, category: 'conexión', subject: 'No conecta WireGuard', status: 'in_progress', created_at: '2026-11-10T10:00:00.000Z', updated_at: '2026-11-11T10:00:00.000Z' }],
+  support_messages: [{ ticket_id: 101, sender_type: 'user', message: 'La conexión no inicia. Mi teléfono es +1 305 555 1234. Telegram ID: 999999999 [Interface]\nPrivateKey = secretvalue123456\nAddress = 10.0.0.2/32', created_at: '2026-11-10T10:00:00.000Z' }],
+  resellers: [{ telegram_id: '123456789', id: 7, status: 'active', sales_count: 3, month_sales: 2, earnings_available: 8, pending_withdraw: 2, total_withdrawn: 15, requested_at: '2026-10-01', approved_at: '2026-10-02' }],
+  reseller_sales: [{ reseller_id: 7, plan: 'basico', commission: 2, created_at: '2026-11-10T10:00:00.000Z', client_telegram_id: '999999999', client_username: 'no_revelar' }],
+  reseller_withdrawals: [{ reseller_id: 7, amount: 5, status: 'paid', requested_at: '2026-11-01', resolved_at: '2026-11-02', note: 'interno' }],
+  reseller_clients: [{ reseller_id: 7, id: 1, client_telegram_id: '999999999', client_username: 'no_revelar' }],
+  reseller_config: [{ id: 1, active: true, level_commissions: { level1: 5 }, level_thresholds: { level1: 2 }, min_withdraw: 5, monthly_bonuses: {} }],
 };
 
 class FakeQuery {
@@ -73,7 +94,8 @@ class FakeQuery {
   select(fields) { this.actions.push('select'); this.selection = fields; return this; }
   eq(key, value) { this.filters[key] = String(value); return this; }
   order() { return this; }
-  limit() { return this; }
+  limit(count) { this.limitCount = count; return this; }
+  range(from, to) { this.rangeStart = from; this.rangeEnd = to; return this; }
   insert() { this.actions.push('insert'); throw new Error('NOVA test blocked a database write'); }
   update() { this.actions.push('update'); throw new Error('NOVA test blocked a database write'); }
   delete() { this.actions.push('delete'); throw new Error('NOVA test blocked a database write'); }
@@ -81,7 +103,10 @@ class FakeQuery {
   filteredRows() {
     const rows = fakeRows[this.table];
     if (!Array.isArray(rows)) return rows;
-    return rows.filter(row => Object.entries(this.filters).every(([key, value]) => String(row?.[key]) === value));
+    let filtered = rows.filter(row => Object.entries(this.filters).every(([key, value]) => String(row?.[key]) === value));
+    if (this.rangeStart !== undefined) filtered = filtered.slice(this.rangeStart, this.rangeEnd + 1);
+    else if (this.limitCount !== undefined) filtered = filtered.slice(0, this.limitCount);
+    return filtered;
   }
   maybeSingle() {
     if (dbFailure || (settingsFailure && this.table === 'settings')) return Promise.resolve({ data: null, error: new Error('simulated database failure') });
@@ -95,7 +120,11 @@ class FakeQuery {
   }
 }
 
-const fakeSupabaseClient = { from: (table) => new FakeQuery(table) };
+const rpcCalls = [];
+const fakeSupabaseClient = {
+  from: (table) => new FakeQuery(table),
+  async rpc(name, args) { rpcCalls.push({ name, args }); return { data: { available_balance: 6.5, pending_balance: 1.5 }, error: null }; },
+};
 const expressStub = {
   Router() {
     return {
@@ -255,7 +284,8 @@ test('NOVA entrega solamente filas reales de plan_prices y valores existentes en
   assert.match(prompt, /\"CUP\":945/);
   assert.match(prompt, /\"availability\":\"disponible\"/);
   assert.match(prompt, /\"availability\":\"agotado\"/);
-  assert.doesNotMatch(prompt, /Plan Básico|90 días|Plan Express|PayPal_USD|project_default|valor predeterminado/);
+  assert.match(prompt, /Plan Básico/); // Descripción general autorizada por el prompt maestro.
+  assert.doesNotMatch(prompt, /\$4(?:\.00)?|\$6(?:\.00)?|\$7(?:\.00)?|Plan Express|PayPal_USD|project_default|precio predeterminado/);
   assert.doesNotMatch(prompt, /\"plan\":\"gaming_pro\"/);
 });
 
@@ -298,7 +328,7 @@ test('un cliente no recibe datos del otro y un ID sin perfil no recibe datos aje
   const prompt = capturedProviderBody.messages[0].content;
   assert.match(prompt, /\"registered\":false/);
   assert.doesNotMatch(prompt, /private_other_customer_plan|99999|999999999/);
-  const ownQueries = queryLog.slice(-4).filter(query => ['users', 'payments'].includes(query.table));
+  const ownQueries = queryLog.filter(query => ['users', 'payments'].includes(query.table) && query.filters.telegram_id === '111111111');
   assert.equal(ownQueries.length, 2);
   assert.ok(ownQueries.every(query => query.filters.telegram_id === '111111111'));
 });
@@ -563,6 +593,51 @@ test('el chat directo de Telegram usa el mismo motor y consulta solo el Telegram
   assert.equal(userQuery.filters.telegram_id, '123456789');
   assert.equal(paymentsQuery.filters.telegram_id, '123456789');
   assert.equal(newQueries.some(query => ['insert', 'update', 'delete', 'upsert'].some(action => query.actions.includes(action))), false);
+});
+
+
+test('NOVA puede consultar las secciones propias adicionales sin filtrar datos de terceros ni exponer campos sensibles', async () => {
+  const before = queryLog.length;
+  const beforeRpc = rpcCalls.length;
+  global.fetch = async (url, options) => {
+    capturedProviderBody = JSON.parse(options.body);
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo revisar tus referidos, saldo de tienda, pedidos y tickets con los datos de tu cuenta.' } }] }; } };
+  };
+  const response = await invokeChat({ authId: '123456789' });
+  assert.equal(response.statusCode, 200);
+  const prompt = capturedProviderBody.messages[0].content;
+  assert.match(prompt, /"total_referrals":1/);
+  assert.match(prompt, /"paid_discount_unused":1/);
+  assert.match(prompt, /"available":false/);
+  assert.match(prompt, /monedero de referidos no pudo consultarse/);
+  assert.match(prompt, /"balance_usd":12.5/);
+  assert.match(prompt, /CapCut/);
+  assert.match(prompt, /Promoción oficial vigente/);
+  assert.match(prompt, /Aviso importante/);
+  assert.match(prompt, /No conecta WireGuard/);
+  assert.match(prompt, /"earnings_available":8/);
+  assert.doesNotMatch(prompt, /555000001|otro_usuario|999999999|no_revelar|private-wallet-address|0x[a]{40,64}|"txid"|"address"|"note":"interno"/);
+
+  const reads = queryLog.slice(before);
+  const expectedScoped = {
+    users: 'telegram_id', payments: 'telegram_id', referrals: 'referrer_id', trial_history: 'telegram_id',
+    xp_log: 'telegram_id', coupon_usage: 'telegram_id', shop_balances: 'telegram_id', shop_topups: 'telegram_id',
+    shop_orders: 'telegram_id', support_tickets: 'telegram_id', resellers: 'telegram_id',
+  };
+  for (const [table, ownerField] of Object.entries(expectedScoped)) {
+    const query = reads.find(item => item.table === table);
+    assert.ok(query, `se esperaba lectura de ${table}`);
+    assert.equal(query.filters[ownerField], '123456789', `${table} debe filtrarse por el propietario autenticado`);
+  }
+  const resellerSalesQuery = reads.find(item => item.table === 'reseller_sales');
+  const resellerWithdrawalsQuery = reads.find(item => item.table === 'reseller_withdrawals');
+  const resellerClientsQuery = reads.filter(item => item.table === 'reseller_clients');
+  assert.equal(resellerSalesQuery.filters.reseller_id, '7');
+  assert.equal(resellerWithdrawalsQuery.filters.reseller_id, '7');
+  assert.ok(resellerClientsQuery.some(query => query.filters.reseller_id === '7'));
+  assert.ok(resellerClientsQuery.some(query => query.filters.client_telegram_id === '123456789'));
+  assert.equal(rpcCalls.length, beforeRpc, 'NOVA no invoca RPCs no auditadas porque su definición SQL no está versionada');
+  assert.equal(reads.some(query => ['insert', 'update', 'delete', 'upsert'].some(action => query.actions.includes(action))), false);
 });
 
 test('el chat de Telegram conserva únicamente el historial efímero del mismo remitente', async () => {

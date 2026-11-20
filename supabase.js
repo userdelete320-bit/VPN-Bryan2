@@ -688,10 +688,13 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
     const userId = String(telegramId || '').trim();
     if (!/^\d{5,20}$/.test(userId)) throw new Error('Identificador de cliente inválido');
 
+    // Consultas principales: si fallan, NOVA no debe responder con datos antiguos o inventados.
     const userFields = [
-      'vip', 'plan', 'speed_download', 'speed_upload',
+      'vip', 'plan', 'plan_price', 'vip_since', 'speed_download', 'speed_upload',
       'is_active', 'trial_requested', 'trial_received', 'trial_requested_at',
-      'trial_sent_at', 'trial_plan_type'
+      'trial_sent_at', 'trial_plan_type', 'trial_game_server', 'trial_connection_type',
+      'referrer_id', 'referrer_username', 'referral_discount', 'xp', 'claimed_rewards',
+      'first_name', 'username', 'created_at'
     ].join(',');
 
     const { data: user, error: userError } = await dbClient
@@ -701,13 +704,10 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
       .maybeSingle();
     if (userError) throw userError;
 
-    // Solo columnas que el código de producción crea o actualiza de forma explícita.
-    // No se seleccionan capturas, notas, direcciones, TXID ni archivos de configuración.
     const paymentFields = [
       'plan', 'price', 'original_price', 'method', 'status', 'created_at', 'approved_at',
       'rejected_at', 'config_sent', 'config_sent_at'
     ].join(',');
-
     const { data: payments, error: paymentsError } = await dbClient
       .from('payments')
       .select(paymentFields)
@@ -716,7 +716,173 @@ async updateUserReferralDiscount(telegramId, newDiscount) {
       .limit(25);
     if (paymentsError) throw paymentsError;
 
-    return { user: user || null, payments: payments || [] };
+    // Las lecturas complementarias son independientes: si una tabla opcional no está
+    // disponible, se marca como unavailable (nunca como cero) y no se bloquea NOVA entera.
+    const optionalRead = async (name, read) => {
+      try {
+        const result = await read();
+        if (result?.error) throw result.error;
+        return { available: true, data: result?.data ?? null };
+      } catch (error) {
+        console.warn(`[NOVA DB] Lectura opcional no disponible: ${name} (${error?.code || 'error'}).`);
+        return { available: false, data: null };
+      }
+    };
+    const optionalReadAllPages = async (name, readPage, pageSize = 500, maxRows = 50000) => {
+      const allRows = [];
+      for (let offset = 0; offset < maxRows; offset += pageSize) {
+        const page = await optionalRead(name, () => readPage(offset, offset + pageSize - 1));
+        if (!page.available || !Array.isArray(page.data)) return { available: false, data: null };
+        allRows.push(...page.data);
+        if (page.data.length < pageSize) return { available: true, data: allRows };
+      }
+      // Do not provide a partial aggregate as if it were the total.
+      console.warn(`[NOVA DB] Se alcanzó el límite de paginación de ${name}; la sección se marcará como no disponible.`);
+      return { available: false, data: null };
+    };
+
+    const reads = await Promise.all([
+      optionalReadAllPages('referrals', (from, to) => dbClient.from('referrals')
+        .select('level,has_paid,discount_used_at,created_at')
+        .eq('referrer_id', userId).order('created_at', { ascending: false }).range(from, to)),
+      optionalRead('trial_history', () => dbClient.from('trial_history')
+        .select('plan,sent_at,auto_sent').eq('telegram_id', userId)
+        .order('sent_at', { ascending: false }).limit(20)),
+      optionalRead('xp_log', () => dbClient.from('xp_log')
+        .select('amount,reason,created_at').eq('telegram_id', userId)
+        .order('created_at', { ascending: false }).limit(20)),
+      optionalRead('coupon_usage', () => dbClient.from('coupon_usage')
+        .select('coupon_code,discount_applied,used_at').eq('telegram_id', userId)
+        .order('used_at', { ascending: false }).limit(20)),
+      optionalRead('shop_balances', () => dbClient.from('shop_balances')
+        .select('balance_usd,updated_at').eq('telegram_id', userId).maybeSingle()),
+      optionalRead('shop_topups', () => dbClient.from('shop_topups')
+        .select('amount_usd,currency,network,status,requested_at,confirmed_at')
+        .eq('telegram_id', userId).order('requested_at', { ascending: false }).limit(20)),
+      optionalRead('shop_orders', () => dbClient.from('shop_orders')
+        .select('source,qty,price_charged_usd,status,created_at,updated_at,shop_products(name)')
+        .eq('telegram_id', userId).order('created_at', { ascending: false }).limit(20)),
+      optionalRead('shop_products', () => dbClient.from('shop_products')
+        .select('name,description,instructions,final_price_usd,stock,min_qty,max_qty,active')
+        .eq('active', true).order('name', { ascending: true }).limit(100)),
+      optionalRead('coupons', () => dbClient.from('coupons')
+        .select('code,discount,stock,expiry,description,status')
+        .eq('status', 'active').order('created_at', { ascending: false }).limit(50)),
+      optionalRead('announcements', () => dbClient.from('announcements')
+        .select('text,active,starts_at,ends_at').eq('id', 1).maybeSingle()),
+      optionalRead('popup_announcement', () => dbClient.from('popup_announcement')
+        .select('enabled,title,message').eq('id', 1).maybeSingle()),
+      optionalRead('support_tickets', () => dbClient.from('support_tickets')
+        .select('id,category,subject,status,created_at,updated_at')
+        .eq('telegram_id', userId).order('updated_at', { ascending: false }).limit(10)),
+      optionalRead('resellers', () => dbClient.from('resellers')
+        .select('id,status,sales_count,month_sales,earnings_available,pending_withdraw,total_withdrawn,requested_at,approved_at')
+        .eq('telegram_id', userId).maybeSingle()),
+      optionalRead('reseller_clients', () => dbClient.from('reseller_clients')
+        .select('id').eq('client_telegram_id', userId).maybeSingle()),
+    ]);
+
+    const [referrals, trialHistory, xpLog, couponUsage, shopBalance, shopTopups, shopOrders,
+      shopProducts, activeCoupons, announcements, popupAnnouncement, supportTickets, resellerRead, linkedReseller] = reads;
+
+    // NOVA no invoca RPCs de Supabase cuya definición SQL no esté versionada y auditada.
+    // Así se garantiza que este flujo no ejecute funciones con posibles efectos secundarios.
+    const referralWallet = { available: false, data: null };
+
+    const asRows = (read) => read.available && Array.isArray(read.data) ? read.data : [];
+    const supportRows = asRows(supportTickets);
+    const supportThreads = {};
+    let supportMessagesAvailable = true;
+    // Cada ticket ya fue seleccionado con telegram_id autenticado. Solo se leen mensajes
+    // asociados a esos IDs de ticket propios; se descartan roles distintos de user/admin.
+    for (const ticket of supportRows) {
+      const thread = await optionalRead(`support_messages#${ticket.id}`, () => dbClient
+        .from('support_messages')
+        .select('ticket_id,sender_type,message,created_at')
+        .eq('ticket_id', ticket.id)
+        .order('created_at', { ascending: true }).limit(30));
+      if (!thread.available) supportMessagesAvailable = false;
+      supportThreads[String(ticket.id)] = thread.available && Array.isArray(thread.data)
+        ? thread.data.filter(row => row.sender_type === 'user' || row.sender_type === 'admin')
+        : [];
+    }
+
+    const reseller = resellerRead.available ? resellerRead.data : null;
+    let resellerSalesRead = { available: !reseller, data: [] };
+    let resellerWithdrawalsRead = { available: !reseller, data: [] };
+    let resellerClientsRead = { available: !reseller, data: [] };
+    let resellerConfigRead = { available: !reseller, data: null };
+    if (reseller?.id != null) {
+      [resellerSalesRead, resellerWithdrawalsRead, resellerClientsRead, resellerConfigRead] = await Promise.all([
+        optionalReadAllPages('reseller_sales', (from, to) => dbClient.from('reseller_sales')
+          .select('plan,commission,created_at').eq('reseller_id', reseller.id)
+          .order('created_at', { ascending: false }).range(from, to)),
+        optionalRead('reseller_withdrawals', () => dbClient.from('reseller_withdrawals')
+          .select('amount,status,requested_at,resolved_at').eq('reseller_id', reseller.id)
+          .order('requested_at', { ascending: false }).limit(30)),
+        optionalReadAllPages('reseller_clients', (from, to) => dbClient.from('reseller_clients')
+          .select('id').eq('reseller_id', reseller.id).range(from, to)),
+        optionalRead('reseller_config', () => dbClient.from('reseller_config')
+          .select('active,level_commissions,level_thresholds,min_withdraw,monthly_bonuses')
+          .eq('id', 1).maybeSingle()),
+      ]);
+    }
+
+    const couponRows = asRows(activeCoupons).filter(row => {
+      if (row.stock != null && Number(row.stock) <= 0) return false;
+      if (row.expiry && Number.isFinite(Date.parse(row.expiry)) && Date.parse(row.expiry) < Date.now()) return false;
+      return true;
+    });
+    const shopBalanceData = shopBalance.available ? shopBalance.data : null;
+
+    return {
+      user: user || null,
+      payments: payments || [],
+      referrals: asRows(referrals),
+      trial_history: asRows(trialHistory),
+      xp_log: asRows(xpLog),
+      coupon_usage: asRows(couponUsage),
+      shop_balance: shopBalanceData,
+      shop_topups: asRows(shopTopups),
+      shop_orders: asRows(shopOrders),
+      shop_products: asRows(shopProducts),
+      active_coupons: couponRows,
+      announcement: announcements.available ? announcements.data : null,
+      popup_announcement: popupAnnouncement.available ? popupAnnouncement.data : null,
+      support_tickets: supportRows,
+      support_threads: supportThreads,
+      referral_wallet: null,
+      reseller: reseller || null,
+      reseller_sales: asRows(resellerSalesRead),
+      reseller_withdrawals: asRows(resellerWithdrawalsRead),
+      reseller_client_count: asRows(resellerClientsRead).length,
+      reseller_config: resellerConfigRead.available ? resellerConfigRead.data : null,
+      linked_to_reseller: Boolean(linkedReseller.available && linkedReseller.data),
+      coverage: {
+        user: true,
+        payments: true,
+        referrals: referrals.available,
+        trial_history: trialHistory.available,
+        xp_log: xpLog.available,
+        coupon_usage: couponUsage.available,
+        shop_balances: shopBalance.available,
+        shop_topups: shopTopups.available,
+        shop_orders: shopOrders.available,
+        shop_products: shopProducts.available,
+        coupons: activeCoupons.available,
+        announcements: announcements.available,
+        popup_announcement: popupAnnouncement.available,
+        support_tickets: supportTickets.available,
+        support_messages: supportMessagesAvailable,
+        referral_wallet: false,
+        resellers: resellerRead.available,
+        reseller_sales: resellerSalesRead.available,
+        reseller_withdrawals: resellerWithdrawalsRead.available,
+        reseller_clients: resellerClientsRead.available,
+        reseller_config: resellerConfigRead.available,
+        linked_to_reseller: linkedReseller.available,
+      },
+    };
   },
 
   // El catálogo de NOVA lee exclusivamente precios administrativos actuales y

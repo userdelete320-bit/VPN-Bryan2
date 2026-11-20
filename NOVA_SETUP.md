@@ -18,6 +18,10 @@ Si un proveedor no está configurado, responde con error HTTP, límite de uso, t
 Los identificadores de modelo para Z.AI, Novita y Cloudflare están fijados en el código para evitar que una variable de entorno seleccione accidentalmente un modelo facturable. Si un proveedor cambia sus precios o retira el modelo, el proveedor puede devolver error y NOVA continuará con el siguiente. Verifica periódicamente las fichas oficiales antes de producción.
 
 
+## Prompt maestro oficial
+
+El texto normativo de NOVA se mantiene en `NOVA_MASTER_PROMPT.md` y se carga como prompt de sistema. Los precios y estados variables del prompt siempre quedan subordinados a los valores actuales de Supabase.
+
 ## Conversación directa por Telegram
 
 - En el chat privado del bot, cualquier mensaje de texto normal que no esté siendo utilizado por un flujo existente de compra, búsqueda, comprobante, recarga o administración se envía a NOVA.
@@ -28,7 +32,7 @@ Los identificadores de modelo para Z.AI, Novita y Cloudflare están fijados en e
 - La conversación reciente de cada Telegram ID se conserva solo en memoria del proceso durante un máximo de 30 minutos. No se guarda en Supabase y no se comparte entre usuarios.
 - El webhook de Telegram se configura con `secret_token`; el endpoint `/webhook` rechaza peticiones que no incluyan el encabezado secreto esperado. Si `TELEGRAM_WEBHOOK_SECRET` no está configurado, el servidor deriva un secreto estable del `BOT_TOKEN`. El secreto nunca se envía al cliente.
 
-La única función que obtiene información privada es `respondToTelegramMessage`, que recibe el ID del remitente proporcionado por el contexto de Telegram después de recibir el update por el webhook validado. El servidor vuelve a leer el perfil y los pagos desde Supabase para ese ID en cada mensaje.
+La única función que obtiene información privada es `respondToTelegramMessage`, que recibe el ID del remitente del contexto confiable del bot de Telegram o de `initData` firmado y validado en la Web App. El servidor vuelve a consultar en modo de solo lectura los datos de cuenta y las secciones pertinentes de Supabase en cada mensaje. Nunca entrega credenciales de Supabase al modelo.
 
 ## Crear las claves
 
@@ -97,14 +101,41 @@ OpenRouter recibe `data_collection=deny` y `zdr=true` por solicitud; si no hay e
 
 El servidor consulta en modo exclusivamente lectura los datos del cliente autenticado en Telegram y el catálogo. No se envían el Telegram ID, notas internas, capturas, claves, TXID, direcciones ni archivos de configuración. El resumen de pagos (importe, método, estado y fecha) y el plan del cliente sí se transmiten al proveedor que genere la respuesta para dar atención personalizada. El proveedor que responda procesará ese contexto; no actives la función si no aceptas esa transferencia. La redacción automática de mensajes es una protección adicional, no una garantía para detectar todos los datos sensibles.
 
-## Datos de Supabase consultados
+## Acceso a Supabase y aislamiento por cliente
 
-- `users`: consulta del registro cuyo `telegram_id` coincide exactamente con el ID autenticado.
-- `payments`: hasta 25 registros recientes filtrados por el mismo `telegram_id`. Se remiten al modelo solo los últimos 8 y campos permitidos; nunca capturas, notas, TXID ni archivos de conexión.
-- `plan_prices`: catálogo general. NOVA muestra exclusivamente filas y valores realmente guardados en esta tabla; no utiliza `plan-price-defaults.js` ni ningún fallback del código.
-- `settings` (`key=plan_availability`): disponibilidad general. Si no existe el valor o falla la consulta, la disponibilidad queda sin confirmar y NOVA no llama al modelo cuando la consulta falla.
+El modelo no tiene una conexión directa a Supabase, no recibe claves y no puede ejecutar SQL. `supabase.js` realiza lecturas controladas en el servidor con `SUPABASE_SERVICE_ROLE_KEY`, exige que la clave de servicio exista y filtra cada tabla privada usando el Telegram ID autenticado. Los datos opcionales llevan una marca de cobertura; una lectura fallida se marca como no disponible y nunca se interpreta como saldo cero, cero referidos o ausencia de actividad.
 
-La cuenta consultada se determina únicamente por el Telegram ID extraído de `X-Telegram-Init-Data` y su firma validada con `BOT_TOKEN`. El cliente no puede sustituir ese ID desde el cuerpo de la solicitud. Los datos de `users` y `payments` siempre usan ese mismo filtro. `plan_prices` y `settings` son datos generales de la empresa y no contienen consultas de cuentas ajenas. NOVA no permite consultar terceros.
+**Límite conocido de precios:** el esquema que utiliza actualmente `getNovaPlanCatalog()` expone `cup`, `mobile`, `usdt`, `stars` y `ton`, pero no una columna `usd`. Por eso los valores de USD incluidos como referencia en el texto del usuario no se han copiado como precios fijos al prompt. Para que NOVA cotice 4/6/7 USD como precios vigentes, esos importes deben guardarse en una columna USD de `plan_prices` y luego añadirse a la consulta. Mientras no exista ese dato, NOVA no debe confirmar precios USD.
+
+### Datos privados consultados para el Telegram ID autenticado
+
+- `users`: campos permitidos del propio perfil, plan, velocidades registradas, pruebas, XP, recompensas y relación de referido. No se envía el Telegram ID ni campos de contacto/credenciales.
+- `payments`: hasta 25 pagos propios; se remiten al modelo solo los últimos 8 y campos permitidos. No se envían capturas, notas, TXID ni archivos.
+- `referrals`: solo filas con `referrer_id` igual al Telegram ID autenticado. Se calculan totales por nivel, pagos y descuentos agregados. Nunca se envían los IDs, nombres o usuarios de las personas referidas.
+- El monedero de referidos no se consulta todavía desde NOVA: la función RPC existente no tiene su definición SQL versionada/auditada y se deja desactivada para garantizar solo lectura.
+- `trial_history`, `xp_log`, `coupon_usage`: solo filas con el mismo Telegram ID.
+- `shop_balances`, `shop_topups`, `shop_orders`: solo filas propias. Se omiten direcciones, TXID y datos de pago sensibles.
+- `support_tickets`: solo tickets propios; `support_messages` se consulta únicamente por IDs de tickets previamente verificados como propiedad del usuario y se limita a roles user/admin. Los textos se recortan y redactan antes de enviarlos al modelo.
+- `resellers`: solo el registro cuyo `telegram_id` coincide con el cliente. `reseller_sales`, `reseller_withdrawals` y `reseller_clients` se consultan solo por el `reseller_id` obtenido de ese registro. El modelo recibe cifras agregadas, no nombres, Telegram IDs ni operaciones de clientes del revendedor.
+- `reseller_clients` también permite comprobar si el propio usuario está vinculado a un revendedor; no se transmite la identidad del revendedor.
+
+### Datos generales públicos permitidos
+
+- `plan_prices`: filas reales de precios vigentes.
+- `settings`: solo la clave `plan_availability`.
+- `shop_products`: solo productos activos y campos comerciales seguros.
+- `coupons`: solo cupones activos, con stock disponible y no vencidos.
+- `reseller_config`: campos de configuración comercial permitidos cuando el cliente tiene un registro propio de revendedor.
+
+### Tablas excluidas de la IA
+
+No se entregan a los modelos archivos de configuración WireGuard ni sus URLs/rutas (`config_files`, `plan_files`, `trial_files`), capturas, buckets de almacenamiento, claves, tokens, contraseñas, direcciones de billetera, TXID, notas administrativas, listas globales de usuarios, historiales globales, estadísticas administrativas, ni filas de terceros. `usdt_payments` no se utiliza para atribuir operaciones personales mientras no exista un vínculo de propietario inequívoco y validado por Telegram ID. Las consultas a tablas no filtrables de forma segura quedan fuera.
+
+`plan_prices`, `settings`, `shop_products` y cupones activos son catálogo público; no habilitan acceso a la cuenta de otros clientes. Las consultas privadas se realizan en el servidor y no se permite al modelo cambiar filtros ni IDs.
+
+### Transferencia a proveedores
+
+El proveedor que responda recibe el contexto mínimo construido para esa consulta. Si una solicitud se envió a un proveedor y expira, es posible que el proveedor haya recibido el contenido aunque no devolviera respuesta; el siguiente proveedor podría recibirlo también al ejecutarse el fallback. Revisa los términos de cada proveedor, limita los campos transmitidos y no actives NOVA con clientes reales hasta aprobar la política de privacidad/consentimiento aplicable.
 
 ## Activación gradual y pruebas
 
