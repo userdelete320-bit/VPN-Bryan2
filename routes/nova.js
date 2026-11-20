@@ -31,19 +31,42 @@ router.get('/status', (_req, res) => {
 });
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_OPENROUTER_MODEL = 'openrouter/free';
+const DEFAULT_OPENROUTER_MODELS = ['baidu/ernie-5.5-flash-preview:free'];
 const ZAI_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
 const ZAI_MODEL = 'glm-4.7-flash';
-const NOVITA_URL = 'https://api.novita.ai/openai/v1/chat/completions';
+const NOVITA_URL = 'https://api.novita.ai/v3/openai/chat/completions';
 const NOVITA_MODEL = 'apodex/apodex-1.1-mini';
 const CLOUDFLARE_MODEL = '@cf/zai-org/glm-4.7-flash';
 
-function getOpenRouterFreeModel() {
-  const requested = String(process.env.NOVA_OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL).trim();
-  // Never send a paid model ID from environment configuration.
-  return requested === DEFAULT_OPENROUTER_MODEL || requested.endsWith(':free')
-    ? requested
-    : DEFAULT_OPENROUTER_MODEL;
+function getOpenRouterFreeModels() {
+  // Supports both the new comma-separated variable and the old single-model variable.
+  // Some dashboards paste the full KEY=value line into the value field; strip that prefix.
+  const configured = process.env.NOVA_OPENROUTER_MODELS || process.env.NOVA_OPENROUTER_MODEL || '';
+  let raw = String(configured).trim().replace(/^\uFEFF/, '');
+  const stripQuotes = value => String(value || '').trim()
+    .replace(/^(?:\"([\s\S]*)\"|'([\s\S]*)')$/, (_match, doubleQuoted, singleQuoted) => doubleQuoted ?? singleQuoted ?? '')
+    .trim();
+  const stripAssignment = value => stripQuotes(stripQuotes(value)
+    .replace(/^NOVA_OPENROUTER_MODELS?\s*=\s*/i, ''));
+  raw = stripAssignment(raw);
+
+  const requested = raw
+    ? raw.split(',').map(stripAssignment).filter(Boolean)
+    : [...DEFAULT_OPENROUTER_MODELS];
+  const freeModelPattern = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*:free$/i;
+  const unique = [];
+  for (const model of requested) {
+    // Only accept explicit free variants. The request also carries a hard $0 price ceiling.
+    if (!freeModelPattern.test(model)) continue;
+    if (!unique.includes(model)) unique.push(model);
+    if (unique.length >= 8) break;
+  }
+
+  if (!unique.length) {
+    console.warn('[NOVA] NOVA_OPENROUTER_MODELS no contiene IDs :free válidos; se usará el modelo gratuito predeterminado.');
+    return [...DEFAULT_OPENROUTER_MODELS];
+  }
+  return unique;
 }
 const MAX_MESSAGE_CHARS = 1200;
 const MAX_HISTORY_MESSAGES = 8;
@@ -364,6 +387,9 @@ function buildNovaDatabaseContext(customerSnapshot, planCatalog, now = Date.now(
 const requestBuckets = new Map();
 const creatorMentionedUsers = new Map();
 let openRouterQuota = { day: new Date().toISOString().slice(0, 10), requests: 0, minute: Math.floor(Date.now() / 60_000), requestsThisMinute: 0 };
+const openRouterModelCooldowns = new Map();
+const OPENROUTER_MODEL_COOLDOWN_MS = 60_000;
+const OPENROUTER_INVALID_MODEL_COOLDOWN_MS = 15 * 60_000;
 let cloudflareQuota = { day: new Date().toISOString().slice(0, 10), neurons: 0 };
 let activeRequests = 0;
 
@@ -489,6 +515,8 @@ async function sendChatCompletion({ providerName, url, apiKey, messages, body, e
         kind: response.status === 429 ? 'rate_limit' : response.status === 401 || response.status === 403 ? 'authentication_error' : 'http_error',
         status: response.status,
         providerCode: diagnostic.code,
+        limitSource: diagnostic.limitSource,
+        upstreamProvider: diagnostic.upstreamProvider,
       };
     }
     const reply = extractAssistantText(payload);
@@ -508,29 +536,65 @@ async function sendChatCompletion({ providerName, url, apiKey, messages, body, e
 
 async function callOpenRouter(messages) {
   if (!process.env.OPENROUTER_API_KEY) return { ok: false, kind: 'not_configured' };
-  const quotaError = reserveOpenRouterRequest();
-  if (quotaError) return { ok: false, kind: 'local_limit', code: quotaError };
+
   const extraHeaders = { 'X-Title': process.env.OPENROUTER_APP_NAME || 'VPN CUBA NOVA' };
   if (process.env.OPENROUTER_SITE_URL) extraHeaders['HTTP-Referer'] = process.env.OPENROUTER_SITE_URL;
-  return sendChatCompletion({
-    providerName: 'OpenRouter',
-    url: OPENROUTER_URL,
-    apiKey: process.env.OPENROUTER_API_KEY,
-    messages,
-    extraHeaders,
-    body: {
-      model: getOpenRouterFreeModel(),
-      max_tokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.25,
-      // The selected :free model may only have free endpoints that do not advertise ZDR.
-      // Requiring zdr/data_collection=deny here can make OpenRouter return 404 even when
-      // the model exists. Keep a strict $0 ceiling so no paid endpoint can be selected.
-      provider: {
-        allow_fallbacks: true,
-        max_price: { prompt: 0, completion: 0 },
+  const models = getOpenRouterFreeModels();
+  const attempted = [];
+
+  for (const model of models) {
+    const cooldownUntil = openRouterModelCooldowns.get(model) || 0;
+    if (cooldownUntil > Date.now()) continue;
+    if (cooldownUntil) openRouterModelCooldowns.delete(model);
+
+    const quotaError = reserveOpenRouterRequest();
+    if (quotaError) return { ok: false, kind: 'local_limit', code: quotaError, attempted };
+
+    const result = await sendChatCompletion({
+      providerName: `OpenRouter ${model}`,
+      url: OPENROUTER_URL,
+      apiKey: process.env.OPENROUTER_API_KEY,
+      messages,
+      extraHeaders,
+      body: {
+        model,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        temperature: 0.25,
+        // Hard ceiling: OpenRouter may only select endpoints with $0 input AND $0 output.
+        provider: {
+          allow_fallbacks: true,
+          max_price: { prompt: 0, completion: 0 },
+        },
       },
-    },
-  });
+    });
+
+    if (result.ok) {
+      openRouterModelCooldowns.delete(model);
+      return { ...result, provider: 'OpenRouter', model };
+    }
+
+    attempted.push({ model, kind: result.kind, status: result.status || null });
+    // A broken/saturated model should not be retried for every customer message.
+    if (result.status === 400 || result.status === 404) {
+      openRouterModelCooldowns.set(model, Date.now() + OPENROUTER_INVALID_MODEL_COOLDOWN_MS);
+    } else if ((result.status === 429 && String(result.limitSource || '').startsWith('upstream_provider'))
+      || result.status >= 500 || result.kind === 'timeout' || result.kind === 'connection_error' || result.kind === 'invalid_response') {
+      // Only cool a model for an upstream-provider 429. A generic OpenRouter 429
+      // may be an account-wide limit, so cooling one model would hide useful diagnostics.
+      openRouterModelCooldowns.set(model, Date.now() + OPENROUTER_MODEL_COOLDOWN_MS);
+    }
+    // A documented OpenRouter-wide 429 applies to the whole free account, not one model.
+    // Stop model rotation in that case so we do not burn the remaining daily request quota.
+    if (result.status === 429 && String(result.limitSource || '').startsWith('openrouter_')) {
+      return { ...result, attempted };
+    }
+    // Authentication errors affect the shared OpenRouter key, not this individual model.
+    if (result.kind === 'authentication_error') return { ...result, attempted };
+  }
+
+  if (!attempted.length) return { ok: false, kind: 'models_in_cooldown', attempted };
+  const allRateLimited = attempted.every(item => item.kind === 'rate_limit');
+  return { ok: false, kind: allRateLimited ? 'rate_limit' : 'models_unavailable', status: allRateLimited ? 429 : 503, attempted };
 }
 
 // GLM Flash free accounts can enforce a very low concurrent-request limit.

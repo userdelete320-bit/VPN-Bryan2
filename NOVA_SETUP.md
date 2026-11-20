@@ -6,9 +6,9 @@ NOVA está conectada al chat privado directo del bot de Telegram y también cons
 
 NOVA utiliza una cadena de respaldo **secuencial**. No hace cuatro llamadas a la vez: se detiene en el primer proveedor que devuelve una respuesta válida en español.
 
-1. **OpenRouter (primario)** — endpoint OpenAI-compatible. `NOVA_OPENROUTER_MODEL=openrouter/free`; se conservan `provider.max_price.prompt=0` y `provider.max_price.completion=0`, además de los filtros de retención ya configurados. En el nivel gratuito OpenRouter publica 20 solicitudes/minuto y 50/día; NOVA limita localmente a 18/minuto y 45/día.
+1. **OpenRouter (primario)** — endpoint OpenAI-compatible. `NOVA_OPENROUTER_MODELS` admite varios IDs `:free` separados por comas y prueba el siguiente cuando uno falla. Cada llamada envía `provider.max_price.prompt=0` y `provider.max_price.completion=0`; solo se aceptan IDs terminados en `:free`. También se admite temporalmente la variable singular `NOVA_OPENROUTER_MODEL` por compatibilidad. En el nivel gratuito OpenRouter publica 20 solicitudes/minuto y 50/día; NOVA limita localmente a 18/minuto y 45/día.
 2. **Z.AI (segundo respaldo)** — modelo fijo `glm-4.7-flash`, endpoint `https://api.z.ai/api/paas/v4/chat/completions`, clave `ZAI_API_KEY`. La tabla oficial consultada muestra entrada y salida a $0 por millón de tokens. Esto no equivale a capacidad ilimitada: la cuota y la disponibilidad dependen de la cuenta y de las condiciones vigentes del proveedor.
-3. **Novita (tercer respaldo)** — modelo fijo `apodex/apodex-1.1-mini`, endpoint `https://api.novita.ai/openai/chat/completions`, clave `NOVITA_API_KEY`. La ficha oficial del modelo muestra entrada y salida a $0 por millón de tokens y documenta compatibilidad OpenAI. Novita no publica en esa ficha un límite diario que permita garantizar 3.000 respuestas.
+3. **Novita (tercer respaldo)** — modelo fijo `apodex/apodex-1.1-mini`, endpoint `https://api.novita.ai/v3/openai/chat/completions`, clave `NOVITA_API_KEY`. La ficha oficial del modelo muestra entrada y salida a $0 por millón de tokens y documenta compatibilidad OpenAI. Novita no publica en esa ficha un límite diario que permita garantizar 3.000 respuestas.
 4. **Cloudflare Workers AI (último respaldo)** — modelo `@cf/zai-org/glm-4.7-flash`, con la asignación gratuita de 10.000 Neurons/día en Workers Free. NOVA reserva localmente hasta 7.500 Neurons estimadas/día y aplica margen de seguridad. El consumo de Neurons no equivale a un número fijo de solicitudes.
 
 Si un proveedor no está configurado, responde con error HTTP, límite de uso, tiempo de espera, fallo de conexión o una respuesta vacía/no válida/en otro idioma, NOVA continúa al siguiente. Una respuesta válida detiene la cadena. Si todos fallan, NOVA ofrece el contacto humano sin exponer detalles internos ni claves.
@@ -65,7 +65,7 @@ La tarifa publicada del modelo muestra entrada y salida gratuitas. La cuota de s
 1. Crea o utiliza una cuenta de [Novita AI](https://novita.ai/).
 2. Genera una API key en el panel de la plataforma.
 3. Guarda la clave en el secreto de servidor `NOVITA_API_KEY`.
-4. El código llama a `https://api.novita.ai/openai/chat/completions` con el modelo fijo `apodex/apodex-1.1-mini`.
+4. El código llama a `https://api.novita.ai/v3/openai/chat/completions` con el modelo fijo `apodex/apodex-1.1-mini`.
 
 La ficha oficial del modelo muestra entrada y salida a $0 por millón de tokens y documenta la API compatible con OpenAI. La ficha no establece un máximo diario garantizado de solicitudes; revisa la cuota y las condiciones en tu cuenta antes de producción.
 
@@ -87,7 +87,7 @@ Usa `.env.example` como referencia y configura:
 ```env
 NOVA_ENABLED=false
 OPENROUTER_API_KEY=...
-NOVA_OPENROUTER_MODEL=openrouter/free
+NOVA_OPENROUTER_MODELS=baidu/ernie-5.5-flash-preview:free,inclusionai/ling-3.2-flash:free,dots-studio/dots-3-note-preview:free,particle-ai/particle-1:free,recursive/flint-v1.0:free,google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free
 OPENROUTER_SITE_URL=https://vpn-cuba.com
 OPENROUTER_APP_NAME=VPN CUBA NOVA
 NOVA_OPENROUTER_DAILY_LIMIT=45
@@ -159,3 +159,16 @@ Los contadores de cuota de esta versión son locales al proceso Node. Si desplie
 NOVA lee la cuenta y el catálogo, pero no escribe datos. No activa, renueva ni cancela servicios; no aprueba pagos; no modifica saldos; no entrega configuraciones; no diagnostica el estado técnico de los túneles. NOVA no calcula ningún vencimiento mientras la duración aplicable no esté disponible como dato verificado en Supabase. Tampoco afirma descripciones o características de planes que no existan en los datos consultados.
 
 Las pruebas incluidas son simuladas: no contactan APIs externas ni Supabase real. Verifican también que el filtro por Telegram ID excluye registros de otros clientes, que el navegador no puede inyectar historial falso y que NOVA no usa precios predeterminados, descripciones ni duraciones incrustadas en el código. Las cuentas y claves reales deben validarse en staging antes de activar el chat en producción.
+
+
+### Modelos gratuitos de OpenRouter para NOVA
+
+Todos los modelos de la lista se invocan por el mismo endpoint de OpenRouter (`https://openrouter.ai/api/v1/chat/completions`) y la misma `OPENROUTER_API_KEY`; no se configura ni se necesita una clave API de Baidu, inclusionAI, Dots Studio, Particle, Recursive o Google. Cada modelo puede estar alojado por su proveedor de inferencia a través de OpenRouter, pero NOVA no llama directamente a las API de esos proveedores. La lista recomendada usa únicamente variantes `:free` de chat y se enruta por la API de OpenRouter con `OPENROUTER_API_KEY`. El código fuerza un máximo de 0 USD tanto para entrada como para salida y omite modelos que no terminen en `:free`. La variable plural acepta hasta ocho IDs separados por comas. En Render, escribe únicamente los IDs en el campo **Value**; no incluyas `NOVA_OPENROUTER_MODELS=` dentro del valor. El parser elimina ese prefijo si se pega por error.
+
+Lista inicial recomendada (los dos modelos Gemma van al final porque ya se observó saturación del grupo compartido de Google):
+
+```env
+NOVA_OPENROUTER_MODELS=baidu/ernie-5.5-flash-preview:free,inclusionai/ling-3.2-flash:free,dots-studio/dots-3-note-preview:free,particle-ai/particle-1:free,recursive/flint-v1.0:free,google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free
+```
+
+No se incluyen los endpoints gratuitos de NVIDIA porque OpenRouter advierte expresamente que no se envíen datos confidenciales ni personales; tampoco se incluye Liquid LFM3 porque su ficha indica que puede conservar prompts y usarlos para entrenamiento. Modelos de audio, generación de imágenes, embeddings, reranking y clasificación no son alternativas adecuadas para el chat de soporte. Dots3-Note Preview tiene retirada anunciada para el 31 de diciembre de 2026.

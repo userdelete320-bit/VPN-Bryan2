@@ -467,6 +467,10 @@ test('NOVA reintenta una sola vez Z.AI cuando responde con código 1305', async 
 
 test('NOVA registra el origen y el proveedor de un HTTP 429 de OpenRouter', async () => {
   const beforeZai = zaiCalls;
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  process.env.NOVA_OPENROUTER_MODELS = '';
+  process.env.NOVA_OPENROUTER_MODEL = 'baidu/ernie-5.5-flash-preview:free';
   const warnings = [];
   const originalWarn = console.warn;
   console.warn = (...args) => warnings.push(args.join(' '));
@@ -492,7 +496,7 @@ test('NOVA registra el origen y el proveedor de un HTTP 429 de OpenRouter', asyn
     const response = await invokeChat({ authId: '123456773' });
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.provider, 'Z.AI GLM-4.7-Flash');
-    const warning = warnings.find(line => line.includes('OpenRouter devolvió HTTP 429')) || '';
+    const warning = warnings.find(line => line.includes('OpenRouter baidu/ernie-5.5-flash-preview:free devolvió HTTP 429')) || '';
     assert.match(warning, /origen upstream_provider_shared_pool/);
     assert.match(warning, /proveedor Google AI Studio/);
     assert.match(warning, /Retry-After 3s/);
@@ -500,11 +504,19 @@ test('NOVA registra el origen y el proveedor de un HTTP 429 de OpenRouter', asyn
     assert.equal(zaiCalls, beforeZai + 1);
   } finally {
     console.warn = originalWarn;
+    if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+    else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+    if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+    else process.env.NOVA_OPENROUTER_MODEL = previousModel;
   }
 });
 
 test('NOVA usa Novita después de fallos de OpenRouter y Z.AI, sin llamar a Cloudflare si Novita responde', async () => {
   const before = { openRouterCalls, zaiCalls, novitaCalls, cloudflareCalls };
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  process.env.NOVA_OPENROUTER_MODELS = '';
+  process.env.NOVA_OPENROUTER_MODEL = 'inclusionai/ling-3.2-flash:free';
   const order = [];
   global.fetch = async (url, options) => {
     if (url.includes('openrouter.ai')) {
@@ -515,7 +527,7 @@ test('NOVA usa Novita después de fallos de OpenRouter y Z.AI, sin llamar a Clou
       order.push('zai'); zaiCalls += 1;
       return { ok: false, status: 503, async json() { return { error: 'unavailable' }; } };
     }
-    assert.equal(url, 'https://api.novita.ai/openai/v1/chat/completions');
+    assert.equal(url, 'https://api.novita.ai/v3/openai/chat/completions');
     order.push('novita'); novitaCalls += 1;
     assert.equal(JSON.parse(options.body).model, 'apodex/apodex-1.1-mini');
     return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo revisar la información registrada de tu cuenta.' } }] }; } };
@@ -528,6 +540,10 @@ test('NOVA usa Novita después de fallos de OpenRouter y Z.AI, sin llamar a Clou
   assert.equal(zaiCalls, before.zaiCalls + 1);
   assert.equal(novitaCalls, before.novitaCalls + 1);
   assert.equal(cloudflareCalls, before.cloudflareCalls);
+  if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+  else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+  if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+  else process.env.NOVA_OPENROUTER_MODEL = previousModel;
 });
 
 test('NOVA puede funcionar solo con Cloudflare cuando no hay clave de OpenRouter', async () => {
@@ -762,4 +778,107 @@ test('el enrutamiento del bot deja pasar los comandos slash y solo NOVA se añad
   assert.match(indexSource, /else \{ await sendTelegramNovaReply\(ctx, text\); \}/);
   assert.match(indexSource, /x-telegram-bot-api-secret-token/);
   assert.match(indexSource, /setWebhook\(webhookUrl, \{ secret_token: TELEGRAM_WEBHOOK_SECRET \}\)/);
+});
+
+
+test('NOVA admite varios modelos OpenRouter separados por coma y mantiene el precio estrictamente en cero', async () => {
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  process.env.NOVA_OPENROUTER_MODELS = 'NOVA_OPENROUTER_MODELS=dots-studio/dots-3-note-preview:free, particle-ai/particle-1:free, recursive/flint-v1.0:free';
+  process.env.NOVA_OPENROUTER_MODEL = '';
+  const seen = [];
+  global.fetch = async (url, options) => {
+    assert.match(url, /openrouter\.ai\/api\/v1\/chat\/completions/);
+    const body = JSON.parse(options.body);
+    seen.push(body);
+    openRouterCalls += 1;
+    assert.deepEqual(body.provider.max_price, { prompt: 0, completion: 0 });
+    assert.equal(body.provider.allow_fallbacks, true);
+    if (body.model === 'dots-studio/dots-3-note-preview:free') {
+      return { ok: false, status: 404, async json() { return { error: { code: 404, message: 'model not found' } }; } };
+    }
+    if (body.model === 'particle-ai/particle-1:free') {
+      return {
+        ok: false,
+        status: 429,
+        async json() { return { error: { code: 429, message: 'Provider returned error', metadata: { limit_source: 'upstream_provider_shared_pool', provider_name: 'Particle AI' } } }; },
+      };
+    }
+    assert.equal(body.model, 'recursive/flint-v1.0:free');
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo ayudarte con los datos verificados de tu cuenta.' } }] }; } };
+  };
+  try {
+    const response = await invokeChat({ authId: '123456772' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.provider, 'OpenRouter');
+    assert.deepEqual(seen.map(item => item.model), [
+      'dots-studio/dots-3-note-preview:free',
+      'particle-ai/particle-1:free',
+      'recursive/flint-v1.0:free',
+    ]);
+  } finally {
+    if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+    else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+    if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+    else process.env.NOVA_OPENROUTER_MODEL = previousModel;
+  }
+});
+
+test('NOVA corrige automáticamente el prefijo accidental NOVA_OPENROUTER_MODEL= dentro del valor', async () => {
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  process.env.NOVA_OPENROUTER_MODELS = '';
+  process.env.NOVA_OPENROUTER_MODEL = 'NOVA_OPENROUTER_MODEL=inclusionai/ling-3.2-flash:free';
+  let sentBody = null;
+  global.fetch = async (url, options) => {
+    assert.match(url, /openrouter\.ai\/api\/v1\/chat\/completions/);
+    sentBody = JSON.parse(options.body);
+    openRouterCalls += 1;
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Tu consulta puede ser atendida con los datos disponibles.' } }] }; } };
+  };
+  try {
+    const response = await invokeChat({ authId: '123456771' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(sentBody.model, 'inclusionai/ling-3.2-flash:free');
+    assert.deepEqual(sentBody.provider.max_price, { prompt: 0, completion: 0 });
+  } finally {
+    if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+    else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+    if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+    else process.env.NOVA_OPENROUTER_MODEL = previousModel;
+  }
+});
+
+
+test('NOVA no rota a otro modelo cuando el límite 429 pertenece a toda la cuenta OpenRouter', async () => {
+  const previousModels = process.env.NOVA_OPENROUTER_MODELS;
+  const previousModel = process.env.NOVA_OPENROUTER_MODEL;
+  process.env.NOVA_OPENROUTER_MODELS = 'google/gemma-4-31b-it:free, recursive/flint-v1.0:free';
+  process.env.NOVA_OPENROUTER_MODEL = '';
+  const seen = [];
+  global.fetch = async (url, options) => {
+    if (url.includes('openrouter.ai')) {
+      const body = JSON.parse(options.body);
+      seen.push(body.model);
+      openRouterCalls += 1;
+      return {
+        ok: false,
+        status: 429,
+        async json() { return { error: { code: 429, message: 'Free-tier limit reached', metadata: { limit_source: 'openrouter_free_tier_per_minute' } } }; },
+      };
+    }
+    assert.ok(url.includes('api.z.ai'));
+    zaiCalls += 1;
+    return { ok: true, status: 200, async json() { return { choices: [{ message: { content: 'Puedo ayudarte con tu consulta.' } }] }; } };
+  };
+  try {
+    const response = await invokeChat({ authId: '123456770' });
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(seen, ['google/gemma-4-31b-it:free']);
+  } finally {
+    if (previousModels === undefined) delete process.env.NOVA_OPENROUTER_MODELS;
+    else process.env.NOVA_OPENROUTER_MODELS = previousModels;
+    if (previousModel === undefined) delete process.env.NOVA_OPENROUTER_MODEL;
+    else process.env.NOVA_OPENROUTER_MODEL = previousModel;
+  }
 });
